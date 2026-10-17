@@ -3,6 +3,7 @@ import SwiftUI
 struct MenuContentView: View {
     let manager: DisplayManager
     let loginItem: LoginItem
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -47,6 +48,10 @@ struct MenuContentView: View {
 
             HStack {
                 Button("Monitore neu suchen") { manager.refresh(force: true) }
+                Button("Diagnose …") {
+                    openWindow(id: DiagnosticsView.windowID)
+                    NSApplication.shared.activate()
+                }
                 Spacer()
                 Button("Beenden") { NSApplication.shared.terminate(nil) }
                     .keyboardShortcut("q")
@@ -73,9 +78,12 @@ private struct MonitorRow: View {
                 value: Binding(get: { monitor.brightness }, set: { manager.setBrightness($0, for: monitor.id) }),
                 isEnabled: monitor.isAdjustable
             )
+            if let connection {
+                Label(connection, systemImage: monitor.intermediary == .dock ? "dock.rectangle" : "cable.connector")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             switch monitor.state {
-            case .ready:
-                EmptyView()
             case .probing:
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.mini)
@@ -83,22 +91,45 @@ private struct MonitorRow: View {
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            case .noResponse where monitor.isBuiltIn:
+            case _ where monitor.usesSoftwareDimming:
+                hint("\(softwareReason) Software-Dimmung aktiv.", systemImage: "circle.lefthalf.filled", color: .secondary, retry: true)
+            case _ where monitor.isBuiltIn && monitor.state.isFailure:
                 hint("Helligkeit lässt sich gerade nicht lesen oder setzen.", retry: true)
-            case .noResponse:
-                hint("Monitor antwortet nicht. DDC/CI im Monitor-Menü aktivieren.", retry: true)
             case .noChannel where monitor.isBuiltIn:
                 hint("macOS erlaubt für dieses Display keine Helligkeitssteuerung.", retry: false)
-            case .noChannel:
-                hint("Kein DDC-Kanal gefunden. Adapter oder Dock lassen DDC evtl. nicht durch.", retry: false)
+            default:
+                // Externe Monitore mit DDC-Fehler laufen per Software-Dimmung (oben).
+                EmptyView()
             }
         }
     }
 
-    private func hint(_ text: String, retry: Bool) -> some View {
+    /// „Über Dock (Realtek)“; `nil` bei direktem Anschluss.
+    private var connection: String? {
+        guard let intermediary = monitor.intermediary else { return nil }
+        let vendor = monitor.branchVendor.map { " (\($0))" } ?? ""
+        return switch intermediary {
+        case .dock: "Über Dock\(vendor)"
+        case .adapter: "Über Adapter\(vendor)"
+        }
+    }
+
+    private var softwareReason: String {
+        switch (monitor.intermediary, monitor.state) {
+        case (.dock, _): "DDC kommt über das Dock nicht durch."
+        case (.adapter, _): "DDC kommt über den Adapter nicht durch."
+        case (nil, .nullReply): "Monitor antwortet leer – DDC/CI im Monitor-Menü aus?"
+        case (nil, .i2cTimeout): "DDC-Verbindung blockiert."
+        case (nil, .ioError(let status)): "I2C-Fehler \(IOReturnDescription.name(status))."
+        case (nil, .noChannel): "Kein DDC-Kanal gefunden."
+        case (nil, _): "Monitor reagiert nicht auf DDC/CI."
+        }
+    }
+
+    private func hint(_ text: String, systemImage: String = "exclamationmark.triangle.fill", color: Color = .orange, retry: Bool) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
+            Image(systemName: systemImage)
+                .foregroundStyle(color)
             Text(text)
                 .fixedSize(horizontal: false, vertical: true)
             if retry {

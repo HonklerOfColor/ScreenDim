@@ -1,10 +1,17 @@
+import CoreGraphics
 import Foundation
 import Synchronization
 
 /// I2C-Kanal ohne Hardware: zeichnet Writes auf und liefert vorbereitete Antworten.
 final class MockTransport: I2CTransport {
+    enum Event: Equatable {
+        case write([UInt8])
+        case read
+    }
+
     private struct State {
         var written: [[UInt8]] = []
+        var events: [(event: Event, at: ContinuousClock.Instant)] = []
         var writeResults: [DDCError?] = []
         var replies: [Result<[UInt8], DDCError>] = []
     }
@@ -19,6 +26,7 @@ final class MockTransport: I2CTransport {
     }
 
     var written: [[UInt8]] { state.withLock { $0.written } }
+    var events: [(event: Event, at: ContinuousClock.Instant)] { state.withLock { $0.events } }
 
     func enqueueWriteResult(_ error: DDCError?) {
         state.withLock { $0.writeResults.append(error) }
@@ -32,6 +40,7 @@ final class MockTransport: I2CTransport {
         blocker?.wait()
         let error = state.withLock { state -> DDCError? in
             state.written.append(bytes)
+            state.events.append((.write(bytes), .now))
             return state.writeResults.isEmpty ? nil : state.writeResults.removeFirst()
         }
         if let error { throw error }
@@ -39,9 +48,61 @@ final class MockTransport: I2CTransport {
 
     func read(count: Int) throws(DDCError) -> [UInt8] {
         let reply = state.withLock { state in
-            state.replies.isEmpty ? .failure(.readFailed(-1)) : state.replies.removeFirst()
+            state.events.append((.read, .now))
+            return state.replies.isEmpty ? .failure(.readFailed(-1)) : state.replies.removeFirst()
         }
         return try reply.get()
+    }
+}
+
+/// Steuerkanal ohne DDC-Schicht für DisplayManager-Tests.
+final class StubControl: DDCControlling {
+    private struct State {
+        var readResult: Result<VCPReading, DDCError>
+        var reads = 0
+        var writes: [UInt16] = []
+    }
+
+    private let state: Mutex<State>
+
+    init(read: Result<VCPReading, DDCError> = .success(VCPReading(current: 50, maximum: 100))) {
+        state = Mutex(State(readResult: read))
+    }
+
+    var reads: Int { state.withLock { $0.reads } }
+    var writes: [UInt16] { state.withLock { $0.writes } }
+
+    func setRead(_ result: Result<VCPReading, DDCError>) {
+        state.withLock { $0.readResult = result }
+    }
+
+    func read(_ code: VCPCode) async throws(DDCError) -> VCPReading {
+        let result = state.withLock { state in
+            state.reads += 1
+            return state.readResult
+        }
+        return try result.get()
+    }
+
+    func write(_ code: VCPCode, value: UInt16) async throws(DDCError) {
+        state.withLock { $0.writes.append(value) }
+    }
+}
+
+/// Software-Dimmung ohne Gamma-Tabellen: merkt sich nur, was gesetzt würde.
+@MainActor
+final class StubDimmer: SoftwareDimming {
+    private(set) var levels: [CGDirectDisplayID: Double] = [:]
+    private(set) var reapplied = 0
+
+    nonisolated init() {}
+
+    func apply(_ levels: [CGDirectDisplayID: Double]) {
+        self.levels = levels
+    }
+
+    func reapply() {
+        reapplied += 1
     }
 }
 
@@ -75,9 +136,12 @@ extension DDCTiming {
     static let immediate = DDCTiming(
         commandGap: .zero,
         replyDelay: .zero,
+        nullReplyDelay: .zero,
         retryDelay: .zero,
         readAttempts: 3,
         writeAttempts: 2,
+        writeRepeats: 1,
+        writeRepeatGap: .zero,
         deadline: .seconds(5)
     )
 }
@@ -93,4 +157,18 @@ enum Replies {
     }
 
     static let null: [UInt8] = [0x6E, 0x80, 0xBE, 0, 0, 0, 0, 0, 0, 0, 0]
+}
+
+/// Wartet (mit Obergrenze), bis eine Bedingung gilt. Läuft in der Isolation des Aufrufers.
+func eventually(
+    isolation: isolated (any Actor)? = #isolation,
+    timeout: Duration = .seconds(3),
+    _ condition: () async -> Bool
+) async -> Bool {
+    let end = ContinuousClock.now.advanced(by: timeout)
+    while ContinuousClock.now < end {
+        if await condition() { return true }
+        try? await Task.sleep(for: .milliseconds(5))
+    }
+    return await condition()
 }

@@ -27,6 +27,14 @@ final class IOAVServiceTransport: I2CTransport, @unchecked Sendable {
         self.service = service
     }
 
+    /// Sucht den `DCPAVServiceProxy` über seine RegistryEntryID.
+    convenience init?(registryEntryID: UInt64) {
+        let entry = IOServiceGetMatchingService(kIOMainPortDefault, IORegistryEntryIDMatching(registryEntryID))
+        guard entry != 0 else { return nil }
+        defer { IOObjectRelease(entry) }
+        self.init(registryEntry: entry)
+    }
+
     func write(_ bytes: [UInt8]) throws(DDCError) {
         let status = bytes.withUnsafeBytes { buffer in
             api.writeI2C(service, DDCPacket.chipAddress, DDCPacket.hostSubaddress, buffer.baseAddress!, UInt32(buffer.count))

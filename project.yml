@@ -54,15 +54,17 @@ targets:
       - sdk: Carbon.framework
       - sdk: ServiceManagement.framework
 
-  # Die DDC-Schicht wird direkt in das Test-Bundle kompiliert. So laufen die Tests
-  # ohne Host-App: kein Menüleisten-Start, keine echten I2C-Zugriffe, keine
-  # Library-Validation-Probleme mit der Hardened Runtime.
+  # DDC- und Display-Schicht werden direkt in das Test-Bundle kompiliert. So laufen
+  # die Tests ohne Host-App: kein Menüleisten-Start, keine echten I2C-Zugriffe, keine
+  # Library-Validation-Probleme mit der Hardened Runtime. Der DisplayManager bekommt in
+  # den Tests Discovery und Kanäle von außen.
   ScreenDimTests:
     type: bundle.unit-test
     platform: macOS
     sources:
       - path: ScreenDimTests
       - path: ScreenDim/DDC
+      - path: ScreenDim/Display
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.andreastrabi.ScreenDim.tests

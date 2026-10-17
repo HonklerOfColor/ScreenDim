@@ -11,6 +11,12 @@ struct ScreenDimApp: App {
             MenuContentView(manager: appDelegate.manager, loginItem: appDelegate.loginItem)
         }
         .menuBarExtraStyle(.window)
+
+        Window("ScreenDim Diagnose", id: DiagnosticsView.windowID) {
+            DiagnosticsView(manager: appDelegate.manager)
+        }
+        .defaultLaunchBehavior(.suppressed)
+        .windowResizability(.contentMinSize)
     }
 }
 
@@ -35,5 +41,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         hotKeys.unregisterAll()
+        manager.stop()
     }
 }

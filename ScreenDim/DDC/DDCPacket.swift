@@ -27,6 +27,33 @@ enum DDCError: Error, Equatable, Sendable {
     case timeout
     /// Auf dem I2C-Kanal hängen bereits zu viele Aufrufe.
     case busy
+    /// Ein früherer I2C-Aufruf hängt noch im Kernel; der Kanal nimmt bis zu dessen
+    /// Rückkehr nichts an.
+    case hung
+
+    /// Der IOReturn-Code, falls der Fehler von IOKit stammt.
+    var ioReturn: Int32? {
+        switch self {
+        case .writeFailed(let status), .readFailed(let status): status
+        default: nil
+        }
+    }
+}
+
+extension DDCError: CustomStringConvertible {
+    var description: String {
+        switch self {
+        case .writeFailed(let status): "writeFailed(\(IOReturnDescription.describe(status)))"
+        case .readFailed(let status): "readFailed(\(IOReturnDescription.describe(status)))"
+        case .nullReply: "nullReply"
+        case .malformedReply: "malformedReply"
+        case .checksumMismatch: "checksumMismatch"
+        case .unsupportedCode(let code): "unsupportedCode(0x\(String(format: "%02X", code)))"
+        case .timeout: "timeout"
+        case .busy: "busy"
+        case .hung: "hung"
+        }
+    }
 }
 
 /// Paketaufbau nach DDC/CI 1.1.
