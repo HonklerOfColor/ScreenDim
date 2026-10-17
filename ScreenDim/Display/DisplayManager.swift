@@ -5,7 +5,7 @@ import os
 
 private let log = Logger(subsystem: "com.andreastrabi.ScreenDim", category: "ddc")
 
-/// Hält die externen Monitore, ihren DDC-Zustand und ihre Helligkeit.
+/// Hält die Displays (eingebautes und externe), ihren Steuerzustand und ihre Helligkeit.
 @MainActor
 @Observable
 final class DisplayManager {
@@ -15,7 +15,8 @@ final class DisplayManager {
         case ready
         /// Kanal vorhanden, aber der Monitor antwortet nicht (DDC/CI aus, busy, Fehler).
         case noResponse
-        /// In der IORegistry wurde kein DDC-Kanal für diesen Monitor gefunden.
+        /// Kein Steuerkanal: extern kein DDC-Kanal in der IORegistry, intern lehnt
+        /// DisplayServices ab.
         case noChannel
     }
 
@@ -23,6 +24,7 @@ final class DisplayManager {
         let id: CGDirectDisplayID
         let name: String
         let storageKey: String
+        let isBuiltIn: Bool
         /// 0…100
         var brightness: Double
         var state: DDCState
@@ -67,29 +69,42 @@ final class DisplayManager {
     /// Sucht die Monitore neu. Ohne `force` passiert nur etwas, wenn sich die Menge der
     /// angeschlossenen Monitore geändert hat (Auflösungswechsel lösen ebenfalls Callbacks aus).
     func refresh(force: Bool) {
-        let displays = DisplayDiscovery.externalDisplays()
+        let displays = DisplayDiscovery.displays()
         let identities = Dictionary(uniqueKeysWithValues: displays.map { ($0.id, $0.identity) })
         guard force || identities != knownIdentities else { return }
 
         knownIdentities = identities
         generation += 1
         channels = [:]
+        for display in displays {
+            if let control = Self.makeControl(for: display) {
+                channels[display.id] = makeChannel(for: display.id, control: control)
+            }
+        }
         monitors = displays.map { display in
             Monitor(
                 id: display.id,
                 name: display.name,
                 storageKey: display.identity.storageKey,
-                brightness: store.brightness(for: display.identity.storageKey) ?? 50,
-                state: display.transport == nil ? .noChannel : .probing
+                isBuiltIn: display.isBuiltIn,
+                brightness: display.isBuiltIn ? 50 : store.brightness(for: display.identity.storageKey) ?? 50,
+                state: channels[display.id] == nil ? .noChannel : .probing
             )
         }
-        log.notice("Monitore: \(displays.map { "\($0.name) [\($0.id)] Kanal: \($0.transport != nil)" }.joined(separator: ", "), privacy: .public)")
+        log.notice("Displays: \(displays.map { "\($0.name) [\($0.id)] Kanal: \(self.channels[$0.id] != nil)" }.joined(separator: ", "), privacy: .public)")
 
-        for display in displays {
-            guard let transport = display.transport else { continue }
-            channels[display.id] = makeChannel(for: display.id, transport: transport)
-            let generation = generation
-            Task { await probe(display.id, generation: generation) }
+        let generation = generation
+        for id in channels.keys {
+            Task { await probe(id, generation: generation) }
+        }
+    }
+
+    private static func makeControl(for display: DiscoveredDisplay) -> (any DDCControlling)? {
+        switch display.kind {
+        case .builtIn:
+            BuiltInDisplayControl(displayID: display.id)
+        case .external(let transport):
+            transport.map { DDCService(transport: $0, label: "\(display.id)") }
         }
     }
 
@@ -129,7 +144,10 @@ final class DisplayManager {
         let value = Self.clamp(percent)
         guard monitors[index].brightness != value else { return }
         monitors[index].brightness = value
-        store.setBrightness(value, for: monitors[index].storageKey)
+        // Das eingebaute Display merkt sich macOS selbst.
+        if !monitors[index].isBuiltIn {
+            store.setBrightness(value, for: monitors[index].storageKey)
+        }
         channel.throttle.submit(Self.raw(fromPercent: value, maximum: channel.maximum))
     }
 
@@ -140,47 +158,65 @@ final class DisplayManager {
     }
 
     func stepAll(by delta: Double) {
-        for monitor in monitors where monitor.isAdjustable {
-            setBrightness(monitor.brightness + delta, for: monitor.id)
+        Task {
+            // Das eingebaute Display kann sich über Helligkeitstasten oder Auto-Helligkeit
+            // geändert haben; erst den echten Wert holen, dann relativ verstellen.
+            await syncBuiltInBrightness()
+            for monitor in monitors where monitor.isAdjustable {
+                setBrightness(monitor.brightness + delta, for: monitor.id)
+            }
         }
     }
 
-    // MARK: - DDC
+    /// Übernimmt den aktuellen Wert des eingebauten Displays, sofern gerade kein eigener
+    /// Write aussteht.
+    func syncBuiltInBrightness() async {
+        for monitor in monitors where monitor.isBuiltIn && monitor.state == .ready {
+            guard let channel = channels[monitor.id], channel.throttle.isIdle,
+                  let reading = try? await channel.control.read(.brightness),
+                  channel.throttle.isIdle, let index = index(of: monitor.id)
+            else { continue }
+            monitors[index].brightness = Self.percent(fromRaw: reading.current, maximum: channel.maximum)
+        }
+    }
+
+    // MARK: - Steuerkanal
 
     @MainActor
     private final class Channel {
-        let ddc: any DDCControlling
+        /// DDCService (extern) oder BuiltInDisplayControl (eingebaut).
+        let control: any DDCControlling
         let throttle: LatestValueThrottle<UInt16>
         var maximum: UInt16 = 100
 
-        init(ddc: any DDCControlling, throttle: LatestValueThrottle<UInt16>) {
-            self.ddc = ddc
+        init(control: any DDCControlling, throttle: LatestValueThrottle<UInt16>) {
+            self.control = control
             self.throttle = throttle
         }
     }
 
-    private func makeChannel(for id: CGDirectDisplayID, transport: any I2CTransport) -> Channel {
-        let ddc: any DDCControlling = DDCService(transport: transport, label: "\(id)")
+    private func makeChannel(for id: CGDirectDisplayID, control: any DDCControlling) -> Channel {
         let throttle = LatestValueThrottle<UInt16>(interval: .milliseconds(50)) { [weak self] raw in
             do throws(DDCError) {
-                try await ddc.write(.brightness, value: raw)
+                try await control.write(.brightness, value: raw)
             } catch {
                 log.error("Write \(raw) an Display \(id) fehlgeschlagen: \(String(describing: error), privacy: .public)")
                 self?.markNoResponse(id)
             }
         }
-        return Channel(ddc: ddc, throttle: throttle)
+        return Channel(control: control, throttle: throttle)
     }
 
-    /// Liest die aktuelle Helligkeit (mit Retry) und stellt danach den gespeicherten Wert her.
+    /// Liest die aktuelle Helligkeit (mit Retry) und stellt bei externen Monitoren danach
+    /// den gespeicherten Wert her.
     private func probe(_ id: CGDirectDisplayID, generation: Int) async {
-        guard let channel = channels[id], let storageKey = monitors.first(where: { $0.id == id })?.storageKey else { return }
-        let saved = store.brightness(for: storageKey)
+        guard let channel = channels[id], let monitor = monitors.first(where: { $0.id == id }) else { return }
+        let saved = monitor.isBuiltIn ? nil : store.brightness(for: monitor.storageKey)
 
         var reading: VCPReading?
-        for round in 1...2 where reading == nil {
+        for round in 1...(monitor.isBuiltIn ? 1 : 2) where reading == nil {
             do throws(DDCError) {
-                reading = try await channel.ddc.read(.brightness)
+                reading = try await channel.control.read(.brightness)
             } catch {
                 log.error("Read Helligkeit Display \(id), Runde \(round): \(String(describing: error), privacy: .public)")
                 if case .unsupportedCode = error { break }

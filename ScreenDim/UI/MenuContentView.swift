@@ -7,7 +7,7 @@ struct MenuContentView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if manager.monitors.isEmpty {
-                Label("Kein externer Monitor gefunden", systemImage: "display.trianglebadge.exclamationmark")
+                Label("Kein Display gefunden", systemImage: "display.trianglebadge.exclamationmark")
                     .foregroundStyle(.secondary)
             } else {
                 if manager.monitors.count > 1 {
@@ -54,7 +54,10 @@ struct MenuContentView: View {
         }
         .padding(14)
         .frame(width: 320)
-        .onAppear { loginItem.reload() }
+        .onAppear {
+            loginItem.reload()
+            Task { await manager.syncBuiltInBrightness() }
+        }
     }
 }
 
@@ -66,7 +69,7 @@ private struct MonitorRow: View {
         VStack(alignment: .leading, spacing: 4) {
             BrightnessSlider(
                 title: monitor.name,
-                systemImage: "display",
+                systemImage: monitor.isBuiltIn ? "laptopcomputer" : "display",
                 value: Binding(get: { monitor.brightness }, set: { manager.setBrightness($0, for: monitor.id) }),
                 isEnabled: monitor.isAdjustable
             )
@@ -80,8 +83,12 @@ private struct MonitorRow: View {
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            case .noResponse where monitor.isBuiltIn:
+                hint("Helligkeit lässt sich gerade nicht lesen oder setzen.", retry: true)
             case .noResponse:
                 hint("Monitor antwortet nicht. DDC/CI im Monitor-Menü aktivieren.", retry: true)
+            case .noChannel where monitor.isBuiltIn:
+                hint("macOS erlaubt für dieses Display keine Helligkeitssteuerung.", retry: false)
             case .noChannel:
                 hint("Kein DDC-Kanal gefunden. Adapter oder Dock lassen DDC evtl. nicht durch.", retry: false)
             }

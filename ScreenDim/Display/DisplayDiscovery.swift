@@ -12,19 +12,37 @@ struct DisplayIdentity: Hashable, Sendable {
     var storageKey: String { "\(vendor)-\(model)-\(serial)" }
 }
 
-struct ExternalDisplay: Identifiable, Sendable {
+struct DiscoveredDisplay: Identifiable, Sendable {
+    enum Kind: Sendable {
+        /// Eingebautes Panel, gesteuert über DisplayServices.
+        case builtIn
+        /// Externer Monitor. `nil`, wenn in der IORegistry kein passender
+        /// DCPAVServiceProxy gefunden wurde.
+        case external(IOAVServiceTransport?)
+    }
+
     let id: CGDirectDisplayID
     let identity: DisplayIdentity
     let name: String
-    /// `nil`, wenn in der IORegistry kein passender DCPAVServiceProxy gefunden wurde.
-    let transport: IOAVServiceTransport?
+    let kind: Kind
+
+    var isBuiltIn: Bool {
+        if case .builtIn = kind { true } else { false }
+    }
 }
 
-/// Findet externe Monitore und ordnet ihnen ihren DDC-Kanal zu.
+/// Findet die Displays (eingebautes zuerst) und ordnet den externen ihren DDC-Kanal zu.
 @MainActor
 enum DisplayDiscovery {
-    static func externalDisplays() -> [ExternalDisplay] {
-        let displays = onlineExternalDisplayIDs()
+    static func displays() -> [DiscoveredDisplay] {
+        let online = onlineDisplayIDs()
+        let builtIn = online.filter { CGDisplayIsBuiltin($0) != 0 }.map { id in
+            DiscoveredDisplay(id: id, identity: identity(of: id), name: screenName(for: id) ?? "MacBook-Display", kind: .builtIn)
+        }
+        return builtIn + externalDisplays(online.filter { CGDisplayIsBuiltin($0) == 0 })
+    }
+
+    private static func externalDisplays(_ displays: [CGDirectDisplayID]) -> [DiscoveredDisplay] {
         guard !displays.isEmpty else { return [] }
 
         var candidates = avServiceCandidates()
@@ -40,23 +58,23 @@ enum DisplayDiscovery {
 
         return displays.map { id in
             let match = matches[id]
-            return ExternalDisplay(
+            return DiscoveredDisplay(
                 id: id,
                 identity: identity(of: id),
                 name: match?.productName ?? screenName(for: id) ?? "Monitor \(id)",
-                transport: match?.transport
+                kind: .external(match?.transport)
             )
         }
     }
 
     // MARK: - CoreGraphics
 
-    private static func onlineExternalDisplayIDs() -> [CGDirectDisplayID] {
+    private static func onlineDisplayIDs() -> [CGDirectDisplayID] {
         var count: UInt32 = 0
         guard CGGetOnlineDisplayList(0, nil, &count) == .success, count > 0 else { return [] }
         var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
         guard CGGetOnlineDisplayList(count, &ids, &count) == .success else { return [] }
-        return ids.prefix(Int(count)).filter { CGDisplayIsBuiltin($0) == 0 }
+        return Array(ids.prefix(Int(count)))
     }
 
     private static func identity(of id: CGDirectDisplayID) -> DisplayIdentity {
