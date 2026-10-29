@@ -1,6 +1,6 @@
 # Status
 
-Stand: 2026-10-29. Beide Targets bauen ohne Warnungen, 109 Tests grün,
+Stand: 2026-10-29. Beide Targets bauen ohne Warnungen, 111 Tests grün,
 `check-mas-binary.sh` auf das App-Store-Binary: OK (Debug).
 
 ## Offene Hardware-Tests

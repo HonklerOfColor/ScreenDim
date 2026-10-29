@@ -21,6 +21,12 @@ struct ScreenDimApp: App {
             SettingsView(sensor: appDelegate.sensor)
         }
 
+        Window("Sensor-Diagnose", id: SensorDebugView.windowID) {
+            SensorDebugView(sensor: appDelegate.sensor)
+        }
+        .defaultLaunchBehavior(.suppressed)
+        .windowResizability(.contentMinSize)
+
         #if SCREENDIM_DIRECT
         Window("ScreenDim Diagnose", id: DiagnosticsView.windowID) {
             DiagnosticsView(manager: appDelegate.manager)

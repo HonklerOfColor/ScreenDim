@@ -4,6 +4,7 @@ import SwiftUI
 /// Einstellungsfenster. Bisher nur der Abschnitt „Sensor“.
 struct SettingsView: View {
     let sensor: SensorController
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Form {
@@ -13,6 +14,17 @@ struct SettingsView: View {
             SensorSection(sensor: sensor)
             LightSection(sensor: sensor)
             DemoSection(sensor: sensor)
+            Section {
+                HStack {
+                    Text("Messwerte und aktive Quellen live ansehen")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Sensor-Diagnose …") {
+                        openWindow(id: SensorDebugView.windowID)
+                        NSApplication.shared.activate()
+                    }
+                }
+            }
             Section {
                 VStack(alignment: .leading, spacing: 4) {
                     Link("Bau dir deinen eigenen Sensor (ca. 30 €, 15 min)", destination: SensorLinks.flashPage)

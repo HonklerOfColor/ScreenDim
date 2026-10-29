@@ -37,7 +37,8 @@ Eine Codebasis, zwei App-Targets aus `project.yml`:
     Quelle, Abwesenheit → `DisplayManager.setScreensBlanked`, Lux → Helligkeit),
     `SensorSource` mit `SSESensorSource` (Digest, SSE, Backoff) und
     `SimulatedSensorSource` (Demo), `SensorBrowser` (NWBrowser), `SensorKeychain`,
-    `PairingCode`, `SSEParser`/`ESPHomeEvents`, `PresenceGate`. Lichtquelle wählbar
+    `PairingCode`, `SSEParser`/`ESPHomeEvents`, `PresenceGate`, `SensorDebug`
+    (Protokoll für das Fenster „Sensor-Diagnose“, läuft nur, solange es offen ist). Lichtquelle wählbar
     (`LightSource`); den eingebauten Lichtsensor reicht Direct per Fabrik
     (`makeBuiltInLightSensor`, Quelle `Direct/BuiltInLightSensor.swift`).
 - `ScreenDim/` (App): `App/` (Einstieg, Varianten-Auswahl), `UI/`, `System/` (Tastenkürzel,

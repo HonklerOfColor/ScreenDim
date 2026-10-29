@@ -242,6 +242,62 @@ struct SensorControllerTests {
         #expect(laptop.monitors.first { $0.id == 7 }?.brightness == 100)
     }
 
+    @Test("Diagnose: eingebauter Sensor liest mit, ohne zu regeln; Schließen stoppt ihn")
+    func debugMonitorsBuiltInWithoutApplying() async {
+        let control = StubControl()
+        let laptop = makeLaptopManager(builtInControl: control)
+        let light = StubSensorSource()
+        let controller = makeController(manager: laptop, builtInLight: light)
+        controller.start()
+        #expect(controller.lightSource == .deskSensor)
+
+        controller.setDebugMonitoring(true)
+        light.send(.connection(.connected), .lux(10))
+        #expect(await eventually { controller.builtInLux == 10 })
+        #expect(controller.builtInLastEventDate != nil)
+        #expect(controller.activeLightOrigin == nil) // Schreibtisch-Sensor noch nicht verbunden
+        #expect(laptop.monitors.first { $0.id == 7 }?.brightness == 100)
+        let last = controller.debugLog.last
+        #expect(last?.origin == .builtIn)
+        #expect(last?.event == .lux(10))
+        #expect(last?.effect == nil)
+
+        controller.setDebugMonitoring(false)
+        #expect(controller.builtInLux == nil)
+        #expect(controller.debugLog.isEmpty)
+    }
+
+    @Test("Diagnose: beide Quellen, Rollen und Wirkung im Protokoll")
+    func debugLogShowsSourcesAndEffects() async {
+        let control = StubControl()
+        let laptop = makeLaptopManager(builtInControl: control)
+        let light = StubSensorSource()
+        let controller = makeController(manager: laptop, builtInLight: light)
+        controller.setLightSource(.builtIn)
+        controller.start()
+        controller.setDebugMonitoring(true)
+
+        source.send(.connection(.connected), .lux(1000), .presence(true), .presence(false))
+        light.send(.connection(.connected), .lux(10))
+        #expect(await eventually { laptop.screensBlanked && controller.builtInLux == 10 })
+        #expect(controller.activePresenceOrigin == .deskSensor)
+        #expect(controller.activeLightOrigin == .builtIn)
+        #expect(controller.lightBrightness == 20)
+        #expect(controller.lightBrightnessOrigin == .builtIn)
+
+        let effects = controller.debugLog.map { [$0.origin.rawValue: $0.effect] }
+        #expect(effects.contains([SensorOrigin.builtIn.rawValue: .brightness(20)]))
+        #expect(effects.contains([SensorOrigin.deskSensor.rawValue: .screensOff]))
+        // Licht des Schreibtisch-Sensors steht im Protokoll, wirkt aber nicht.
+        #expect(controller.debugLog.contains { $0.origin == .deskSensor && $0.event == .lux(1000) && $0.effect == nil })
+
+        // Ohne offene Diagnose wird nichts protokolliert.
+        controller.setDebugMonitoring(false)
+        source.send(.presence(true))
+        #expect(await eventually { !laptop.screensBlanked })
+        #expect(controller.debugLog.isEmpty)
+    }
+
     @Test("Kopplung im offenen Fenster: Code abholen, prüfen, speichern")
     func pairsAutomatically() async {
         let controller = makeController(paired: false)

@@ -12,6 +12,16 @@
         }
       }
     },
+    "%lld %%" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%%"
+          }
+        }
+      }
+    },
     "%lld Lanes" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -166,6 +176,26 @@
         }
       }
     },
+    "An" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On"
+          }
+        }
+      }
+    },
+    "Anwesend" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Present"
+          }
+        }
+      }
+    },
     "Anwesenheit" : {
       "localizations" : {
         "en" : {
@@ -182,6 +212,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Off"
+          }
+        }
+      }
+    },
+    "Aus (niemand da)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off (nobody there)"
           }
         }
       }
@@ -223,6 +263,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ready"
+          }
+        }
+      }
+    },
+    "Bildschirme" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screens"
           }
         }
       }
@@ -338,12 +388,42 @@
         }
       }
     },
+    "Das Protokoll läuft nur, solange dieses Fenster offen ist." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The log only runs while this window is open."
+          }
+        }
+      }
+    },
     "Deckel zu: Der Lichtsensor ist pausiert." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lid closed: the light sensor is paused."
+          }
+        }
+      }
+    },
+    "Demo-Modus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demo mode"
+          }
+        }
+      }
+    },
+    "Demo-Modus (simuliert)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demo mode (simulated)"
           }
         }
       }
@@ -598,6 +678,16 @@
         }
       }
     },
+    "Gerade aktiv" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active now"
+          }
+        }
+      }
+    },
     "Helligkeit %@" : {
       "localizations" : {
         "en" : {
@@ -645,6 +735,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Help: pair the optional presence and light sensor or try demo mode"
+          }
+        }
+      }
+    },
+    "Host" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Host"
           }
         }
       }
@@ -794,6 +894,26 @@
         }
       }
     },
+    "Keine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None"
+          }
+        }
+      }
+    },
+    "Kopieren" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy"
+          }
+        }
+      }
+    },
     "Kopiert" : {
       "localizations" : {
         "en" : {
@@ -814,12 +934,32 @@
         }
       }
     },
+    "Kopplung nötig" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pairing required"
+          }
+        }
+      }
+    },
     "Kopplung verloren – neu koppeln" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pairing lost – pair again"
+          }
+        }
+      }
+    },
+    "Lebenszeichen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heartbeat"
           }
         }
       }
@@ -888,12 +1028,42 @@
         }
       }
     },
+    "Letztes Ereignis" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last event"
+          }
+        }
+      }
+    },
+    "Licht" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light"
+          }
+        }
+      }
+    },
     "Licht von Hand" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Set light manually"
+          }
+        }
+      }
+    },
+    "Lichtquelle (Einstellung)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light source (setting)"
           }
         }
       }
@@ -936,6 +1106,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "MacBook Display"
+          }
+        }
+      }
+    },
+    "Messwerte und aktive Quellen live ansehen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View live readings and active sources"
           }
         }
       }
@@ -991,6 +1171,26 @@
         }
       }
     },
+    "Nicht verfügbar: Dieser Mac hat keinen Lichtsensor, oder die Variante darf ihn nicht lesen (App Store)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not available: this Mac has no light sensor, or this version can’t read it (App Store)."
+          }
+        }
+      }
+    },
+    "Noch keine Ereignisse." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No events yet."
+          }
+        }
+      }
+    },
     "Null-Antwort (6E 80 BE)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1008,6 +1208,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Overlay"
+          }
+        }
+      }
+    },
+    "Protokoll" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Log"
+          }
+        }
+      }
+    },
+    "Protokoll leeren" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear Log"
           }
         }
       }
@@ -1151,6 +1371,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sensor not reachable. Is it on the same Wi-Fi?"
+          }
+        }
+      }
+    },
+    "Sensor-Diagnose" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sensor Diagnostics"
+          }
+        }
+      }
+    },
+    "Sensor-Diagnose …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sensor Diagnostics…"
           }
         }
       }
@@ -1390,6 +1630,16 @@
         }
       }
     },
+    "Zuletzt gesetzt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last set"
+          }
+        }
+      }
+    },
     "Zustand" : {
       "localizations" : {
         "en" : {
@@ -1407,6 +1657,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "State: %@"
+          }
+        }
+      }
+    },
+    "aus %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "from %@"
           }
         }
       }
@@ -1487,6 +1747,16 @@
         }
       }
     },
+    "nur Anzeige" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "display only"
+          }
+        }
+      }
+    },
     "Über Adapter" : {
       "localizations" : {
         "en" : {
@@ -1534,6 +1804,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "– (built-in display)"
+          }
+        }
+      }
+    },
+    "→ %lld %%" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "→ %lld%%"
+          }
+        }
+      }
+    },
+    "→ Bildschirme an" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "→ screens on"
+          }
+        }
+      }
+    },
+    "→ Bildschirme aus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "→ screens off"
           }
         }
       }
