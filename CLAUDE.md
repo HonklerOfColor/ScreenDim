@@ -32,7 +32,12 @@ Eine Codebasis, zwei App-Targets aus `project.yml`:
   - `Display/`: `DisplayManager` (Zustand, Kanal-Cache über Refreshes, Probe, Routing
     der Software-Dimmung), `DisplayDiscovery` (CoreGraphics, optional IORegistry),
     `BrightnessStore` (DDC- und Software-Wert getrennt, Verfahren je Monitor),
-    `SoftwareDimming` mit `GammaDimmer` und `OverlayDimmer`, `DisplayDiagnostics`.
+    `SoftwareDimming` mit `GammaDimmer` und `OverlayDimmer`, `ScreenBlanker`, `DisplayDiagnostics`.
+  - `Sensor/`: optionaler Schreibtisch-Sensor. `SensorController` (Einstellungen, Kopplung,
+    Quelle, Abwesenheit → `DisplayManager.setScreensBlanked`, Lux → Helligkeit),
+    `SensorSource` mit `SSESensorSource` (Digest, SSE, Backoff) und
+    `SimulatedSensorSource` (Demo), `SensorBrowser` (NWBrowser), `SensorKeychain`,
+    `PairingCode`, `SSEParser`/`ESPHomeEvents`, `PresenceGate`.
 - `ScreenDim/` (App): `App/` (Einstieg, Varianten-Auswahl), `UI/`, `System/` (Tastenkürzel,
   Login-Item), `Direct/` (private API), `Resources/` (Asset-Katalog, String-Katalog,
   Privacy-Manifest).

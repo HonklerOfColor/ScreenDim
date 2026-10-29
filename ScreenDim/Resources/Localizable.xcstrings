@@ -53,6 +53,16 @@
         }
       }
     },
+    "%lld lx" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld lx"
+          }
+        }
+      }
+    },
     "%lld offene Aufrufe" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -115,6 +125,16 @@
         }
       }
     },
+    "Abbrechen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        }
+      }
+    },
     "Abdunkeln über" : {
       "localizations" : {
         "en" : {
@@ -142,6 +162,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "All Displays"
+          }
+        }
+      }
+    },
+    "Anwesenheit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Presence"
+          }
+        }
+      }
+    },
+    "Aus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off"
+          }
+        }
+      }
+    },
+    "Bau dir deinen eigenen Sensor (ca. 30 €, 15 min)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Build your own sensor (about €30, 15 min)"
           }
         }
       }
@@ -208,6 +258,26 @@
         }
       }
     },
+    "Code ließ sich nicht im Schlüsselbund sichern (%lld)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t save the code to the keychain (%lld)."
+          }
+        }
+      }
+    },
+    "Code, z. B. ABCD-EFGH" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code, e.g. ABCD-EFGH"
+          }
+        }
+      }
+    },
     "DDC kommt über das Dock nicht durch. Software-Dimmung aktiv." : {
       "localizations" : {
         "en" : {
@@ -248,6 +318,76 @@
         }
       }
     },
+    "Da" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Present"
+          }
+        }
+      }
+    },
+    "Da: %lld s" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Present: %lld s"
+          }
+        }
+      }
+    },
+    "Demo-Modus (simulierter Sensor)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demo mode (simulated sensor)"
+          }
+        }
+      }
+    },
+    "Demo-Modus aktiv" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demo mode active"
+          }
+        }
+      }
+    },
+    "Demo-Modus aktiv: Anwesenheit und Licht sind simuliert." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demo mode active: presence and light are simulated."
+          }
+        }
+      }
+    },
+    "Der Code hat 8 Zeichen aus 0–9 und A–Z (ohne I, L, O, U)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The code has 8 characters from 0–9 and A–Z (without I, L, O, U)."
+          }
+        }
+      }
+    },
+    "Der Sensor antwortet nicht (Zeitüberschreitung)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The sensor isn’t responding (timeout)."
+          }
+        }
+      }
+    },
     "Diagnose kopieren" : {
       "localizations" : {
         "en" : {
@@ -264,6 +404,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Diagnostics…"
+          }
+        }
+      }
+    },
+    "Die Bildschirme gehen nach 3 s aus. Maus oder Tastatur weckt sie sofort." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The screens turn off after 3 s. Mouse or keyboard wakes them immediately."
+          }
+        }
+      }
+    },
+    "Die Hardware ist nicht im Kauf enthalten. Der Sensor ist optional; ScreenDim funktioniert vollständig ohne ihn." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hardware is not included in the purchase. The sensor is optional; ScreenDim works fully without it."
           }
         }
       }
@@ -288,12 +448,42 @@
         }
       }
     },
+    "Drück kurz die BOOT-Taste am Sensor (LED blinkt)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Briefly press the BOOT button on the sensor (LED blinks)."
+          }
+        }
+      }
+    },
     "EDID" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "EDID"
+          }
+        }
+      }
+    },
+    "Einstellungen …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings…"
+          }
+        }
+      }
+    },
+    "Entkoppeln" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unpair"
           }
         }
       }
@@ -308,12 +498,42 @@
         }
       }
     },
+    "Erneut versuchen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try Again"
+          }
+        }
+      }
+    },
+    "Falscher Code." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wrong code."
+          }
+        }
+      }
+    },
     "Frage Monitor per DDC/CI ab …" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Querying display via DDC/CI…"
+          }
+        }
+      }
+    },
+    "Frage den Sensor nach dem Code …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Asking the sensor for its code…"
           }
         }
       }
@@ -348,6 +568,16 @@
         }
       }
     },
+    "Gekoppelt mit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paired with"
+          }
+        }
+      }
+    },
     "Helligkeit %@" : {
       "localizations" : {
         "en" : {
@@ -369,12 +599,32 @@
         }
       }
     },
+    "Helligkeit ans Umgebungslicht anpassen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjust brightness to ambient light"
+          }
+        }
+      }
+    },
     "Helligkeit lässt sich gerade nicht lesen oder setzen." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Brightness can't be read or set right now."
+          }
+        }
+      }
+    },
+    "Hilfe: optionalen Anwesenheits- und Lichtsensor koppeln oder den Demo-Modus testen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Help: pair the optional presence and light sensor or try demo mode"
           }
         }
       }
@@ -462,6 +712,16 @@
         }
       }
     },
+    "Kein Code erhalten. Drück kurz BOOT und versuch es erneut oder gib den Code ein." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No code received. Briefly press BOOT and try again, or enter the code."
+          }
+        }
+      }
+    },
     "Kein DDC-Kanal gefunden. Software-Dimmung aktiv." : {
       "localizations" : {
         "en" : {
@@ -504,12 +764,42 @@
         }
       }
     },
+    "Kein Zugriff aufs lokale Netzwerk. Erlaube ihn unter Systemeinstellungen › Datenschutz & Sicherheit › Lokales Netzwerk." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No access to the local network. Allow it in System Settings › Privacy & Security › Local Network."
+          }
+        }
+      }
+    },
     "Kopiert" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Copied"
+          }
+        }
+      }
+    },
+    "Koppeln" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pair"
+          }
+        }
+      }
+    },
+    "Kopplung verloren – neu koppeln" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pairing lost – pair again"
           }
         }
       }
@@ -578,6 +868,16 @@
         }
       }
     },
+    "Licht von Hand" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set light manually"
+          }
+        }
+      }
+    },
     "Link" : {
       "localizations" : {
         "en" : {
@@ -595,6 +895,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Link: %@"
+          }
+        }
+      }
+    },
+    "Lux" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lux"
           }
         }
       }
@@ -651,6 +961,16 @@
         }
       }
     },
+    "Nicht gekoppelt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not paired"
+          }
+        }
+      }
+    },
     "Null-Antwort (6E 80 BE)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -668,6 +988,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Overlay"
+          }
+        }
+      }
+    },
+    "Prüfe den Code …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking the code…"
+          }
+        }
+      }
+    },
+    "Prüfen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check"
           }
         }
       }
@@ -704,6 +1044,26 @@
         }
       }
     },
+    "Schreibtisch-Sensor einrichten …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set Up Desk Sensor…"
+          }
+        }
+      }
+    },
+    "Schreibtisch-Sensor verwenden" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use desk sensor"
+          }
+        }
+      }
+    },
     "ScreenDim" : {
       "localizations" : {
         "en" : {
@@ -735,6 +1095,66 @@
         }
       }
     },
+    "Sensor" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sensor"
+          }
+        }
+      }
+    },
+    "Sensor nicht erreichbar. Ist er im selben WLAN?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sensor not reachable. Is it on the same Wi-Fi?"
+          }
+        }
+      }
+    },
+    "Sensor:" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sensor:"
+          }
+        }
+      }
+    },
+    "Simulieren: weg" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simulate: away"
+          }
+        }
+      }
+    },
+    "Simulieren: zurück" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simulate: back"
+          }
+        }
+      }
+    },
+    "Simuliert Anwesenheit und Umgebungslicht, ganz ohne Hardware. Ist nach dem nächsten Start wieder aus." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simulates presence and ambient light without any hardware. Turns off again at the next launch."
+          }
+        }
+      }
+    },
     "Software-Dimmung (Gamma)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -753,6 +1173,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Software dimming (overlay)"
+          }
+        }
+      }
+    },
+    "Status" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Status"
+          }
+        }
+      }
+    },
+    "Suche Sensoren im Netzwerk …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Looking for sensors on the network…"
+          }
+        }
+      }
+    },
+    "Suche …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Searching…"
           }
         }
       }
@@ -787,6 +1237,16 @@
         }
       }
     },
+    "Umgebungslicht" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ambient light"
+          }
+        }
+      }
+    },
     "Ungültige Antwort" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -794,6 +1254,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Invalid reply"
+          }
+        }
+      }
+    },
+    "Verbunden" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected"
+          }
+        }
+      }
+    },
+    "Warte auf den Sensor …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for the sensor…"
+          }
+        }
+      }
+    },
+    "Weg" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Away"
+          }
+        }
+      }
+    },
+    "Weg: %lld s" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Away: %lld s"
           }
         }
       }
@@ -816,6 +1316,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Write %lld failed: %@, %lld ms"
+          }
+        }
+      }
+    },
+    "Während des Demo-Modus ist der echte Sensor getrennt." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The real sensor is disconnected while demo mode is on."
           }
         }
       }

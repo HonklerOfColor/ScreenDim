@@ -55,6 +55,8 @@ public final class DisplayManager {
     public private(set) var monitors: [Monitor] = []
     /// `false`, wenn die globalen Tastenkürzel schon von einer anderen App belegt sind.
     public var hotKeysAvailable = true
+    /// Alle Bildschirme schwarz, weil der Schreibtisch-Sensor „weg“ meldet.
+    public private(set) var screensBlanked = false
 
     public let timing: DDCTiming
 
@@ -77,6 +79,7 @@ public final class DisplayManager {
     @ObservationIgnored private let makeBuiltInControl: MakeBuiltInControl
     @ObservationIgnored private let gamma: any SoftwareDimming
     @ObservationIgnored private let overlay: any SoftwareDimming
+    @ObservationIgnored private let blanker: any ScreenBlanking
     /// Pause zwischen den beiden Probe-Runden eines externen Monitors.
     @ObservationIgnored private let probeRetryDelay: Duration
 
@@ -86,6 +89,7 @@ public final class DisplayManager {
         probeRetryDelay: Duration = .seconds(2),
         gamma: any SoftwareDimming = GammaDimmer(),
         overlay: any SoftwareDimming = OverlayDimmer(),
+        blanker: any ScreenBlanking = ScreenBlanker(),
         discover: @escaping Discover = { DisplayDiscovery.displays() },
         makeExternalControl: @escaping MakeExternalControl = { _, _, _ in nil },
         makeBuiltInControl: @escaping MakeBuiltInControl = { _ in nil }
@@ -95,6 +99,7 @@ public final class DisplayManager {
         self.probeRetryDelay = probeRetryDelay
         self.gamma = gamma
         self.overlay = overlay
+        self.blanker = blanker
         self.discover = discover
         self.makeExternalControl = makeExternalControl
         self.makeBuiltInControl = makeBuiltInControl
@@ -105,6 +110,7 @@ public final class DisplayManager {
     public func stop() {
         gamma.apply([:])
         overlay.apply([:])
+        blanker.blank([])
     }
 
     // MARK: - Lebenszyklus
@@ -194,6 +200,7 @@ public final class DisplayManager {
             )
         }
         syncSoftwareDimming()
+        syncBlanking()
         log.notice("Displays: \(displays.map { "\($0.name) [\($0.id)] AV-Service: \($0.avServiceID.map { String(format: "0x%llX", $0) } ?? "-") Kanal: \(self.channels[$0.id] != nil)" }.joined(separator: ", "), privacy: .public); \(reused) Kanäle wiederverwendet")
 
         let generation = generation
@@ -309,6 +316,21 @@ public final class DisplayManager {
             monitors[index].gammaUnavailable = false
         }
         syncSoftwareDimming()
+    }
+
+    // MARK: - Schreibtisch-Sensor
+
+    /// Schaltet alle Bildschirme schwarz bzw. wieder sichtbar. Helligkeit, Dimmung und
+    /// DDC bleiben dabei unberührt.
+    public func setScreensBlanked(_ blanked: Bool) {
+        guard blanked != screensBlanked else { return }
+        log.notice("Bildschirme \(blanked ? "aus" : "an", privacy: .public) (Sensor)")
+        screensBlanked = blanked
+        syncBlanking()
+    }
+
+    private func syncBlanking() {
+        blanker.blank(screensBlanked ? Set(monitors.map(\.id)) : [])
     }
 
     // MARK: - Steuerkanal

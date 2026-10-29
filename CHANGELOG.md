@@ -3,6 +3,16 @@
 ## Unveröffentlicht (1.0, Build 1)
 
 ### Neu
+- Optionaler Schreibtisch-Sensor (ESP32/ESPHome, DIY): Suche per Bonjour
+  (`_screendim._tcp`), Kopplung mit Code (automatisch im Kopplungsfenster, sonst BOOT-Taste
+  oder Eingabe), Digest-Login, SSE-Strom mit Neuverbindung (1 s → 30 s). Abwesenheit
+  schaltet die Bildschirme schwarz (nur bei verbundenem Sensor und frischem Ereignis;
+  Eingaben wecken sofort), Umgebungslicht regelt die Helligkeit. Code im Schlüsselbund,
+  Hostname in UserDefaults. Standard: aus.
+- Demo-Modus mit simuliertem Sensor für Nutzer ohne Hardware und für App Review; Banner,
+  Menüeintrag und eigenes Menüleisten-Symbol, nach dem Start immer aus (außer
+  `-ScreenDimDemo YES`).
+- Einstellungsfenster (Abschnitt „Sensor“), App-Review-Notizen in `docs/AppReviewNotes.md`.
 - Zwei Varianten aus einer Codebasis: „ScreenDim“ für den Mac App Store (Sandbox, ohne
   private API, Software-Dimmung) und „ScreenDim Direct“ (Developer ID, DDC/CI).
 - Overlay-Dimmung als zweiter Weg neben Gamma: randloses Fenster über Menüleiste, allen

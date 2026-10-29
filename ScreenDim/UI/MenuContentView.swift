@@ -3,13 +3,29 @@ import SwiftUI
 
 struct MenuContentView: View {
     let manager: DisplayManager
+    let sensor: SensorController
     let loginItem: LoginItem
+    @Environment(\.openSettings) private var openSettings
     #if SCREENDIM_DIRECT
     @Environment(\.openWindow) private var openWindow
     #endif
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if sensor.isDemoActive {
+                HStack(spacing: 6) {
+                    Image(systemName: "theatermasks.fill")
+                    Text("Demo-Modus aktiv")
+                        .fontWeight(.semibold)
+                    Spacer()
+                    Button("Beenden") { sensor.setDemoActive(false) }
+                        .buttonStyle(.link)
+                }
+                .font(.callout)
+                .padding(6)
+                .background(.yellow.opacity(0.35), in: .rect(cornerRadius: 6))
+            }
+
             if manager.monitors.isEmpty {
                 Label("Kein Display gefunden", systemImage: "display.trianglebadge.exclamationmark")
                     .foregroundStyle(.secondary)
@@ -38,6 +54,15 @@ struct MenuContentView: View {
             }
             #endif
 
+            if sensor.isEnabled && !sensor.isDemoActive {
+                HStack(spacing: 6) {
+                    Text("Sensor:")
+                    SensorStatusLabel(sensor: sensor)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
             Divider()
 
             VStack(alignment: .leading, spacing: 6) {
@@ -64,6 +89,15 @@ struct MenuContentView: View {
             }
 
             HStack {
+                Button("Einstellungen …") { showSettings() }
+                Spacer()
+                Button("Schreibtisch-Sensor einrichten …") { showSettings() }
+                    .buttonStyle(.link)
+                    .help("Hilfe: optionalen Anwesenheits- und Lichtsensor koppeln oder den Demo-Modus testen")
+            }
+            .font(.caption)
+
+            HStack {
                 Button("Monitore neu suchen") { manager.refresh(force: true) }
                 #if SCREENDIM_DIRECT
                 Button("Diagnose …") {
@@ -82,6 +116,14 @@ struct MenuContentView: View {
             loginItem.reload()
             Task { await manager.syncBuiltInBrightness() }
         }
+    }
+}
+
+extension MenuContentView {
+    /// Menüleisten-App: Das Fenster käme sonst hinter anderen Apps hoch.
+    private func showSettings() {
+        openSettings()
+        NSApplication.shared.activate()
     }
 }
 

@@ -269,3 +269,132 @@ func eventually(
     }
     return await condition()
 }
+
+// MARK: - Sensor
+
+/// Uhr ohne Wartezeit: `sleep` springt sofort zum Ziel. Für deterministische Simulationen.
+final class InstantClock: Clock, Sendable {
+    struct Instant: InstantProtocol {
+        var offset: Duration
+
+        func advanced(by duration: Duration) -> Instant {
+            Instant(offset: offset + duration)
+        }
+
+        func duration(to other: Instant) -> Duration {
+            other.offset - offset
+        }
+
+        static func < (lhs: Instant, rhs: Instant) -> Bool {
+            lhs.offset < rhs.offset
+        }
+    }
+
+    private let current = Mutex(Instant(offset: .zero))
+
+    var now: Instant { current.withLock { $0 } }
+    var minimumResolution: Duration { .zero }
+
+    func sleep(until deadline: Instant, tolerance: Duration?) async throws {
+        try Task.checkCancellation()
+        current.withLock { $0 = max($0, deadline) }
+        await Task.yield()
+    }
+}
+
+/// Sensorquelle, deren Ereignisse der Test schickt.
+final class StubSensorSource: SensorSource {
+    private let stream: AsyncStream<SensorEvent>
+    private let continuation: AsyncStream<SensorEvent>.Continuation
+
+    init() {
+        (stream, continuation) = AsyncStream.makeStream()
+    }
+
+    func events() -> AsyncStream<SensorEvent> {
+        stream
+    }
+
+    func send(_ events: SensorEvent...) {
+        events.forEach { continuation.yield($0) }
+    }
+}
+
+/// HTTP ohne Netz: Antworten je Pfad (`sensor/Ambient Light`), der Reihe nach; danach
+/// `.unreachable`.
+final class StubSensorHTTP: SensorHTTP {
+    private struct State {
+        var responses: [String: [SensorResponse]] = [:]
+        var requests: [(path: String, password: String?)] = []
+    }
+
+    private let state = Mutex(State())
+
+    var requests: [(path: String, password: String?)] { state.withLock { $0.requests } }
+
+    func enqueue(_ response: SensorResponse, for path: String) {
+        state.withLock { $0.responses[path, default: []].append(response) }
+    }
+
+    func get(_ url: URL, password: String?) async -> SensorResponse {
+        let path = String(url.path().removingPercentEncoding?.dropFirst() ?? "")
+        return state.withLock { state in
+            state.requests.append((path, password))
+            guard var queue = state.responses[path], !queue.isEmpty else { return .unreachable }
+            let response = queue.removeFirst()
+            state.responses[path] = queue
+            return response
+        }
+    }
+}
+
+/// Schlüsselbund im RAM.
+final class MemoryCredentials: SensorCredentialStore {
+    private let codes = Mutex<[String: PairingCode]>([:])
+
+    func code(for hostname: String) -> PairingCode? {
+        codes.withLock { $0[hostname] }
+    }
+
+    func save(_ code: PairingCode, for hostname: String) throws(SensorKeychain.Failure) {
+        codes.withLock { $0[hostname] = code }
+    }
+
+    func delete(_ hostname: String) {
+        codes.withLock { $0[hostname] = nil }
+    }
+}
+
+/// Eingaben auf Zuruf.
+@MainActor
+final class StubInput: InputActivityMonitoring {
+    var timeSinceLastInput: Duration = .seconds(60)
+    private(set) var onInput: (@MainActor () -> Void)?
+
+    nonisolated init() {}
+
+    func startObserving(_ onInput: @escaping @MainActor () -> Void) {
+        self.onInput = onInput
+    }
+
+    func stopObserving() {
+        onInput = nil
+    }
+
+    /// Simuliert eine Mausbewegung.
+    func fire() {
+        onInput?()
+    }
+}
+
+/// Merkt sich, welche Displays schwarz wären.
+@MainActor
+final class StubBlanker: ScreenBlanking {
+    private(set) var blanked: Set<CGDirectDisplayID> = []
+
+    nonisolated init() {}
+
+    func blank(_ displays: Set<CGDirectDisplayID>) {
+        blanked = displays
+    }
+}

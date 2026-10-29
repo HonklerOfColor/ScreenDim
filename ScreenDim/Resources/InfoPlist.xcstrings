@@ -1,0 +1,24 @@
+{
+  "sourceLanguage" : "de",
+  "strings" : {
+    "NSLocalNetworkUsageDescription" : {
+      "comment" : "Begründung für den Zugriff aufs lokale Netzwerk (Schreibtisch-Sensor)",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ScreenDim sucht im lokalen Netzwerk nach deinem Schreibtisch-Sensor und verbindet sich nur mit ihm."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ScreenDim looks for your desk sensor on the local network and connects only to it."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

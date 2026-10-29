@@ -109,3 +109,37 @@ final class DimmingPanel: OverlayWindow {
         panel.close()
     }
 }
+
+/// Schaltet Bildschirme schwarz, solange niemand am Schreibtisch sitzt. In Tests ersetzbar.
+@MainActor
+public protocol ScreenBlanking: AnyObject {
+    /// Genau diese Displays schwarz, alle anderen wieder sichtbar.
+    func blank(_ displays: Set<CGDirectDisplayID>)
+}
+
+/// Schwarze Fenster über der Software-Dimmung, gleiche Art wie deren Overlay. Mausklicks
+/// gehen durch; aufwecken muss der Aufrufer bei Eingaben.
+@MainActor
+public final class ScreenBlanker: ScreenBlanking {
+    private let makeWindow: OverlayDimmer.MakeWindow
+    private var windows: [CGDirectDisplayID: any OverlayWindow] = [:]
+
+    public convenience init() {
+        self.init(makeWindow: { DimmingPanel(displayID: $0) })
+    }
+
+    init(makeWindow: @escaping OverlayDimmer.MakeWindow) {
+        self.makeWindow = makeWindow
+    }
+
+    public func blank(_ displays: Set<CGDirectDisplayID>) {
+        for id in windows.keys where !displays.contains(id) {
+            windows.removeValue(forKey: id)?.close()
+        }
+        for id in displays {
+            guard let window = windows[id] ?? makeWindow(id) else { continue }
+            windows[id] = window
+            window.show(alpha: 1)
+        }
+    }
+}

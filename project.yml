@@ -69,11 +69,19 @@ targets:
         LSApplicationCategoryType: public.app-category.utilities
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         NSHumanReadableCopyright: "© 2026 Andreas Trabi"
+        # Optionaler Schreibtisch-Sensor im LAN (Bonjour, HTTP an <name>.local).
+        # Übersetzung der Begründung: ScreenDim/Resources/InfoPlist.xcstrings
+        NSBonjourServices: [_screendim._tcp]
+        NSLocalNetworkUsageDescription: "ScreenDim sucht im lokalen Netzwerk nach deinem Schreibtisch-Sensor und verbindet sich nur mit ihm."
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
         ITSAppUsesNonExemptEncryption: false
     entitlements:
       path: ScreenDim/ScreenDim.entitlements
       properties:
         com.apple.security.app-sandbox: true
+        # Nur für den optionalen Sensor im LAN.
+        com.apple.security.network.client: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.andreastrabi.ScreenDim
@@ -97,6 +105,12 @@ targets:
         LSApplicationCategoryType: public.app-category.utilities
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         NSHumanReadableCopyright: "© 2026 Andreas Trabi"
+        # Optionaler Schreibtisch-Sensor im LAN (Bonjour, HTTP an <name>.local).
+        # Übersetzung der Begründung: ScreenDim/Resources/InfoPlist.xcstrings
+        NSBonjourServices: [_screendim._tcp]
+        NSLocalNetworkUsageDescription: "ScreenDim sucht im lokalen Netzwerk nach deinem Schreibtisch-Sensor und verbindet sich nur mit ihm."
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.andreastrabi.ScreenDim.direct

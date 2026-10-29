@@ -1,7 +1,7 @@
 # Status
 
-Stand: 2026-10-29. Beide Targets bauen ohne Warnungen, 69 Tests grün,
-`check-mas-binary.sh` auf das App-Store-Binary: OK (Debug und Release).
+Stand: 2026-10-29. Beide Targets bauen ohne Warnungen, 102 Tests grün,
+`check-mas-binary.sh` auf das App-Store-Binary: OK (Debug).
 
 ## Offene Hardware-Tests
 
@@ -33,7 +33,21 @@ Auf echter Hardware noch nicht geprüft. Die Tests decken nur die Logik ab.
 - [ ] Auflösungswechsel: keine Kurven-Rücksetzung auf anderen Displays, Overlay passt
       seine Größe an.
 
+### Schreibtisch-Sensor (ESP32)
+- [ ] Bonjour-Suche zeigt den Sensor (Hostname, Firmware); macOS fragt einmal nach dem
+      lokalen Netzwerk (MAS und Direct).
+- [ ] Kopplung im Kopplungsfenster automatisch; danach 401 → BOOT kurz drücken → Code kommt;
+      manuelle Eingabe; neuer Code (BOOT 10 s) → „Kopplung verloren – neu koppeln“.
+- [ ] SSE: IDs im echten Strom prüfen (`binary_sensor-presence` bzw. `binary_sensor/Presence`),
+      Ping-Abstand (Annahme ≤ 10 s; Bildschirme gehen nach 30 s Stille wieder an).
+- [ ] Abwesenheit: Bildschirme schwarz, Mausbewegung weckt; Sensor ausstecken → wieder an.
+- [ ] Lux → Helligkeit: Kurve 10 lx → 20 %, 1000 lx → 100 % am Schreibtisch prüfen.
+- [ ] Demo-Modus: Banner, Menüeintrag, Symbol; nach Neustart aus.
+
 ## Offene Punkte für die Einreichung
+
+- [ ] **Sensor-Links:** `SensorLinks.flashPage` ist ein Platzhalter
+      (`screendim.example.com`); Videolink in `docs/AppReviewNotes.md` fehlt.
 
 - [ ] **App-Icon:** Slot `AppIcon` in `ScreenDim/Resources/Assets.xcassets` ist leer
       (Icon kommt von Andreas).

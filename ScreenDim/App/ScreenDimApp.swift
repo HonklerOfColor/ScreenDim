@@ -8,10 +8,18 @@ struct ScreenDimApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        MenuBarExtra("ScreenDim", systemImage: "sun.max") {
-            MenuContentView(manager: appDelegate.manager, loginItem: appDelegate.loginItem)
+        // Im Demo-Modus ein anderes Symbol, damit er nie unbemerkt läuft.
+        MenuBarExtra(
+            "ScreenDim",
+            systemImage: appDelegate.sensor.isDemoActive ? "sun.max.trianglebadge.exclamationmark" : "sun.max"
+        ) {
+            MenuContentView(manager: appDelegate.manager, sensor: appDelegate.sensor, loginItem: appDelegate.loginItem)
         }
         .menuBarExtraStyle(.window)
+
+        Settings {
+            SettingsView(sensor: appDelegate.sensor)
+        }
 
         #if SCREENDIM_DIRECT
         Window("ScreenDim Diagnose", id: DiagnosticsView.windowID) {
@@ -35,11 +43,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Displays. Externe Monitore dimmt der Manager per Software.
     let manager = DisplayManager(discover: { DisplayDiscovery.displays(scanRegistry: false) })
     #endif
+    /// Optionaler Schreibtisch-Sensor; ohne Einstellung passiert nichts.
+    lazy var sensor = SensorController(manager: manager)
     let loginItem = LoginItem()
     private let hotKeys = HotKeyCenter()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         manager.start()
+        sensor.start()
 
         let modifiers = controlKey | optionKey
         let up = hotKeys.register(keyCode: kVK_UpArrow, modifiers: modifiers) { [manager] in
@@ -53,6 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         hotKeys.unregisterAll()
+        sensor.stop()
         manager.stop()
     }
 }
