@@ -379,25 +379,72 @@ struct DisplayManagerTests {
         #expect(setup.overlay.levels.isEmpty)
     }
 
-    @Test("Ohne DDC-Fabrik (App-Store-Variante): externe per Software, eingebautes nicht regelbar")
-    func withoutDDCFactory() async {
-        let builtIn = DiscoveredDisplay(
-            id: 1, identity: DisplayIdentity(vendor: 1552, model: 1, serial: 1), name: "MacBook", kind: .builtIn
-        )
-        setup.displays = [builtIn, Self.external(2, avService: nil)]
-        let manager = DisplayManager(
+    private static let builtIn = DiscoveredDisplay(
+        id: 1, identity: DisplayIdentity(vendor: 1552, model: 1, serial: 1), name: "MacBook", kind: .builtIn
+    )
+
+    /// App-Store-Variante: keine Fabriken für DDC und das eingebaute Display.
+    private func makeStoreManager() -> DisplayManager {
+        DisplayManager(
             store: BrightnessStore(storage: setup.preferences),
             timing: .immediate,
             gamma: setup.gamma,
             overlay: setup.overlay,
             discover: { [setup] in setup.displays }
         )
+    }
+
+    @Test("Ohne Fabriken (App-Store-Variante): externe und eingebautes per Software")
+    func withoutDDCFactory() async {
+        setup.displays = [Self.builtIn, Self.external(2, avService: nil)]
+        let manager = makeStoreManager()
         manager.refresh(force: true)
 
         #expect(monitor(manager, 1)?.state == .noChannel)
-        #expect(monitor(manager, 1)?.isAdjustable == false)
+        #expect(monitor(manager, 1)?.usesSoftwareDimming == true)
+        #expect(monitor(manager, 1)?.isAdjustable == true)
+        #expect(monitor(manager, 1)?.brightness == 100)
         #expect(monitor(manager, 2)?.usesSoftwareDimming == true)
         #expect(monitor(manager, 2)?.isAdjustable == true)
+    }
+
+    @Test("Eingebautes Display per Software: Wert gemerkt, Gamma oder Overlay wählbar")
+    func builtInSoftwareDimming() async {
+        setup.displays = [Self.builtIn]
+        let manager = makeStoreManager()
+        manager.refresh(force: true)
+
+        manager.setBrightness(40, for: 1)
+        #expect(setup.gamma.levels == [1: 40])
+        manager.setDimmingMethod(.overlay, for: 1)
+        #expect(setup.gamma.levels.isEmpty)
+        #expect(setup.overlay.levels == [1: 40])
+
+        // Neustart: Wert und Verfahren kommen zurück, nur als Software-Wert.
+        let restarted = makeStoreManager()
+        restarted.refresh(force: true)
+        #expect(monitor(restarted, 1)?.brightness == 40)
+        #expect(monitor(restarted, 1)?.dimming == .overlay)
+        #expect(BrightnessStore(storage: setup.preferences).brightness(for: Self.builtIn.identity.storageKey, mode: .ddc) == nil)
+    }
+
+    @Test("Eingebautes Display mit Steuerung (Direct): keine Software-Dimmung")
+    func builtInWithControl() async {
+        setup.displays = [Self.builtIn]
+        let manager = DisplayManager(
+            store: BrightnessStore(storage: setup.preferences),
+            timing: .immediate,
+            gamma: setup.gamma,
+            overlay: setup.overlay,
+            discover: { [setup] in setup.displays },
+            makeBuiltInControl: { _ in StubControl(read: .failure(.timeout)) }
+        )
+        manager.refresh(force: true)
+        #expect(await eventually { monitor(manager, 1)?.state == .i2cTimeout })
+        #expect(monitor(manager, 1)?.usesSoftwareDimming == false)
+        manager.setDimmingMethod(.overlay, for: 1)
+        #expect(setup.overlay.levels.isEmpty)
+        #expect(setup.gamma.levels.isEmpty)
     }
 
     @Test("Dock-Erkennung aus dem DisplayPort-Link")

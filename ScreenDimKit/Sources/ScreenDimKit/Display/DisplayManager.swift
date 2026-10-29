@@ -9,7 +9,8 @@ private let log = ddcLog
 ///
 /// Die Steuerkanäle kommen über Fabriken von außen: Die Direct-Variante der App reicht
 /// DDC und die Steuerung des eingebauten Displays herein, die App-Store-Variante nichts.
-/// Ohne Kanal dimmt der Manager externe Monitore per Software (Gamma oder Overlay).
+/// Displays ohne Kanal dimmt der Manager per Software (Gamma oder Overlay), in der
+/// App-Store-Variante also auch das eingebaute.
 @MainActor
 @Observable
 public final class DisplayManager {
@@ -174,15 +175,16 @@ public final class DisplayManager {
         channelCache = cache
 
         // Wer schon per Software gedimmt wurde, bleibt es während der Probe; sonst würde
-        // der Monitor kurz aufhellen.
+        // der Monitor kurz aufhellen. Das eingebaute Display wechselt nur ohne Kanal zur
+        // Software; scheitert seine Steuerung, bleibt es beim Hinweis.
         let softwareDimmed = Set(monitors.filter(\.usesSoftwareDimming).map(\.storageKey))
         monitors = displays.map { display in
             let key = display.identity.storageKey
-            let software = !display.isBuiltIn && (channels[display.id] == nil || softwareDimmed.contains(key))
-            let brightness: Double = if display.isBuiltIn {
-                50
-            } else if software {
+            let software = channels[display.id] == nil || (!display.isBuiltIn && softwareDimmed.contains(key))
+            let brightness: Double = if software {
                 store.brightness(for: key, mode: .software) ?? 100
+            } else if display.isBuiltIn {
+                50
             } else {
                 store.brightness(for: key, mode: .ddc) ?? 50
             }
@@ -265,8 +267,8 @@ public final class DisplayManager {
         let value = Self.clamp(percent)
         guard monitors[index].brightness != value else { return }
         monitors[index].brightness = value
-        // Das eingebaute Display merkt sich macOS selbst.
-        if !monitors[index].isBuiltIn {
+        // Die Hintergrundbeleuchtung des eingebauten Displays merkt sich macOS selbst.
+        if !monitors[index].isBuiltIn || monitors[index].usesSoftwareDimming {
             let mode: BrightnessStore.Mode = monitors[index].usesSoftwareDimming ? .software : .ddc
             store.setBrightness(value, for: monitors[index].storageKey, mode: mode)
         }
@@ -306,10 +308,10 @@ public final class DisplayManager {
         }
     }
 
-    /// Wählt Gamma oder Overlay für einen extern angeschlossenen Monitor. Gamma wird dabei
-    /// neu versucht, auch wenn es vorher nicht ging.
+    /// Wählt Gamma oder Overlay für einen externen Monitor oder ein per Software gedimmtes
+    /// eingebautes Display. Gamma wird dabei neu versucht, auch wenn es vorher nicht ging.
     public func setDimmingMethod(_ method: DimmingMethod, for id: CGDirectDisplayID) {
-        guard let index = index(of: id), !monitors[index].isBuiltIn else { return }
+        guard let index = index(of: id), !monitors[index].isBuiltIn || monitors[index].usesSoftwareDimming else { return }
         store.setDimmingMethod(method, for: monitors[index].storageKey)
         monitors[index].preferredDimming = method
         if method == .gamma {

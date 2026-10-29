@@ -428,22 +428,22 @@
         }
       }
     },
-    "Die Helligkeit des eingebauten Displays regelst du mit den Helligkeitstasten." : {
+    "Die des eingebauten Displays regelst du weiter mit den Helligkeitstasten." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Use the brightness keys to adjust the built-in display."
+            "value" : "Use the brightness keys to adjust the built-in display’s backlight."
           }
         }
       }
     },
-    "Diese Version dimmt externe Monitore per Software. Die Hintergrundbeleuchtung bleibt, wie sie ist." : {
+    "Diese Version dimmt per Software. Die Hintergrundbeleuchtung bleibt, wie sie ist." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This version dims external displays in software. The backlight stays as it is."
+            "value" : "This version dims in software. The backlight stays as it is."
           }
         }
       }
@@ -1406,12 +1406,12 @@
         }
       }
     },
-    "macOS erlaubt für dieses Display keine Helligkeitssteuerung." : {
+    "macOS erlaubt für dieses Display keine Helligkeitssteuerung. Software-Dimmung aktiv." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "macOS doesn't allow brightness control for this display."
+            "value" : "macOS doesn’t allow brightness control for this display. Software dimming active."
           }
         }
       }

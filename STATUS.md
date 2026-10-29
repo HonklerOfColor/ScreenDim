@@ -1,6 +1,6 @@
 # Status
 
-Stand: 2026-10-29. Beide Targets bauen ohne Warnungen, 102 Tests grün,
+Stand: 2026-10-29. Beide Targets bauen ohne Warnungen, 104 Tests grün,
 `check-mas-binary.sh` auf das App-Store-Binary: OK (Debug).
 
 ## Offene Hardware-Tests
@@ -54,8 +54,9 @@ Auf echter Hardware noch nicht geprüft. Die Tests decken nur die Logik ab.
 - [ ] **Team-ID und Signatur:** `DEVELOPMENT_TEAM` ist leer, Signatur ad hoc. App Store:
       Apple Distribution + Provisioning-Profil. Direct: Developer ID + Notarisierung.
 - [ ] **Englische Texte** gegenlesen (`Localizable.xcstrings`).
-- [ ] **Eingebautes Display in der App-Store-Variante:** zurzeit nicht regelbar (Hinweis
-      auf die Helligkeitstasten). Software-Dimmung auch dafür wäre möglich, ist aber
-      nicht entschieden.
+- [x] **Eingebautes Display in der App-Store-Variante:** per Software (Gamma/Overlay)
+      regelbar; die Hintergrundbeleuchtung bleibt bei den Helligkeitstasten.
+- [ ] **App Store:** Gamma-Dimmung des eingebauten Displays mit True Tone und Night Shift
+      auf echter Hardware prüfen.
 - [ ] Alte Test-Plists `ScreenDimTests.*.plist` in `~/Library/Preferences` (37 Stück, aus
       Testläufen vor dem Umbau) können gelöscht werden; neue entstehen nicht mehr.

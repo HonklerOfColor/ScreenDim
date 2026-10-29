@@ -47,10 +47,15 @@ struct MenuContentView: View {
 
             #if !SCREENDIM_DIRECT
             if manager.monitors.contains(where: \.usesSoftwareDimming) {
-                Text("Diese Version dimmt externe Monitore per Software. Die Hintergrundbeleuchtung bleibt, wie sie ist.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Diese Version dimmt per Software. Die Hintergrundbeleuchtung bleibt, wie sie ist.")
+                    if manager.monitors.contains(where: { $0.isBuiltIn && $0.usesSoftwareDimming }) {
+                        Text("Die des eingebauten Displays regelst du weiter mit den Helligkeitstasten.")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
             #endif
 
@@ -144,7 +149,7 @@ private struct MonitorRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            if monitor.usesSoftwareDimming && !monitor.isBuiltIn {
+            if monitor.usesSoftwareDimming {
                 dimmingPicker
             }
             switch monitor.state {
@@ -164,15 +169,8 @@ private struct MonitorRow: View {
                 #endif
             case _ where monitor.isBuiltIn && monitor.state.isFailure:
                 hint("Helligkeit lässt sich gerade nicht lesen oder setzen.", retry: true)
-            case .noChannel where monitor.isBuiltIn:
-                #if SCREENDIM_DIRECT
-                hint("macOS erlaubt für dieses Display keine Helligkeitssteuerung.", retry: false)
-                #else
-                hint("Die Helligkeit des eingebauten Displays regelst du mit den Helligkeitstasten.",
-                     systemImage: "info.circle", color: .secondary, retry: false)
-                #endif
             default:
-                // Externe Monitore mit DDC-Fehler laufen per Software-Dimmung (oben).
+                // Displays ohne Kanal und externe mit DDC-Fehler laufen per Software-Dimmung (oben).
                 EmptyView()
             }
         }
@@ -212,7 +210,10 @@ private struct MonitorRow: View {
 
     #if SCREENDIM_DIRECT
     private var softwareReason: LocalizedStringKey {
-        switch (monitor.intermediary, monitor.state) {
+        if monitor.isBuiltIn {
+            return "macOS erlaubt für dieses Display keine Helligkeitssteuerung. Software-Dimmung aktiv."
+        }
+        return switch (monitor.intermediary, monitor.state) {
         case (.dock, _): "DDC kommt über das Dock nicht durch. Software-Dimmung aktiv."
         case (.adapter, _): "DDC kommt über den Adapter nicht durch. Software-Dimmung aktiv."
         case (nil, .nullReply): "Monitor antwortet leer – DDC/CI im Monitor-Menü aus? Software-Dimmung aktiv."
