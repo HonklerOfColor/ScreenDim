@@ -226,7 +226,50 @@ struct DisplayManagerTests {
         #expect(await eventually { state(manager, 2) == .ready })
         #expect(monitor(manager, 2)?.usesSoftwareDimming == false)
         #expect(setup.dimmer.levels.isEmpty)
-        #expect(await eventually { control.writes == [60] })
+        // Der Gamma-Wert 60 geht nicht per DDC raus; ohne gespeicherten DDC-Wert bleibt
+        // die Hintergrundbeleuchtung, wie der Monitor sie meldet.
+        #expect(monitor(manager, 2)?.brightness == 80)
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(control.writes.isEmpty)
+    }
+
+    @Test("DDC-Wert wird nie als Gamma übernommen (keine doppelte Abdunklung)")
+    func ddcValueNotUsedForGamma() async {
+        // Direkt angeschlossen: DDC setzt die Hintergrundbeleuchtung auf 30 %.
+        let direct = StubControl()
+        setup.displays = [Self.external(2, avService: 0x100)]
+        setup.makeControl = { _ in direct }
+        let first = makeManager()
+        first.refresh(force: true)
+        #expect(await eventually { state(first, 2) == .ready })
+        first.setBrightness(30, for: 2)
+        #expect(await eventually { direct.writes == [30] })
+
+        // Am Dock antwortet DDC nicht. Die Beleuchtung steht noch auf 30 %, also kein Gamma.
+        setup.makeControl = { _ in StubControl(read: .failure(.nullReply)) }
+        let docked = makeManager()
+        docked.refresh(force: true)
+        #expect(await eventually { monitor(docked, 2)?.usesSoftwareDimming == true })
+        #expect(monitor(docked, 2)?.brightness == 100)
+        #expect(setup.dimmer.levels == [2: 100])
+        docked.setBrightness(70, for: 2)
+
+        // Wieder direkt: Es gilt der DDC-Wert 30, nicht der Gamma-Wert 70.
+        let again = StubControl(read: .success(VCPReading(current: 50, maximum: 100)))
+        setup.makeControl = { _ in again }
+        let third = makeManager()
+        third.refresh(force: true)
+        #expect(await eventually { state(third, 2) == .ready })
+        #expect(monitor(third, 2)?.brightness == 30)
+        #expect(setup.dimmer.levels.isEmpty)
+        #expect(await eventually { again.writes == [30] })
+
+        // Und zurück ans Dock: der eigene Gamma-Wert 70 kommt wieder.
+        setup.makeControl = { _ in StubControl(read: .failure(.nullReply)) }
+        let fourth = makeManager()
+        fourth.refresh(force: true)
+        #expect(await eventually { monitor(fourth, 2)?.usesSoftwareDimming == true })
+        #expect(setup.dimmer.levels == [2: 70])
     }
 
     @Test("Refresh behält Software-Dimmung und schreibt Gamma neu")

@@ -134,6 +134,13 @@ final class DisplayManager {
         monitors = displays.map { display in
             let key = display.identity.storageKey
             let software = !display.isBuiltIn && (channels[display.id] == nil || softwareDimmed.contains(key))
+            let brightness: Double = if display.isBuiltIn {
+                50
+            } else if software {
+                store.brightness(for: key, mode: .software) ?? 100
+            } else {
+                store.brightness(for: key, mode: .ddc) ?? 50
+            }
             return Monitor(
                 id: display.id,
                 name: display.name,
@@ -141,7 +148,7 @@ final class DisplayManager {
                 isBuiltIn: display.isBuiltIn,
                 intermediary: display.link?.intermediary,
                 branchVendor: display.link?.branchVendor,
-                brightness: display.isBuiltIn ? 50 : store.brightness(for: key) ?? (software ? 100 : 50),
+                brightness: brightness,
                 state: channels[display.id] == nil ? .noChannel : .probing,
                 usesSoftwareDimming: software
             )
@@ -206,7 +213,8 @@ final class DisplayManager {
         monitors[index].brightness = value
         // Das eingebaute Display merkt sich macOS selbst.
         if !monitors[index].isBuiltIn {
-            store.setBrightness(value, for: monitors[index].storageKey)
+            let mode: BrightnessStore.Mode = monitors[index].usesSoftwareDimming ? .software : .ddc
+            store.setBrightness(value, for: monitors[index].storageKey, mode: mode)
         }
         if monitors[index].usesSoftwareDimming {
             syncSoftwareDimming()
@@ -283,7 +291,7 @@ final class DisplayManager {
     /// den gespeicherten Wert her.
     private func probe(_ id: CGDirectDisplayID, generation: Int) async {
         guard let channel = channels[id], let monitor = monitors.first(where: { $0.id == id }) else { return }
-        let saved = monitor.isBuiltIn ? nil : store.brightness(for: monitor.storageKey)
+        let saved = monitor.isBuiltIn ? nil : store.brightness(for: monitor.storageKey, mode: .ddc)
 
         var reading: VCPReading?
         var lastError: DDCError?
@@ -343,8 +351,9 @@ final class DisplayManager {
         guard !monitors[index].usesSoftwareDimming else { return }
         log.notice("Display \(self.monitors[index].id): Software-Dimmung statt DDC")
         monitors[index].usesSoftwareDimming = true
-        // Ohne gespeicherten Wert nicht abdunkeln: die Hintergrundbeleuchtung ist unbekannt.
-        monitors[index].brightness = store.brightness(for: monitors[index].storageKey) ?? 100
+        // Nur den eigenen Gamma-Wert übernehmen, nie den DDC-Wert: Die Hintergrundbeleuchtung
+        // steht schon darauf, Gamma käme oben drauf. Ohne gespeicherten Wert nicht abdunkeln.
+        monitors[index].brightness = store.brightness(for: monitors[index].storageKey, mode: .software) ?? 100
         syncSoftwareDimming()
     }
 

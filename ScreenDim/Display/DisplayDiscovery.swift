@@ -153,6 +153,7 @@ enum DisplayDiscovery {
     private static func registryScan() -> (candidates: [Candidate], links: [LinkCandidate]) {
         var iterator: io_iterator_t = 0
         let root = IORegistryGetRootEntry(kIOMainPortDefault)
+        defer { IOObjectRelease(root) }
         guard IORegistryEntryCreateIterator(root, kIOServicePlane, IOOptionBits(kIORegistryIterateRecursively), &iterator) == KERN_SUCCESS else {
             return ([], [])
         }
