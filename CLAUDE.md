@@ -52,6 +52,10 @@ geschrieben.
 
 - Projektänderungen nur über `project.yml`, danach `xcodegen generate`. Das `.xcodeproj`
   und `Config/*.plist` sind generiert und nicht im Git.
+- `xcodegen generate` nur, wenn das Projekt in Xcode geschlossen ist. Lädt Xcode 27 ein
+  offenes Projekt neu, hält es `ScreenDimKit/.swiftpm/xcode` für ein Projekt, öffnet das
+  Paket als Ordner und meldet „Missing package product 'ScreenDimKit'“. Abhilfe: Xcode
+  beenden (⌘Q), `ScreenDimKit/.swiftpm` löschen, Projekt neu öffnen.
 - Builds nur generisch, DerivedData außerhalb von iCloud:
   ```
   xcodebuild -project ScreenDim.xcodeproj -scheme "ScreenDim" -destination 'generic/platform=macOS' -derivedDataPath /tmp/screendim-dd CODE_SIGNING_ALLOWED=NO build
