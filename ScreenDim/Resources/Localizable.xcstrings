@@ -1,0 +1,983 @@
+{
+  "sourceLanguage" : "de",
+  "strings" : {
+    "%@ (eingebaut)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (built-in)"
+          }
+        }
+      }
+    },
+    "%lld Lanes" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Lane"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Lanes"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lane"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lanes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld offene Aufrufe" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld offener Aufruf"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld offene Aufrufe"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld open call"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld open calls"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "AV-Service" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AV service"
+          }
+        }
+      }
+    },
+    "AV-Service: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AV service: %@"
+          }
+        }
+      }
+    },
+    "Abdunkeln über" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dim with"
+          }
+        }
+      }
+    },
+    "Abfrage läuft" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Querying"
+          }
+        }
+      }
+    },
+    "Alle Monitore" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All Displays"
+          }
+        }
+      }
+    },
+    "Beenden" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quit"
+          }
+        }
+      }
+    },
+    "Bei Login starten" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launch at Login"
+          }
+        }
+      }
+    },
+    "Bereit" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ready"
+          }
+        }
+      }
+    },
+    "Branch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Branch"
+          }
+        }
+      }
+    },
+    "Branch: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Branch: %@"
+          }
+        }
+      }
+    },
+    "CGDirectDisplayID" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CGDirectDisplayID"
+          }
+        }
+      }
+    },
+    "DDC kommt über das Dock nicht durch. Software-Dimmung aktiv." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DDC doesn't get through the dock. Software dimming active."
+          }
+        }
+      }
+    },
+    "DDC kommt über den Adapter nicht durch. Software-Dimmung aktiv." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DDC doesn't get through the adapter. Software dimming active."
+          }
+        }
+      }
+    },
+    "DDC-Timing: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DDC timing: %@"
+          }
+        }
+      }
+    },
+    "DDC-Verbindung blockiert. Software-Dimmung aktiv." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DDC connection blocked. Software dimming active."
+          }
+        }
+      }
+    },
+    "Diagnose kopieren" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy Diagnostics"
+          }
+        }
+      }
+    },
+    "Diagnose …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnostics…"
+          }
+        }
+      }
+    },
+    "Die Helligkeit des eingebauten Displays regelst du mit den Helligkeitstasten." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use the brightness keys to adjust the built-in display."
+          }
+        }
+      }
+    },
+    "Diese Version dimmt externe Monitore per Software. Die Hintergrundbeleuchtung bleibt, wie sie ist." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This version dims external displays in software. The backlight stays as it is."
+          }
+        }
+      }
+    },
+    "EDID" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "EDID"
+          }
+        }
+      }
+    },
+    "Erneut prüfen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check Again"
+          }
+        }
+      }
+    },
+    "Frage Monitor per DDC/CI ab …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Querying display via DDC/CI…"
+          }
+        }
+      }
+    },
+    "Gamma" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gamma"
+          }
+        }
+      }
+    },
+    "Gamma skaliert die Farbkurve des Displays. Overlay legt ein halbtransparentes Fenster darüber." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gamma scales the display's color curve. Overlay places a translucent window on top."
+          }
+        }
+      }
+    },
+    "Gamma-Tabelle nicht nutzbar, Overlay aktiv." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gamma table unavailable, using overlay."
+          }
+        }
+      }
+    },
+    "Helligkeit %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brightness %@"
+          }
+        }
+      }
+    },
+    "Helligkeit %lld von 100, Maximum %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brightness %lld of 100, maximum %lld"
+          }
+        }
+      }
+    },
+    "Helligkeit lässt sich gerade nicht lesen oder setzen." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brightness can't be read or set right now."
+          }
+        }
+      }
+    },
+    "I/O-Fehler %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I/O error %@"
+          }
+        }
+      }
+    },
+    "I2C-Fehler %@. Software-Dimmung aktiv." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I2C error %@. Software dimming active."
+          }
+        }
+      }
+    },
+    "I2C-Read" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I2C read"
+          }
+        }
+      }
+    },
+    "I2C-Timeout, Kanal blockiert" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I2C timeout, channel blocked"
+          }
+        }
+      }
+    },
+    "I2C-Write" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I2C write"
+          }
+        }
+      }
+    },
+    "In den Systemeinstellungen erlauben …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow in System Settings…"
+          }
+        }
+      }
+    },
+    "Kanal" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel"
+          }
+        }
+      }
+    },
+    "Kanal: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel: %@"
+          }
+        }
+      }
+    },
+    "Kein DDC-Kanal gefunden. Software-Dimmung aktiv." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No DDC channel found. Software dimming active."
+          }
+        }
+      }
+    },
+    "Kein Display gefunden" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No display found"
+          }
+        }
+      }
+    },
+    "Kein Kanal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No channel"
+          }
+        }
+      }
+    },
+    "Kein Steuerkanal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No control channel"
+          }
+        }
+      }
+    },
+    "Kopiert" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copied"
+          }
+        }
+      }
+    },
+    "Letzter I2C-Read: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last I2C read: %@"
+          }
+        }
+      }
+    },
+    "Letzter I2C-Write: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last I2C write: %@"
+          }
+        }
+      }
+    },
+    "Letzter Read" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last read"
+          }
+        }
+      }
+    },
+    "Letzter Read: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last read: %@"
+          }
+        }
+      }
+    },
+    "Letzter Write" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last write"
+          }
+        }
+      }
+    },
+    "Letzter Write: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last write: %@"
+          }
+        }
+      }
+    },
+    "Link" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Link"
+          }
+        }
+      }
+    },
+    "Link: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Link: %@"
+          }
+        }
+      }
+    },
+    "MacBook-Display" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MacBook Display"
+          }
+        }
+      }
+    },
+    "Monitor %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Display %lld"
+          }
+        }
+      }
+    },
+    "Monitor antwortet leer – DDC/CI im Monitor-Menü aus? Software-Dimmung aktiv." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Display sends empty replies – is DDC/CI off in its menu? Software dimming active."
+          }
+        }
+      }
+    },
+    "Monitor reagiert nicht auf DDC/CI. Software-Dimmung aktiv." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Display doesn't respond to DDC/CI. Software dimming active."
+          }
+        }
+      }
+    },
+    "Monitore neu suchen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rescan Displays"
+          }
+        }
+      }
+    },
+    "Null-Antwort (6E 80 BE)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Null reply (6E 80 BE)"
+          }
+        }
+      }
+    },
+    "Overlay" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overlay"
+          }
+        }
+      }
+    },
+    "Read OK: %lld/%lld, %lld ms" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read OK: %lld/%lld, %lld ms"
+          }
+        }
+      }
+    },
+    "Read fehlgeschlagen: %@, %lld ms" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read failed: %@, %lld ms"
+          }
+        }
+      }
+    },
+    "Schreibt einmal den Wert, den der Slider zeigt: %@ von 100." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Writes the slider value once: %@ of 100."
+          }
+        }
+      }
+    },
+    "ScreenDim" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ScreenDim"
+          }
+        }
+      }
+    },
+    "ScreenDim Diagnose" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ScreenDim Diagnostics"
+          }
+        }
+      }
+    },
+    "ScreenDim Diagnose, %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ScreenDim Diagnostics, %@"
+          }
+        }
+      }
+    },
+    "Software-Dimmung (Gamma)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Software dimming (gamma)"
+          }
+        }
+      }
+    },
+    "Software-Dimmung (Overlay)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Software dimming (overlay)"
+          }
+        }
+      }
+    },
+    "Tastenkürzel ⌃⌥↑/↓ sind von einer anderen App belegt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shortcuts ⌃⌥↑/↓ are taken by another app"
+          }
+        }
+      }
+    },
+    "Test: Read 0x10" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test: Read 0x10"
+          }
+        }
+      }
+    },
+    "Test: Write 0x10 = aktueller Wert" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test: Write 0x10 = current value"
+          }
+        }
+      }
+    },
+    "Ungültige Antwort" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invalid reply"
+          }
+        }
+      }
+    },
+    "Write %lld OK, %lld ms" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write %lld OK, %lld ms"
+          }
+        }
+      }
+    },
+    "Write %lld fehlgeschlagen: %@, %lld ms" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write %lld failed: %@, %lld ms"
+          }
+        }
+      }
+    },
+    "Zustand" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "State"
+          }
+        }
+      }
+    },
+    "Zustand: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "State: %@"
+          }
+        }
+      }
+    },
+    "gefunden, RegistryEntryID %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "found, RegistryEntryID %@"
+          }
+        }
+      }
+    },
+    "gefunden, RegistryEntryID %@, Kanal nicht erzeugt" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "found, RegistryEntryID %@, channel not created"
+          }
+        }
+      }
+    },
+    "getunnelt (USB4/TB)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "tunneled (USB4/TB)"
+          }
+        }
+      }
+    },
+    "hängt seit %@ s" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "hung for %@ s"
+          }
+        }
+      }
+    },
+    "keine Bytes" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no bytes"
+          }
+        }
+      }
+    },
+    "macOS erlaubt für dieses Display keine Helligkeitssteuerung." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS doesn't allow brightness control for this display."
+          }
+        }
+      }
+    },
+    "nicht gefunden" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "not found"
+          }
+        }
+      }
+    },
+    "Über Adapter" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Via adapter"
+          }
+        }
+      }
+    },
+    "Über Adapter (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Via adapter (%@)"
+          }
+        }
+      }
+    },
+    "Über Dock" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Via dock"
+          }
+        }
+      }
+    },
+    "Über Dock (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Via dock (%@)"
+          }
+        }
+      }
+    },
+    "– (eingebautes Display)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "– (built-in display)"
+          }
+        }
+      }
+    },
+    "⌃⌥↑ / ⌃⌥↓  alle Monitore ±%@ %%" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃⌥↑ / ⌃⌥↓  all displays ±%@%%"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

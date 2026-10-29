@@ -1,9 +1,12 @@
+import ScreenDimKit
 import SwiftUI
 
 struct MenuContentView: View {
     let manager: DisplayManager
     let loginItem: LoginItem
+    #if SCREENDIM_DIRECT
     @Environment(\.openWindow) private var openWindow
+    #endif
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -13,7 +16,7 @@ struct MenuContentView: View {
             } else {
                 if manager.monitors.count > 1 {
                     BrightnessSlider(
-                        title: "Alle Monitore",
+                        title: String(localized: "Alle Monitore"),
                         systemImage: "sun.max.fill",
                         value: Binding(get: { manager.masterBrightness }, set: { manager.setAllBrightness($0) }),
                         isEnabled: manager.monitors.contains(where: \.isAdjustable)
@@ -26,6 +29,15 @@ struct MenuContentView: View {
                 }
             }
 
+            #if !SCREENDIM_DIRECT
+            if manager.monitors.contains(where: \.usesSoftwareDimming) {
+                Text("Diese Version dimmt externe Monitore per Software. Die Hintergrundbeleuchtung bleibt, wie sie ist.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            #endif
+
             Divider()
 
             VStack(alignment: .leading, spacing: 6) {
@@ -37,21 +49,28 @@ struct MenuContentView: View {
                         .font(.caption)
                 }
                 if let error = loginItem.lastError {
-                    Text(error).font(.caption).foregroundStyle(.red)
+                    Text(verbatim: error).font(.caption).foregroundStyle(.red)
                 }
-                Text(manager.hotKeysAvailable
-                     ? "⌃⌥↑ / ⌃⌥↓  alle Monitore ±\(Int(DisplayManager.hotKeyStep)) %"
-                     : "Tastenkürzel ⌃⌥↑/↓ sind von einer anderen App belegt")
-                    .font(.caption)
-                    .foregroundStyle(manager.hotKeysAvailable ? Color.secondary : Color.orange)
+                Group {
+                    if manager.hotKeysAvailable {
+                        Text("⌃⌥↑ / ⌃⌥↓  alle Monitore ±\(Int(DisplayManager.hotKeyStep).formatted()) %")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Tastenkürzel ⌃⌥↑/↓ sind von einer anderen App belegt")
+                            .foregroundStyle(.orange)
+                    }
+                }
+                .font(.caption)
             }
 
             HStack {
                 Button("Monitore neu suchen") { manager.refresh(force: true) }
+                #if SCREENDIM_DIRECT
                 Button("Diagnose …") {
                     openWindow(id: DiagnosticsView.windowID)
                     NSApplication.shared.activate()
                 }
+                #endif
                 Spacer()
                 Button("Beenden") { NSApplication.shared.terminate(nil) }
                     .keyboardShortcut("q")
@@ -83,6 +102,9 @@ private struct MonitorRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            if monitor.usesSoftwareDimming && !monitor.isBuiltIn {
+                dimmingPicker
+            }
             switch monitor.state {
             case .probing:
                 HStack(spacing: 6) {
@@ -92,11 +114,21 @@ private struct MonitorRow: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             case _ where monitor.usesSoftwareDimming:
-                hint("\(softwareReason) Software-Dimmung aktiv.", systemImage: "circle.lefthalf.filled", color: .secondary, retry: true)
+                #if SCREENDIM_DIRECT
+                hint(softwareReason, systemImage: "circle.lefthalf.filled", color: .secondary, retry: true)
+                #else
+                // Ohne DDC ist Software-Dimmung der Normalfall; der Hinweis steht einmal unten.
+                EmptyView()
+                #endif
             case _ where monitor.isBuiltIn && monitor.state.isFailure:
                 hint("Helligkeit lässt sich gerade nicht lesen oder setzen.", retry: true)
             case .noChannel where monitor.isBuiltIn:
+                #if SCREENDIM_DIRECT
                 hint("macOS erlaubt für dieses Display keine Helligkeitssteuerung.", retry: false)
+                #else
+                hint("Die Helligkeit des eingebauten Displays regelst du mit den Helligkeitstasten.",
+                     systemImage: "info.circle", color: .secondary, retry: false)
+                #endif
             default:
                 // Externe Monitore mit DDC-Fehler laufen per Software-Dimmung (oben).
                 EmptyView()
@@ -104,29 +136,58 @@ private struct MonitorRow: View {
         }
     }
 
+    /// Gamma oder Overlay. Geht Gamma bei diesem Display nicht, dimmt das Overlay.
+    private var dimmingPicker: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Picker("Abdunkeln über", selection: Binding(
+                get: { monitor.dimming },
+                set: { manager.setDimmingMethod($0, for: monitor.id) }
+            )) {
+                Text("Gamma").tag(DimmingMethod.gamma)
+                Text("Overlay").tag(DimmingMethod.overlay)
+            }
+            .pickerStyle(.segmented)
+            .controlSize(.small)
+            .help("Gamma skaliert die Farbkurve des Displays. Overlay legt ein halbtransparentes Fenster darüber.")
+            if monitor.gammaUnavailable {
+                Text("Gamma-Tabelle nicht nutzbar, Overlay aktiv.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     /// „Über Dock (Realtek)“; `nil` bei direktem Anschluss.
-    private var connection: String? {
+    private var connection: LocalizedStringKey? {
         guard let intermediary = monitor.intermediary else { return nil }
-        let vendor = monitor.branchVendor.map { " (\($0))" } ?? ""
-        return switch intermediary {
-        case .dock: "Über Dock\(vendor)"
-        case .adapter: "Über Adapter\(vendor)"
+        return switch (intermediary, monitor.branchVendor) {
+        case (.dock, let vendor?): "Über Dock (\(vendor))"
+        case (.dock, nil): "Über Dock"
+        case (.adapter, let vendor?): "Über Adapter (\(vendor))"
+        case (.adapter, nil): "Über Adapter"
         }
     }
 
-    private var softwareReason: String {
+    #if SCREENDIM_DIRECT
+    private var softwareReason: LocalizedStringKey {
         switch (monitor.intermediary, monitor.state) {
-        case (.dock, _): "DDC kommt über das Dock nicht durch."
-        case (.adapter, _): "DDC kommt über den Adapter nicht durch."
-        case (nil, .nullReply): "Monitor antwortet leer – DDC/CI im Monitor-Menü aus?"
-        case (nil, .i2cTimeout): "DDC-Verbindung blockiert."
-        case (nil, .ioError(let status)): "I2C-Fehler \(IOReturnDescription.name(status))."
-        case (nil, .noChannel): "Kein DDC-Kanal gefunden."
-        case (nil, _): "Monitor reagiert nicht auf DDC/CI."
+        case (.dock, _): "DDC kommt über das Dock nicht durch. Software-Dimmung aktiv."
+        case (.adapter, _): "DDC kommt über den Adapter nicht durch. Software-Dimmung aktiv."
+        case (nil, .nullReply): "Monitor antwortet leer – DDC/CI im Monitor-Menü aus? Software-Dimmung aktiv."
+        case (nil, .i2cTimeout): "DDC-Verbindung blockiert. Software-Dimmung aktiv."
+        case (nil, .ioError(let status)): "I2C-Fehler \(IOReturnDescription.name(status)). Software-Dimmung aktiv."
+        case (nil, .noChannel): "Kein DDC-Kanal gefunden. Software-Dimmung aktiv."
+        case (nil, _): "Monitor reagiert nicht auf DDC/CI. Software-Dimmung aktiv."
         }
     }
+    #endif
 
-    private func hint(_ text: String, systemImage: String = "exclamationmark.triangle.fill", color: Color = .orange, retry: Bool) -> some View {
+    private func hint(
+        _ text: LocalizedStringKey,
+        systemImage: String = "exclamationmark.triangle.fill",
+        color: Color = .orange,
+        retry: Bool
+    ) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: systemImage)
                 .foregroundStyle(color)
@@ -143,6 +204,7 @@ private struct MonitorRow: View {
 }
 
 private struct BrightnessSlider: View {
+    /// Schon lokalisiert bzw. Monitorname.
     let title: String
     let systemImage: String
     @Binding var value: Double
@@ -154,12 +216,12 @@ private struct BrightnessSlider: View {
                 Label(title, systemImage: systemImage)
                     .lineLimit(1)
                 Spacer()
-                Text("\(Int(value)) %")
+                Text(verbatim: "\(Int(value)) %")
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
             Slider(value: $value, in: 0...100, step: 1)
-                .accessibilityLabel("Helligkeit \(title)")
+                .accessibilityLabel(Text("Helligkeit \(title)"))
         }
         .disabled(!isEnabled)
     }

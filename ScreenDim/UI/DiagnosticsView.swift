@@ -1,8 +1,10 @@
+#if SCREENDIM_DIRECT
 import AppKit
+import ScreenDimKit
 import SwiftUI
 
 /// Fenster „Diagnose …“: pro Display Zuordnung, Link, Kanalzustand und die letzten
-/// I2C-Ergebnisse, dazu Test-Read und Test-Write.
+/// I2C-Ergebnisse, dazu Test-Read und Test-Write. Nur in der Direct-Variante.
 struct DiagnosticsView: View {
     static let windowID = "diagnostics"
 
@@ -71,12 +73,12 @@ struct DiagnosticsView: View {
             HStack(spacing: 8) {
                 Button("Test: Read 0x10") { runTest(display.id) { await manager.testRead(display.id) } }
                 Button("Test: Write 0x10 = aktueller Wert") { runTest(display.id) { await manager.testWrite(display.id) } }
-                    .help("Schreibt einmal den Wert, den der Slider zeigt (\(Int(display.brightness)) %).")
+                    .help(Text("Schreibt einmal den Wert, den der Slider zeigt: \(Int(display.brightness).formatted()) von 100."))
                 if running.contains(display.id) {
                     ProgressView().controlSize(.small)
                 }
                 if let result = testResults[display.id] {
-                    Text(result)
+                    Text(verbatim: result)
                         .font(.caption.monospaced())
                         .textSelection(.enabled)
                 }
@@ -85,12 +87,12 @@ struct DiagnosticsView: View {
         }
     }
 
-    private func row(_ title: String, _ value: String) -> some View {
+    private func row(_ title: LocalizedStringKey, _ value: String) -> some View {
         GridRow {
             Text(title)
                 .foregroundStyle(.secondary)
                 .gridColumnAlignment(.trailing)
-            Text(value)
+            Text(verbatim: value)
                 .font(.callout.monospaced())
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
@@ -117,3 +119,4 @@ struct DiagnosticsView: View {
         }
     }
 }
+#endif

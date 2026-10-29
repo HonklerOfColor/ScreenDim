@@ -20,4 +20,4 @@ Package.resolved
 
 # Von xcodegen aus project.yml erzeugt
 *.xcodeproj/
-Config/Info.plist
+Config/*.plist

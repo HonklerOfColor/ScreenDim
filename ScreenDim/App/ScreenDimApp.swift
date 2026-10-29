@@ -1,5 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
+import ScreenDimKit
 import SwiftUI
 
 @main
@@ -12,17 +13,28 @@ struct ScreenDimApp: App {
         }
         .menuBarExtraStyle(.window)
 
+        #if SCREENDIM_DIRECT
         Window("ScreenDim Diagnose", id: DiagnosticsView.windowID) {
             DiagnosticsView(manager: appDelegate.manager)
         }
         .defaultLaunchBehavior(.suppressed)
         .windowResizability(.contentMinSize)
+        #endif
     }
 }
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    let manager = DisplayManager()
+    #if SCREENDIM_DIRECT
+    let manager = DisplayManager(
+        makeExternalControl: DirectControls.external,
+        makeBuiltInControl: DirectControls.builtIn
+    )
+    #else
+    /// App Store: keine private API, also weder DDC noch Steuerung des eingebauten
+    /// Displays. Externe Monitore dimmt der Manager per Software.
+    let manager = DisplayManager(discover: { DisplayDiscovery.displays(scanRegistry: false) })
+    #endif
     let loginItem = LoginItem()
     private let hotKeys = HotKeyCenter()
 
