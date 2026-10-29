@@ -13,6 +13,10 @@
   Menüeintrag und eigenes Menüleisten-Symbol, nach dem Start immer aus (außer
   `-ScreenDimDemo YES`).
 - Einstellungsfenster (Abschnitt „Sensor“), App-Review-Notizen in `docs/AppReviewNotes.md`.
+- Lichtquelle wählbar: Schreibtisch-Sensor, eingebauter Lichtsensor des Macs (nur Direct,
+  Prototyp; regelt nur die externen Monitore, pausiert bei zugeklapptem Deckel) oder aus.
+  Ersetzt den Schalter „Helligkeit ans Umgebungslicht anpassen“. Details:
+  `docs/EingebauterLichtsensor.md`.
 - Zwei Varianten aus einer Codebasis: „ScreenDim“ für den Mac App Store (Sandbox, ohne
   private API, Software-Dimmung) und „ScreenDim Direct“ (Developer ID, DDC/CI).
 - Overlay-Dimmung als zweiter Weg neben Gamma: randloses Fenster über Menüleiste, allen

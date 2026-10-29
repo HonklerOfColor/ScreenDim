@@ -277,8 +277,10 @@ public final class DisplayManager {
         }
     }
 
-    public func setAllBrightness(_ percent: Double) {
-        for monitor in monitors {
+    /// - Parameter includingBuiltIn: `false` lässt das eingebaute Display aus, etwa wenn
+    ///   macOS es per Auto-Helligkeit selbst regelt.
+    public func setAllBrightness(_ percent: Double, includingBuiltIn: Bool = true) {
+        for monitor in monitors where includingBuiltIn || !monitor.isBuiltIn {
             setBrightness(percent, for: monitor.id)
         }
     }

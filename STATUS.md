@@ -1,6 +1,6 @@
 # Status
 
-Stand: 2026-10-29. Beide Targets bauen ohne Warnungen, 102 Tests grün,
+Stand: 2026-10-29. Beide Targets bauen ohne Warnungen, 107 Tests grün,
 `check-mas-binary.sh` auf das App-Store-Binary: OK (Debug).
 
 ## Offene Hardware-Tests
@@ -43,6 +43,13 @@ Auf echter Hardware noch nicht geprüft. Die Tests decken nur die Logik ab.
 - [ ] Abwesenheit: Bildschirme schwarz, Mausbewegung weckt; Sensor ausstecken → wieder an.
 - [ ] Lux → Helligkeit: Kurve 10 lx → 20 %, 1000 lx → 100 % am Schreibtisch prüfen.
 - [ ] Demo-Modus: Banner, Menüeintrag, Symbol; nach Neustart aus.
+
+### Eingebauter Lichtsensor (nur Direct, Prototyp)
+Machbarkeit und Messungen: `docs/EingebauterLichtsensor.md`.
+- [ ] MacBook: Lichtquelle „Eingebauter Lichtsensor“; Lux bei Tageslicht und Lampe, externe
+      Monitore folgen, eingebautes Display bleibt bei macOS.
+- [ ] Deckel zu (Clamshell): Hinweis „pausiert“, Monitore bleiben; aufklappen → wieder Werte.
+- [ ] Mac Studio: Option fehlt.
 
 ## Offene Punkte für die Einreichung
 

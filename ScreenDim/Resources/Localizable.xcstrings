@@ -338,6 +338,16 @@
         }
       }
     },
+    "Deckel zu: Der Lichtsensor ist pausiert." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lid closed: the light sensor is paused."
+          }
+        }
+      }
+    },
     "Demo-Modus (simulierter Sensor)" : {
       "localizations" : {
         "en" : {
@@ -464,6 +474,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "EDID"
+          }
+        }
+      }
+    },
+    "Eingebauter Lichtsensor" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Built-in light sensor"
           }
         }
       }
@@ -599,12 +619,12 @@
         }
       }
     },
-    "Helligkeit ans Umgebungslicht anpassen" : {
+    "Helligkeit anpassen nach" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adjust brightness to ambient light"
+            "value" : "Adjust brightness using"
           }
         }
       }
@@ -1034,12 +1054,32 @@
         }
       }
     },
+    "Regelt nur die externen Monitore. Das eingebaute Display regelt macOS (Automatische Helligkeit)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjusts external displays only. macOS adjusts the built-in display (Automatically adjust brightness)."
+          }
+        }
+      }
+    },
     "Schreibt einmal den Wert, den der Slider zeigt: %@ von 100." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Writes the slider value once: %@ of 100."
+          }
+        }
+      }
+    },
+    "Schreibtisch-Sensor" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desk sensor"
           }
         }
       }
@@ -1298,6 +1338,16 @@
         }
       }
     },
+    "Wirkt, sobald der Schreibtisch-Sensor verbunden ist." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Takes effect once the desk sensor is connected."
+          }
+        }
+      }
+    },
     "Write %lld OK, %lld ms" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1326,6 +1376,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The real sensor is disconnected while demo mode is on."
+          }
+        }
+      }
+    },
+    "Während des Demo-Modus kommt das Licht aus der Simulation." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "While demo mode is on, the light level is simulated."
           }
         }
       }

@@ -11,6 +11,7 @@ struct SettingsView: View {
                 DemoBanner(sensor: sensor)
             }
             SensorSection(sensor: sensor)
+            LightSection(sensor: sensor)
             DemoSection(sensor: sensor)
             Section {
                 VStack(alignment: .leading, spacing: 4) {
@@ -68,9 +69,6 @@ private struct SensorSection: View {
                     LabeledContent("Status") { SensorStatusLabel(sensor: sensor) }
                     if sensor.status == .connected {
                         SensorReadings(sensor: sensor)
-                        Toggle("Helligkeit ans Umgebungslicht anpassen", isOn: Binding(
-                            get: { sensor.adjustsBrightness }, set: { sensor.adjustsBrightness = $0 }
-                        ))
                     }
                     Button("Entkoppeln", role: .destructive) { sensor.unpair() }
                 }
@@ -83,6 +81,66 @@ private struct SensorSection: View {
             if needed { browser.start() } else { browser.stop() }
         }
         .onDisappear { browser.stop() }
+    }
+}
+
+/// Woher das Licht für die Helligkeit kommt. Ohne Lichtsensor im Mac bleibt nur
+/// Schreibtisch-Sensor oder aus; die Wahl erscheint dann erst mit verbundenem Sensor.
+private struct LightSection: View {
+    let sensor: SensorController
+
+    private var deskSensorConnected: Bool {
+        sensor.isEnabled && !sensor.isDemoActive && sensor.status == .connected
+    }
+
+    var body: some View {
+        if sensor.hasBuiltInLightSensor || deskSensorConnected {
+            Section("Umgebungslicht") {
+                Picker("Helligkeit anpassen nach", selection: Binding(
+                    get: { sensor.lightSource }, set: { sensor.setLightSource($0) }
+                )) {
+                    Text("Schreibtisch-Sensor").tag(SensorController.LightSource.deskSensor)
+                    if sensor.hasBuiltInLightSensor {
+                        Text("Eingebauter Lichtsensor").tag(SensorController.LightSource.builtIn)
+                    }
+                    Text("Aus").tag(SensorController.LightSource.off)
+                }
+                switch sensor.lightSource {
+                case .deskSensor where !deskSensorConnected && !sensor.isDemoActive:
+                    caption("Wirkt, sobald der Schreibtisch-Sensor verbunden ist.")
+                case .builtIn:
+                    builtInStatus
+                default:
+                    EmptyView()
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var builtInStatus: some View {
+        if sensor.isDemoActive {
+            caption("Während des Demo-Modus kommt das Licht aus der Simulation.")
+        } else if sensor.isBuiltInLightSensorCovered {
+            Label("Deckel zu: Der Lichtsensor ist pausiert.", systemImage: "laptopcomputer")
+                .foregroundStyle(.orange)
+        } else {
+            LabeledContent("Umgebungslicht") {
+                if let lux = sensor.builtInLux {
+                    Text("\(Int(lux.rounded())) lx").monospacedDigit()
+                } else {
+                    Text(verbatim: "–")
+                }
+            }
+        }
+        caption("Regelt nur die externen Monitore. Das eingebaute Display regelt macOS (Automatische Helligkeit).")
+    }
+
+    private func caption(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 

@@ -13,11 +13,12 @@ app="$1"
 
 # Zeichenketten, die nur private API mit sich bringt: IOAVService (DDC über den DCP),
 # DisplayServices (Helligkeit des eingebauten Displays), private Frameworks, SkyLight
-# und CoreDisplay-Interna.
-string_pattern='IOAVService|DisplayServices|PrivateFrameworks|SkyLight|CoreDisplay_'
+# und CoreDisplay-Interna; dazu die nicht öffentlichen Funktionen des HID-Event-Systems
+# (Lichtsensor des MacBooks).
+string_pattern='IOAVService|DisplayServices|PrivateFrameworks|SkyLight|CoreDisplay_|IOHIDServiceClientCopyEvent|IOHIDEventSystemClient(Create$|SetMatching|RegisterEventCallback|ScheduleWith)|IOHIDEventGet'
 # Importierte Symbole: Nachladen von Bibliotheken und private Funktionen (CGS…/SLS…
 # sind private CoreGraphics/SkyLight-Aufrufe; öffentliche wie CGSetDisplay… passen nicht).
-symbol_pattern='^_(dlopen|IOAVService|DisplayServices|CoreDisplay_|CGS[A-Z]|SLS[A-Z])'
+symbol_pattern='^_(dlopen|IOAVService|DisplayServices|CoreDisplay_|CGS[A-Z]|SLS[A-Z]|IOHIDServiceClientCopyEvent|IOHIDEventSystemClient(Create$|SetMatching|RegisterEventCallback|ScheduleWith)|IOHIDEventGet)'
 # `_dlsym` allein ist kein Treffer: clangs Laufzeit für Verfügbarkeitsprüfungen
 # (`__isPlatformVersionAtLeast`, von SwiftUI-Code eingebettet) importiert es in jeder
 # SwiftUI-App und sucht damit nur CoreFoundation-Funktionen. Private Namen, die per

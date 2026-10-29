@@ -44,7 +44,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let manager = DisplayManager(discover: { DisplayDiscovery.displays(scanRegistry: false) })
     #endif
     /// Optionaler Schreibtisch-Sensor; ohne Einstellung passiert nichts.
+    #if SCREENDIM_DIRECT
+    lazy var sensor = SensorController(manager: manager, makeBuiltInLightSensor: DirectControls.lightSensor)
+    #else
     lazy var sensor = SensorController(manager: manager)
+    #endif
     let loginItem = LoginItem()
     private let hotKeys = HotKeyCenter()
 
