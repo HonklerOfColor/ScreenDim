@@ -12,5 +12,10 @@ enum DirectControls {
     static func builtIn(displayID: CGDirectDisplayID) -> (any DDCControlling)? {
         BuiltInDisplayControl(displayID: displayID)
     }
+
+    /// Eingebauter Lichtsensor (MacBook, iMac); `nil` auf Macs ohne Sensor.
+    static func lightSensor() -> (any SensorSource)? {
+        BuiltInLightSensor()
+    }
 }
 #endif

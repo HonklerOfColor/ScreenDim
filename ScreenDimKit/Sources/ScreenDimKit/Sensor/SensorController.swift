@@ -5,6 +5,10 @@ import Observation
 /// `DisplayManager`: Abwesenheit schaltet die Bildschirme schwarz, Umgebungslicht regelt
 /// die Helligkeit. Ohne Sensor passiert nichts; Standard ist „aus“.
 ///
+/// Das Licht kann statt vom Schreibtisch-Sensor auch vom eingebauten Lichtsensor des Macs
+/// kommen (MacBook, iMac; nur „ScreenDim Direct“, Quelle per Fabrik). Dann regelt es nur
+/// die externen Monitore.
+///
 /// Gekoppelt ist höchstens ein Sensor. Sein Hostname steht in UserDefaults, der Code nur
 /// im Schlüsselbund.
 @MainActor
@@ -19,6 +23,15 @@ public final class SensorController {
         case connected
         /// Der Sensor lehnt den gespeicherten Code ab.
         case pairingRequired
+    }
+
+    /// Woher das Umgebungslicht für die Helligkeit kommt.
+    public enum LightSource: String, CaseIterable, Sendable {
+        /// Lux des Schreibtisch-Sensors.
+        case deskSensor
+        /// Eingebauter Lichtsensor des Macs. Nur wählbar, wenn es ihn gibt.
+        case builtIn
+        case off
     }
 
     public enum PairingFailure: Equatable, Sendable {
@@ -58,6 +71,9 @@ public final class SensorController {
     enum Keys {
         static let enabled = "sensorEnabled"
         static let hostname = "sensorHostname"
+        static let lightSource = "sensorLightSource"
+        /// Alt (Schalter „Helligkeit ans Umgebungslicht anpassen“); nur noch gelesen, um
+        /// die Einstellung in `lightSource` zu übernehmen.
         static let adjustsBrightness = "sensorAdjustsBrightness"
         /// Startargument `-ScreenDimDemo YES`; wird nie geschrieben.
         static let demo = "ScreenDimDemo"
@@ -79,12 +95,18 @@ public final class SensorController {
     /// Letzte Meldungen des Sensors; `nil` ohne Verbindung.
     public private(set) var presence: Bool?
     public private(set) var lux: Double?
+    public private(set) var lightSource: LightSource
+    /// Letzter Wert des eingebauten Lichtsensors; `nil`, solange er nicht die Lichtquelle
+    /// ist oder der Deckel zu ist.
+    public private(set) var builtInLux: Double?
 
-    public var adjustsBrightness: Bool {
-        didSet {
-            preferences.set(adjustsBrightness, forKey: Keys.adjustsBrightness)
-            lastAppliedBrightness = nil
-        }
+    /// Dieser Mac hat einen Lichtsensor, und die Variante darf ihn lesen.
+    public var hasBuiltInLightSensor: Bool { builtInLightSensor != nil }
+
+    /// Deckel zu: Das eingebaute Display ist nicht online, der Sensor liegt im Dunkeln und
+    /// seine Werte zählen nicht.
+    public var isBuiltInLightSensorCovered: Bool {
+        !manager.monitors.contains(where: \.isBuiltIn)
     }
 
     @ObservationIgnored private let manager: DisplayManager
@@ -94,17 +116,24 @@ public final class SensorController {
     @ObservationIgnored private let input: any InputActivityMonitoring
     @ObservationIgnored private let makeLiveSource: @MainActor (SensorEndpoint, PairingCode) -> any SensorSource
     @ObservationIgnored private let makeSimulation: @MainActor (SimulationSchedule) -> SimulatedSensorSource
+    @ObservationIgnored private let builtInLightSensor: (any SensorSource)?
     @ObservationIgnored private let now: @MainActor () -> ContinuousClock.Instant
 
     @ObservationIgnored private var simulation: SimulatedSensorSource?
     @ObservationIgnored private var sourceTask: Task<Void, Never>?
+    @ObservationIgnored private var builtInLightTask: Task<Void, Never>?
     @ObservationIgnored private var pairingTask: Task<Void, Never>?
     @ObservationIgnored private var watchdog: Task<Void, Never>?
     @ObservationIgnored private var connection: SensorConnection?
     @ObservationIgnored private var lastEventAt: ContinuousClock.Instant?
     @ObservationIgnored private var lastAppliedBrightness: Double?
 
-    public convenience init(manager: DisplayManager) {
+    /// - Parameter makeBuiltInLightSensor: eingebauter Lichtsensor; `nil` ohne Sensor
+    ///   (Mac mini, Mac Studio) und in der App-Store-Variante.
+    public convenience init(
+        manager: DisplayManager,
+        makeBuiltInLightSensor: @MainActor () -> (any SensorSource)? = { nil }
+    ) {
         self.init(
             manager: manager,
             preferences: UserDefaults.standard,
@@ -113,7 +142,8 @@ public final class SensorController {
             input: SystemInputActivity(),
             demoAtLaunch: UserDefaults.standard.bool(forKey: Keys.demo),
             makeLiveSource: { SSESensorSource(endpoint: $0, code: $1) },
-            makeSimulation: { SimulatedSensorSource(schedule: $0) }
+            makeSimulation: { SimulatedSensorSource(schedule: $0) },
+            makeBuiltInLightSensor: makeBuiltInLightSensor
         )
     }
 
@@ -126,6 +156,7 @@ public final class SensorController {
         demoAtLaunch: Bool,
         makeLiveSource: @escaping @MainActor (SensorEndpoint, PairingCode) -> any SensorSource,
         makeSimulation: @escaping @MainActor (SimulationSchedule) -> SimulatedSensorSource,
+        makeBuiltInLightSensor: @MainActor () -> (any SensorSource)? = { nil },
         now: @escaping @MainActor () -> ContinuousClock.Instant = { .now }
     ) {
         self.manager = manager
@@ -136,8 +167,12 @@ public final class SensorController {
         self.makeLiveSource = makeLiveSource
         self.makeSimulation = makeSimulation
         self.now = now
+        builtInLightSensor = makeBuiltInLightSensor()
         isEnabled = preferences.object(forKey: Keys.enabled) as? Bool ?? false
-        adjustsBrightness = preferences.object(forKey: Keys.adjustsBrightness) as? Bool ?? true
+        let stored = preferences.string(forKey: Keys.lightSource).flatMap(LightSource.init(rawValue:))
+            ?? ((preferences.object(forKey: Keys.adjustsBrightness) as? Bool ?? true) ? .deskSensor : .off)
+        // Ohne Lichtsensor gilt „eingebaut“ als aus; gespeichert bleibt die Wahl trotzdem.
+        lightSource = stored == .builtIn && builtInLightSensor == nil ? .off : stored
         pairedHostname = preferences.string(forKey: Keys.hostname)
         // Der Demo-Modus ist nach jedem Start aus, außer per Startargument.
         isDemoActive = demoAtLaunch
@@ -145,12 +180,15 @@ public final class SensorController {
 
     public func start() {
         restartSource()
+        restartBuiltInLight()
     }
 
     public func stop() {
         pairingTask?.cancel()
         sourceTask?.cancel()
         sourceTask = nil
+        builtInLightTask?.cancel()
+        builtInLightTask = nil
         restoreScreens()
     }
 
@@ -171,6 +209,15 @@ public final class SensorController {
         isDemoActive = active
         if active { cancelPairing() }
         restartSource()
+        restartBuiltInLight()
+    }
+
+    public func setLightSource(_ source: LightSource) {
+        guard source != lightSource, source != .builtIn || hasBuiltInLightSensor else { return }
+        lightSource = source
+        preferences.set(source.rawValue, forKey: Keys.lightSource)
+        lastAppliedBrightness = nil
+        restartBuiltInLight()
     }
 
     public func simulateAway() {
@@ -268,7 +315,10 @@ public final class SensorController {
         case .lux(let value):
             lastEventAt = now()
             lux = value
-            applyAmbientLight(value)
+            // Die Demo ersetzt jede Lichtquelle außer „aus“.
+            if lightSource == .deskSensor || (isDemoActive && lightSource != .off) {
+                applyAmbientLight(value, includingBuiltIn: true)
+            }
         case .heartbeat:
             lastEventAt = now()
         }
@@ -278,12 +328,41 @@ public final class SensorController {
         lastEventAt.map { now() - $0 }
     }
 
-    private func applyAmbientLight(_ lux: Double) {
-        guard adjustsBrightness, !manager.screensBlanked else { return }
+    private func applyAmbientLight(_ lux: Double, includingBuiltIn: Bool) {
+        guard !manager.screensBlanked else { return }
         let target = AmbientLightCurve.percent(forLux: lux)
         if let last = lastAppliedBrightness, abs(last - target) < Self.luxHysteresis { return }
         lastAppliedBrightness = target
-        manager.setAllBrightness(target)
+        manager.setAllBrightness(target, includingBuiltIn: includingBuiltIn)
+    }
+
+    // MARK: - Eingebauter Lichtsensor
+
+    /// Läuft nur, solange er die Lichtquelle ist und keine Demo läuft.
+    private func restartBuiltInLight() {
+        builtInLightTask?.cancel()
+        builtInLightTask = nil
+        builtInLux = nil
+        guard lightSource == .builtIn, !isDemoActive, let sensor = builtInLightSensor else { return }
+        builtInLightTask = Task { [weak self] in
+            for await event in sensor.events() {
+                guard !Task.isCancelled, let self else { return }
+                self.handleBuiltInLight(event)
+            }
+        }
+    }
+
+    func handleBuiltInLight(_ event: SensorEvent) {
+        guard case .lux(let value) = event else { return }
+        // Bei zugeklapptem Deckel meldet der Sensor Dunkelheit und würde die Monitore
+        // abdunkeln. Ist er wieder offen, gilt der nächste Wert.
+        guard !isBuiltInLightSensorCovered else {
+            builtInLux = nil
+            return
+        }
+        builtInLux = value
+        // Das eingebaute Display regelt macOS per Auto-Helligkeit mit demselben Sensor.
+        applyAmbientLight(value, includingBuiltIn: false)
     }
 
     // MARK: - Bildschirme

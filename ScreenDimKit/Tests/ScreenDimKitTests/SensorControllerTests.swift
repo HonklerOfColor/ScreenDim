@@ -37,7 +37,12 @@ struct SensorControllerTests {
         manager.refresh(force: true)
     }
 
-    private func makeController(paired: Bool = true, demo: Bool = false) -> SensorController {
+    private func makeController(
+        paired: Bool = true,
+        demo: Bool = false,
+        manager: DisplayManager? = nil,
+        builtInLight: (any SensorSource)? = nil
+    ) -> SensorController {
         if paired {
             preferences.set(true, forKey: SensorController.Keys.enabled)
             preferences.set(Self.host, forKey: SensorController.Keys.hostname)
@@ -45,15 +50,41 @@ struct SensorControllerTests {
         }
         let source = source
         return SensorController(
-            manager: manager,
+            manager: manager ?? self.manager,
             preferences: preferences,
             credentials: credentials,
             http: http,
             input: input,
             demoAtLaunch: demo,
             makeLiveSource: { _, _ in source },
-            makeSimulation: { SimulatedSensorSource(schedule: $0, seed: 1) }
+            makeSimulation: { SimulatedSensorSource(schedule: $0, seed: 1) },
+            makeBuiltInLightSensor: { builtInLight }
         )
+    }
+
+    /// MacBook mit offenem Deckel (eingebautes Display 1) und externem Monitor 7.
+    private func makeLaptopManager(builtInControl: StubControl) -> DisplayManager {
+        let manager = DisplayManager(
+            store: BrightnessStore(storage: preferences),
+            timing: .immediate,
+            gamma: StubDimmer(),
+            overlay: StubDimmer(),
+            blanker: blanker,
+            discover: {
+                [
+                    DiscoveredDisplay(
+                        id: 1, identity: DisplayIdentity(vendor: 1552, model: 1, serial: 1), name: "MacBook", kind: .builtIn
+                    ),
+                    DiscoveredDisplay(
+                        id: 7, identity: DisplayIdentity(vendor: 1, model: 2, serial: 3), name: "Monitor 7",
+                        kind: .external(avServiceID: nil)
+                    ),
+                ]
+            },
+            makeBuiltInControl: { _ in builtInControl }
+        )
+        manager.refresh(force: true)
+        return manager
     }
 
     private var brightness: Double? { manager.monitors.first?.brightness }
@@ -135,10 +166,80 @@ struct SensorControllerTests {
         source.send(.lux(10))
         #expect(await eventually { brightness == 20 })
 
-        controller.adjustsBrightness = false
+        controller.setLightSource(.off)
         source.send(.lux(1000))
         #expect(await eventually { controller.lux == 1000 })
         #expect(brightness == 20)
+    }
+
+    @Test("Alter Schalter „Helligkeit anpassen: aus“ wird zu Lichtquelle „aus“")
+    func migratesAdjustsBrightness() {
+        preferences.set(false, forKey: SensorController.Keys.adjustsBrightness)
+        #expect(makeController().lightSource == .off)
+        preferences.set(true, forKey: SensorController.Keys.adjustsBrightness)
+        #expect(makeController().lightSource == .deskSensor)
+    }
+
+    @Test("Ohne eingebauten Lichtsensor ist er nicht wählbar")
+    func builtInLightUnavailable() {
+        let controller = makeController()
+        #expect(!controller.hasBuiltInLightSensor)
+        controller.setLightSource(.builtIn)
+        #expect(controller.lightSource == .deskSensor)
+
+        // Gespeicherte Wahl von einem MacBook, jetzt ohne Sensor: gilt als aus.
+        preferences.set(SensorController.LightSource.builtIn.rawValue, forKey: SensorController.Keys.lightSource)
+        #expect(makeController().lightSource == .off)
+    }
+
+    @Test("Eingebauter Lichtsensor regelt nur die externen Monitore")
+    func builtInLightAdjustsExternalsOnly() async {
+        let control = StubControl()
+        let laptop = makeLaptopManager(builtInControl: control)
+        #expect(await eventually { laptop.monitors.first { $0.isBuiltIn }?.state == .ready })
+        let light = StubSensorSource()
+        let controller = makeController(paired: false, manager: laptop, builtInLight: light)
+        controller.start()
+        #expect(controller.hasBuiltInLightSensor)
+        controller.setLightSource(.builtIn)
+        #expect(controller.lightSource == .builtIn)
+
+        light.send(.connection(.connected), .lux(10))
+        #expect(await eventually { laptop.monitors.first { $0.id == 7 }?.brightness == 20 })
+        #expect(controller.builtInLux == 10)
+        #expect(control.writes.isEmpty)
+
+        controller.setLightSource(.off)
+        #expect(controller.builtInLux == nil)
+    }
+
+    @Test("Deckel zu: Werte des eingebauten Lichtsensors zählen nicht")
+    func builtInLightIgnoredWhenLidClosed() async {
+        // Der Standard-Manager kennt nur den externen Monitor, wie bei zugeklapptem Deckel.
+        let light = StubSensorSource()
+        let controller = makeController(paired: false, builtInLight: light)
+        controller.setLightSource(.builtIn)
+        controller.start()
+        #expect(controller.isBuiltInLightSensorCovered)
+        #expect(brightness == 100)
+        light.send(.connection(.connected), .lux(1))
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(brightness == 100)
+        #expect(controller.builtInLux == nil)
+    }
+
+    @Test("Ist der eingebaute Sensor die Lichtquelle, zählt das Licht des Schreibtisch-Sensors nicht")
+    func deskLuxIgnoredForBuiltInSource() async {
+        let control = StubControl()
+        let laptop = makeLaptopManager(builtInControl: control)
+        let controller = makeController(manager: laptop, builtInLight: StubSensorSource())
+        controller.setLightSource(.builtIn)
+        controller.start()
+        let before = laptop.monitors.first { $0.id == 7 }?.brightness
+        source.send(.connection(.connected), .lux(10))
+        #expect(await eventually { controller.lux == 10 })
+        #expect(before == 100)
+        #expect(laptop.monitors.first { $0.id == 7 }?.brightness == 100)
     }
 
     @Test("Kopplung im offenen Fenster: Code abholen, prüfen, speichern")
