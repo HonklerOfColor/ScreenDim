@@ -302,6 +302,16 @@ final class InstantClock: Clock, Sendable {
     }
 }
 
+/// Eingespeiste Uhr für den `SensorController`: steht, bis der Test sie vorstellt.
+@MainActor
+final class ManualNow {
+    private(set) var instant = ContinuousClock.now
+
+    func advance(by duration: Duration) {
+        instant = instant + duration
+    }
+}
+
 /// Sensorquelle, deren Ereignisse der Test schickt.
 final class StubSensorSource: SensorSource {
     private let stream: AsyncStream<SensorEvent>

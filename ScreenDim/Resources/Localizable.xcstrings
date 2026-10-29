@@ -12,6 +12,26 @@
         }
       }
     },
+    "%@ – der Schreibtisch-Sensor springt ein." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ – the desk sensor takes over."
+          }
+        }
+      }
+    },
+    "%@ – der eingebaute Sensor springt ein." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ – the built-in sensor takes over."
+          }
+        }
+      }
+    },
     "%lld %%" : {
       "localizations" : {
         "en" : {
@@ -162,6 +182,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Querying"
+          }
+        }
+      }
+    },
+    "Aktiv" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active"
           }
         }
       }
@@ -398,6 +428,16 @@
         }
       }
     },
+    "Deckel zu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lid closed"
+          }
+        }
+      }
+    },
     "Deckel zu: Der Lichtsensor ist pausiert." : {
       "localizations" : {
         "en" : {
@@ -478,6 +518,16 @@
         }
       }
     },
+    "Der eingebaute Sensor regelt nur die externen Monitore. Das eingebaute Display regelt macOS (Automatische Helligkeit)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The built-in sensor adjusts external displays only. macOS adjusts the built-in display (automatic brightness)."
+          }
+        }
+      }
+    },
     "Diagnose kopieren" : {
       "localizations" : {
         "en" : {
@@ -538,6 +588,16 @@
         }
       }
     },
+    "Dieser Mac hat keinen eingebauten Lichtsensor." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Mac has no built-in light sensor."
+          }
+        }
+      }
+    },
     "Drück kurz die BOOT-Taste am Sensor (LED blinkt)." : {
       "localizations" : {
         "en" : {
@@ -564,6 +624,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Built-in light sensor"
+          }
+        }
+      }
+    },
+    "Eingebauter Sensor meldet nichts" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Built-in sensor reports nothing"
+          }
+        }
+      }
+    },
+    "Eingebauter Sensor, sonst Schreibtisch-Sensor" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Built-in sensor, else desk sensor"
           }
         }
       }
@@ -904,6 +984,16 @@
         }
       }
     },
+    "Keine Quelle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No source"
+          }
+        }
+      }
+    },
     "Kopieren" : {
       "localizations" : {
         "en" : {
@@ -1058,6 +1148,16 @@
         }
       }
     },
+    "Lichtquelle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light source"
+          }
+        }
+      }
+    },
     "Lichtquelle (Einstellung)" : {
       "localizations" : {
         "en" : {
@@ -1171,16 +1271,6 @@
         }
       }
     },
-    "Nicht verfügbar: Dieser Mac hat keinen Lichtsensor, oder die Variante darf ihn nicht lesen (App Store)." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not available: this Mac has no light sensor, or this version can’t read it (App Store)."
-          }
-        }
-      }
-    },
     "Noch keine Ereignisse." : {
       "localizations" : {
         "en" : {
@@ -1198,6 +1288,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Null reply (6E 80 BE)"
+          }
+        }
+      }
+    },
+    "Nur Schreibtisch-Sensor" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desk sensor only"
+          }
+        }
+      }
+    },
+    "Nur eingebauter Lichtsensor" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Built-in light sensor only"
+          }
+        }
+      }
+    },
+    "Nur in ScreenDim Direct verfügbar – der App Store erlaubt keinen Zugriff auf den Lichtsensor." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only available in ScreenDim Direct – the App Store version can't access the light sensor."
           }
         }
       }
@@ -1274,12 +1394,12 @@
         }
       }
     },
-    "Regelt nur die externen Monitore. Das eingebaute Display regelt macOS (Automatische Helligkeit)." : {
+    "Rückfall" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adjusts external displays only. macOS adjusts the built-in display (Automatically adjust brightness)."
+            "value" : "Fallback"
           }
         }
       }
@@ -1304,6 +1424,16 @@
         }
       }
     },
+    "Schreibtisch-Sensor aus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desk sensor off"
+          }
+        }
+      }
+    },
     "Schreibtisch-Sensor einrichten …" : {
       "localizations" : {
         "en" : {
@@ -1314,12 +1444,42 @@
         }
       }
     },
+    "Schreibtisch-Sensor getrennt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desk sensor disconnected"
+          }
+        }
+      }
+    },
+    "Schreibtisch-Sensor meldet kein Licht" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desk sensor reports no light"
+          }
+        }
+      }
+    },
     "Schreibtisch-Sensor verwenden" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Use desk sensor"
+          }
+        }
+      }
+    },
+    "Schreibtisch-Sensor, sonst eingebauter" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desk sensor, else built-in"
           }
         }
       }
@@ -1548,12 +1708,32 @@
         }
       }
     },
+    "Verfügbar" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Available"
+          }
+        }
+      }
+    },
     "Warte auf den Sensor …" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Waiting for the sensor…"
+          }
+        }
+      }
+    },
+    "Wechsel: %@ → %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch: %@ → %@"
           }
         }
       }
@@ -1574,16 +1754,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Away: %lld s"
-          }
-        }
-      }
-    },
-    "Wirkt, sobald der Schreibtisch-Sensor verbunden ist." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Takes effect once the desk sensor is connected."
           }
         }
       }
@@ -1711,6 +1881,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "hung for %@ s"
+          }
+        }
+      }
+    },
+    "keine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "none"
           }
         }
       }

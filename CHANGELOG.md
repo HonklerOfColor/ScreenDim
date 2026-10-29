@@ -15,14 +15,18 @@
 - Einstellungsfenster (Abschnitt „Sensor“), App-Review-Notizen in `docs/AppReviewNotes.md`.
 - App-Store-Variante: Das eingebaute Display lässt sich per Software dimmen (Gamma oder
   Overlay, gemerkt pro Display). Allgemein: Displays ohne Steuerkanal dimmt die Software.
-- Lichtquelle wählbar: Schreibtisch-Sensor, eingebauter Lichtsensor des Macs (nur Direct,
-  Prototyp; regelt nur die externen Monitore, pausiert bei zugeklapptem Deckel) oder aus.
-  Ersetzt den Schalter „Helligkeit ans Umgebungslicht anpassen“. Details:
-  `docs/EingebauterLichtsensor.md`.
+- Lichtquelle mit Vorrang: Schreibtisch-Sensor zuerst (Standard), eingebauter Lichtsensor
+  zuerst, nur einer von beiden oder aus. Fällt die bevorzugte Quelle aus (getrennt, kein
+  frischer Wert, Deckel zu), springt die andere ein; zurück frühestens nach 5 s. Der
+  eingebaute Sensor (nur Direct, Prototyp) regelt nur die externen Monitore. Einstellungen
+  zeigen die aktive Quelle mit Grund; die App-Store-Variante nennt, dass der Lichtsensor
+  nur in ScreenDim Direct geht. Ersetzt den Schalter „Helligkeit ans Umgebungslicht
+  anpassen“. Details: `docs/EingebauterLichtsensor.md`.
 - Fenster „Sensor-Diagnose“ (Einstellungen → „Sensor-Diagnose …“): aktuelle Messung von
   Schreibtisch-Sensor bzw. Demo und eingebautem Lichtsensor, welche Quelle gerade
-  Anwesenheit und Licht liefert, zuletzt gesetzte Helligkeit und ein Protokoll der
-  Ereignisse mit ihrer Wirkung. Solange es offen ist, liest der eingebaute Sensor mit.
+  Anwesenheit und Licht liefert (und ob als Rückfall), zuletzt gesetzte Helligkeit und ein
+  Protokoll der Ereignisse und Quellwechsel mit ihrer Wirkung. Solange es offen ist, liest
+  der eingebaute Sensor mit.
 - Zwei Varianten aus einer Codebasis: „ScreenDim“ für den Mac App Store (Sandbox, ohne
   private API, Software-Dimmung) und „ScreenDim Direct“ (Developer ID, DDC/CI).
 - Overlay-Dimmung als zweiter Weg neben Gamma: randloses Fenster über Menüleiste, allen

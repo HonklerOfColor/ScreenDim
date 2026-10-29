@@ -38,9 +38,14 @@ Eine Codebasis, zwei App-Targets aus `project.yml`:
     `SensorSource` mit `SSESensorSource` (Digest, SSE, Backoff) und
     `SimulatedSensorSource` (Demo), `SensorBrowser` (NWBrowser), `SensorKeychain`,
     `PairingCode`, `SSEParser`/`ESPHomeEvents`, `PresenceGate`, `SensorDebug`
-    (Protokoll für das Fenster „Sensor-Diagnose“, läuft nur, solange es offen ist). Lichtquelle wählbar
-    (`LightSource`); den eingebauten Lichtsensor reicht Direct per Fabrik
-    (`makeBuiltInLightSensor`, Quelle `Direct/BuiltInLightSensor.swift`).
+    (Protokoll für das Fenster „Sensor-Diagnose“, läuft nur, solange es offen ist).
+    Lichtquelle mit Vorrang (`LightSource`: Schreibtisch zuerst (Standard), eingebaut
+    zuerst, nur Schreibtisch, nur eingebaut, aus); `LightSourceSelector` (rein) wählt nach
+    Verfügbarkeit (ESP32: verbunden, Lux ≤ 10 s; eingebaut: Deckel offen, Wert ≤ 5 s) mit
+    5 s Wechselsperre. Eingebautes Licht regelt nur externe Monitore, Anwesenheit kommt
+    nur vom ESP32. Ohne eingebauten Sensor wirkt jede Wahl außer „aus“ wie „nur
+    Schreibtisch“, gespeichert bleibt sie. Den eingebauten Lichtsensor reicht Direct per
+    Fabrik (`makeBuiltInLightSensor`, Quelle `Direct/BuiltInLightSensor.swift`).
 - `ScreenDim/` (App): `App/` (Einstieg, Varianten-Auswahl), `UI/`, `System/` (Tastenkürzel,
   Login-Item), `Direct/` (private API), `Resources/` (Asset-Katalog, String-Katalog,
   Privacy-Manifest).

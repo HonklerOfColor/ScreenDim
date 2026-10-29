@@ -96,8 +96,9 @@ private struct SensorSection: View {
     }
 }
 
-/// Woher das Licht für die Helligkeit kommt. Ohne Lichtsensor im Mac bleibt nur
-/// Schreibtisch-Sensor oder aus; die Wahl erscheint dann erst mit verbundenem Sensor.
+/// Woher das Licht für die Helligkeit kommt, mit Vorrang und Rückfall. Ohne Lichtsensor im
+/// Mac bleibt nur Schreibtisch-Sensor oder aus; die Wahl erscheint dann erst mit
+/// verbundenem Sensor.
 private struct LightSection: View {
     let sensor: SensorController
 
@@ -105,47 +106,91 @@ private struct LightSection: View {
         sensor.isEnabled && !sensor.isDemoActive && sensor.status == .connected
     }
 
+    private var showsChoice: Bool {
+        sensor.hasBuiltInLightSensor || deskSensorConnected
+    }
+
+    private var usesBuiltIn: Bool {
+        sensor.effectiveLightSource.order.contains(.builtIn)
+    }
+
     var body: some View {
-        if sensor.hasBuiltInLightSensor || deskSensorConnected {
-            Section("Umgebungslicht") {
+        #if SCREENDIM_DIRECT
+        if showsChoice { section }
+        #else
+        // App Store: Der Hinweis auf den eingebauten Sensor steht auch ohne Schreibtisch-Sensor.
+        section
+        #endif
+    }
+
+    private var section: some View {
+        Section("Umgebungslicht") {
+            if showsChoice {
                 Picker("Helligkeit anpassen nach", selection: Binding(
-                    get: { sensor.lightSource }, set: { sensor.setLightSource($0) }
+                    get: { sensor.effectiveLightSource }, set: { sensor.setLightSource($0) }
                 )) {
-                    Text("Schreibtisch-Sensor").tag(SensorController.LightSource.deskSensor)
-                    if sensor.hasBuiltInLightSensor {
-                        Text("Eingebauter Lichtsensor").tag(SensorController.LightSource.builtIn)
+                    ForEach(sensor.availableLightSources, id: \.self) { source in
+                        Text(lightSourceName(source, hasBuiltIn: sensor.hasBuiltInLightSensor)).tag(source)
                     }
-                    Text("Aus").tag(SensorController.LightSource.off)
                 }
-                switch sensor.lightSource {
-                case .deskSensor where !deskSensorConnected && !sensor.isDemoActive:
-                    caption("Wirkt, sobald der Schreibtisch-Sensor verbunden ist.")
-                case .builtIn:
-                    builtInStatus
-                default:
-                    EmptyView()
+                if sensor.effectiveLightSource != .off {
+                    activeStatus
                 }
+                if usesBuiltIn && !sensor.isDemoActive {
+                    caption("Der eingebaute Sensor regelt nur die externen Monitore. Das eingebaute Display regelt macOS (Automatische Helligkeit).")
+                }
+            }
+            #if !SCREENDIM_DIRECT
+            caption("Nur in ScreenDim Direct verfügbar – der App Store erlaubt keinen Zugriff auf den Lichtsensor.")
+            #endif
+        }
+    }
+
+    /// „Aktiv: …“ und, wenn nötig, warum.
+    @ViewBuilder
+    private var activeStatus: some View {
+        LabeledContent("Aktiv") {
+            switch sensor.activeLightOrigin {
+            case .deskSensor?: Text("Schreibtisch-Sensor")
+            case .builtIn?: Text("Eingebauter Lichtsensor")
+            case .demo?: Text("Demo-Modus (simuliert)")
+            case nil: Text("Keine Quelle").foregroundStyle(.secondary)
+            }
+        }
+        if sensor.isDemoActive {
+            caption("Während des Demo-Modus kommt das Licht aus der Simulation.")
+        } else if sensor.isLightFallback {
+            switch sensor.activeLightOrigin {
+            case .builtIn?: reason("\(Text(deskSensorReason)) – der eingebaute Sensor springt ein.")
+            case .deskSensor?: reason("\(Text(builtInReason)) – der Schreibtisch-Sensor springt ein.")
+            default: EmptyView()
+            }
+        } else if sensor.activeLightOrigin == nil {
+            ForEach(sensor.effectiveLightSource.order, id: \.self) { origin in
+                reason(origin == .builtIn ? builtInReason : deskSensorReason)
+            }
+        } else if sensor.activeLightOrigin == .builtIn, let lux = sensor.builtInLux {
+            LabeledContent("Umgebungslicht") {
+                Text("\(Int(lux.rounded())) lx").monospacedDigit()
             }
         }
     }
 
-    @ViewBuilder
-    private var builtInStatus: some View {
-        if sensor.isDemoActive {
-            caption("Während des Demo-Modus kommt das Licht aus der Simulation.")
-        } else if sensor.isBuiltInLightSensorCovered {
-            Label("Deckel zu: Der Lichtsensor ist pausiert.", systemImage: "laptopcomputer")
-                .foregroundStyle(.orange)
-        } else {
-            LabeledContent("Umgebungslicht") {
-                if let lux = sensor.builtInLux {
-                    Text("\(Int(lux.rounded())) lx").monospacedDigit()
-                } else {
-                    Text(verbatim: "–")
-                }
-            }
-        }
-        caption("Regelt nur die externen Monitore. Das eingebaute Display regelt macOS (Automatische Helligkeit).")
+    private var deskSensorReason: LocalizedStringKey {
+        if !sensor.isEnabled { return "Schreibtisch-Sensor aus" }
+        if sensor.status != .connected { return "Schreibtisch-Sensor getrennt" }
+        return "Schreibtisch-Sensor meldet kein Licht"
+    }
+
+    private var builtInReason: LocalizedStringKey {
+        sensor.isBuiltInLightSensorCovered ? "Deckel zu" : "Eingebauter Sensor meldet nichts"
+    }
+
+    private func reason(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(.orange)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func caption(_ text: LocalizedStringKey) -> some View {
@@ -153,6 +198,18 @@ private struct LightSection: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Name einer Lichtquellen-Wahl. Ohne eingebauten Sensor gibt es keinen Rückfall, dann
+/// heißt „nur Schreibtisch-Sensor“ schlicht so.
+func lightSourceName(_ source: SensorController.LightSource, hasBuiltIn: Bool) -> LocalizedStringKey {
+    switch source {
+    case .deskSensorFirst: "Schreibtisch-Sensor, sonst eingebauter"
+    case .builtInFirst: "Eingebauter Sensor, sonst Schreibtisch-Sensor"
+    case .deskSensorOnly: hasBuiltIn ? "Nur Schreibtisch-Sensor" : "Schreibtisch-Sensor"
+    case .builtInOnly: "Nur eingebauter Lichtsensor"
+    case .off: "Aus"
     }
 }
 

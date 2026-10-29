@@ -1,13 +1,15 @@
 # Eingebauter Lichtsensor als Lichtquelle
 
-Stand: 2026-10-29, Prototyp, nur „ScreenDim Direct“.
+Stand: 2026-10-29, Prototyp, nur „ScreenDim Direct“. Vorrang und Rückfall zwischen beiden
+Lichtquellen: ebenfalls 2026-10-29.
 
 ## Ergebnis
 
 Der Umgebungslichtsensor (ALS) eines MacBooks lässt sich auf Apple Silicon ohne Sandbox
-und mit Hardened Runtime ohne Entitlement lesen, ereignisgesteuert im Takt von 1 s. Er
-ersetzt den ESP32-Sensor als Lichtquelle; Anwesenheit liefert er nicht. In der
-App-Store-Variante geht das nicht (private API).
+und mit Hardened Runtime ohne Entitlement lesen, ereignisgesteuert im Takt von 1 s. Er ist
+die zweite Lichtquelle neben dem ESP32-Sensor, mit wählbarem Vorrang und gegenseitigem
+Rückfall; Anwesenheit liefert er nicht. In der App-Store-Variante geht das nicht (private
+API).
 
 Geprüft auf einem MacBook Air M4 (Mac16,13), macOS 27, mit einem eigenen Prüfprogramm
 (ad hoc signiert, `--options=runtime`, ohne Entitlements) und dem echten Quelltext von
@@ -57,9 +59,9 @@ im `SensorController` lassen nur deutliche Lichtwechsel durch, DDC-Writes bleibe
 
 | Fall | Erkennung | Verhalten |
 |---|---|---|
-| Mac mini, Mac Studio, Intel | kein Dienst mit 0xFF00/4 und `Built-In` | `BuiltInLightSensor()` ist `nil`, Option ausgeblendet. Eine gespeicherte Wahl gilt als „aus“. |
-| App-Store-Variante | keine Fabrik | Option ausgeblendet |
-| MacBook, Deckel zu | eingebautes Display nicht in `DisplayManager.monitors` (macOS nimmt es im Clamshell-Betrieb offline; die Liste folgt schon dem Reconfiguration-Callback) | Werte zählen nicht, Hinweis „Deckel zu: Der Lichtsensor ist pausiert.“ Nach dem Aufklappen gilt der nächste Wert. |
+| Mac mini, Mac Studio, Intel | kein Dienst mit 0xFF00/4 und `Built-In` | `BuiltInLightSensor()` ist `nil`. Wählbar nur „Schreibtisch-Sensor“ oder „Aus“. Eine gespeicherte Wahl mit „eingebaut“ wirkt wie „nur Schreibtisch-Sensor“ und bleibt gespeichert. Diagnose: „Dieser Mac hat keinen eingebauten Lichtsensor.“ |
+| App-Store-Variante | keine Fabrik | wie Mac mini. Einstellungen und Diagnose: „Nur in ScreenDim Direct verfügbar – der App Store erlaubt keinen Zugriff auf den Lichtsensor.“ (ohne Hardware-Erkennung) |
+| MacBook, Deckel zu | eingebautes Display nicht in `DisplayManager.monitors` (macOS nimmt es im Clamshell-Betrieb offline; die Liste folgt schon dem Reconfiguration-Callback) | Werte zählen nicht, der Sensor gilt sofort als nicht verfügbar; der Schreibtisch-Sensor springt ein, wenn die Wahl ihn enthält. Nach dem Aufklappen gilt der nächste Wert. |
 | iMac | hat einen Sensor, eingebautes Display immer da | wie MacBook mit offenem Deckel (nicht auf Hardware geprüft) |
 
 Bei zugeklapptem Deckel liest der Strom weiter im 1-s-Takt; die Werte werden nur
@@ -73,12 +75,48 @@ verworfen. Abschalten und wieder Anmelden lohnt bei einem Ereignis pro Sekunde n
 - `DirectControls.lightSensor` reicht die Quelle als Fabrik an
   `SensorController(manager:makeBuiltInLightSensor:)`, wie `makeExternalControl` beim
   `DisplayManager`. `ScreenDimKit` enthält weder private API noch deren Namen.
-- `SensorController.LightSource`: Schreibtisch-Sensor (Standard), eingebauter Sensor,
-  aus. Ersetzt den Schalter „Helligkeit ans Umgebungslicht anpassen“; ein gespeichertes
-  „aus“ wird übernommen.
-- Mit dem eingebauten Sensor regelt ScreenDim **nur die externen Monitore**
+- `SensorController.LightSource` (Einstellung „Helligkeit anpassen nach“):
+
+  | Wahl | Wirkung |
+  |---|---|
+  | `deskSensorFirst` (Standard) | Schreibtisch-Sensor, Rückfall eingebaut |
+  | `builtInFirst` | eingebaut, Rückfall Schreibtisch-Sensor |
+  | `deskSensorOnly` | nur Schreibtisch-Sensor |
+  | `builtInOnly` | nur eingebaut |
+  | `off` | aus |
+
+  Gespeicherte Werte früherer Versionen werden gelesen, nicht umgeschrieben:
+  `deskSensor` → `deskSensorFirst`, `builtIn` → `builtInFirst`, `off` → `off`. Der ältere
+  Schalter „Helligkeit ans Umgebungslicht anpassen“ (aus) wird zu `off`. Ohne
+  eingebauten Sensor wirkt jede Wahl außer „aus“ wie `deskSensorOnly`
+  (`effectiveLightSource`).
+- `LightSourceSelector` (rein, getestet) wählt die aktive Quelle:
+  - Schreibtisch-Sensor verfügbar: verbunden und letztes Lux höchstens 10 s alt.
+  - Eingebaut verfügbar: Sensor vorhanden, Deckel offen, letzter Wert höchstens 5 s alt.
+  - Aktiv ist die bevorzugte Quelle, wenn verfügbar, sonst die andere, sonst keine.
+  - Sperre gegen Hin-und-her: Eine verfügbare aktive Quelle bleibt mindestens 5 s, bevor
+    die bevorzugte sie wieder ablöst. Fällt die aktive aus, wird sofort gewechselt.
+  - Beim Wechsel beginnt die Hysterese neu, und der letzte Wert der neuen Quelle gilt
+    sofort. `activeLightOrigin` ist die tatsächlich aktive Quelle, `isLightFallback`
+    sagt, ob sie einspringt.
+  - Geprüft wird nach jedem Ereignis und jeder Einstellung. Für das Ablaufen ohne neues
+    Ereignis gibt es einen einzelnen, neu gesetzten Task-Sleep bis zum nächsten Termin
+    (Ablauf einer Quelle oder Ende einer Sperre, die gerade einen Wechsel zurückhält);
+    kein Polling.
+- Lux vom Schreibtisch-Sensor regeln alle Monitore samt eingebautem Display. Lux vom
+  eingebauten Sensor regeln **nur die externen Monitore**
   (`setAllBrightness(_:includingBuiltIn: false)`). Das eingebaute Display regelt macOS mit
-  demselben Sensor; beide gleichzeitig würden gegeneinander arbeiten.
+  demselben Sensor; beide gleichzeitig würden gegeneinander arbeiten. Anwesenheit kommt
+  nur vom Schreibtisch-Sensor. Kurve und Hysterese sind für beide Quellen gleich;
+  `SensorController.builtInLuxFactor` (1,0, ohne UI) korrigiert den eingebauten Sensor
+  hinter dem Glas, sobald er kalibriert ist.
+- Der eingebaute Sensor liest nur, wenn die (wirksame) Wahl ihn enthält und keine Demo
+  läuft, oder wenn die Sensor-Diagnose offen ist. Mit dem Standard `deskSensorFirst` liest
+  er auf einem MacBook also immer mit, damit er sofort einspringen kann.
+- Einstellungen: unter der Wahl „Aktiv: Schreibtisch-Sensor / Eingebauter Lichtsensor /
+  Keine Quelle“ mit Grund („Schreibtisch-Sensor getrennt – der eingebaute Sensor springt
+  ein.“, „Deckel zu“, …). Sensor-Diagnose: aktive Quelle mit Kennzeichen „Rückfall“,
+  Verfügbarkeit beider Quellen; das Protokoll markiert Quellwechsel.
 - Demo-Modus: Das simulierte Licht ersetzt jede Lichtquelle außer „aus“; der eingebaute
   Sensor ist dann getrennt.
 - `scripts/check-mas-binary.sh` sucht zusätzlich nach den privaten HID-Namen.
@@ -118,7 +156,12 @@ die Signatur der DisplayServices-Benachrichtigung prüfen.
       gingen die Monitore damit auf 20 %. Eventuell braucht der eingebaute Sensor eine
       eigene Kurve, weil er hinter dem Displayglas sitzt und anders misst als der
       ESP32-Sensor.
-- [ ] Deckel zu und wieder auf (Clamshell mit externem Monitor): Hinweis erscheint,
-      danach wieder Werte.
-- [ ] Mac Studio: Option fehlt.
+- [ ] Faktor `builtInLuxFactor` bzw. eigene Kurve für den eingebauten Sensor auf Hardware
+      kalibrieren (gleiche Lampe, ESP32 und MacBook nebeneinander).
+- [ ] Deckel zu und wieder auf (Clamshell mit externem Monitor): Rückfall auf den
+      Schreibtisch-Sensor bzw. „Deckel zu“, danach wieder Werte.
+- [ ] ESP32-Firmware: Lux mindestens alle 10 s melden (`update_interval`, kein Filter, der
+      gleiche Werte unterdrückt). Sonst gilt der Schreibtisch-Sensor bei ruhigem Licht als
+      abgelaufen, und der eingebaute Sensor springt ein.
+- [ ] Mac Studio: nur „Schreibtisch-Sensor“ und „Aus“ wählbar.
 - [ ] Notarisierter Direct-Build: Lesen weiterhin ohne Rückfrage.

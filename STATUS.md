@@ -46,10 +46,15 @@ Auf echter Hardware noch nicht geprüft. Die Tests decken nur die Logik ab.
 
 ### Eingebauter Lichtsensor (nur Direct, Prototyp)
 Machbarkeit und Messungen: `docs/EingebauterLichtsensor.md`.
-- [ ] MacBook: Lichtquelle „Eingebauter Lichtsensor“; Lux bei Tageslicht und Lampe, externe
-      Monitore folgen, eingebautes Display bleibt bei macOS.
-- [ ] Deckel zu (Clamshell): Hinweis „pausiert“, Monitore bleiben; aufklappen → wieder Werte.
-- [ ] Mac Studio: Option fehlt.
+- [ ] MacBook: Lichtquelle „Nur eingebauter Lichtsensor“; Lux bei Tageslicht und Lampe,
+      externe Monitore folgen, eingebautes Display bleibt bei macOS. Faktor/Kurve kalibrieren.
+- [ ] MacBook mit ESP32, „Schreibtisch-Sensor, sonst eingebauter“: ESP32 trennen → „Aktiv:
+      Eingebauter Lichtsensor“ mit Grund; wieder verbinden → nach ≥ 5 s zurück.
+- [ ] Deckel zu (Clamshell): „Deckel zu“, ESP32 springt ein bzw. Monitore bleiben;
+      aufklappen → wieder Werte.
+- [ ] ESP32 bei ruhigem Licht: kommt Lux mindestens alle 10 s? Sonst springt der
+      eingebaute Sensor ungewollt ein.
+- [ ] Mac Studio: nur „Schreibtisch-Sensor“ und „Aus“.
 
 ## Offene Punkte für die Einreichung
 

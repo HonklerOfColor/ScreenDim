@@ -3,9 +3,9 @@ import ScreenDimKit
 import SwiftUI
 
 /// Fenster „Sensor-Diagnose“: aktuelle Messung jeder Quelle, welche gerade Anwesenheit
-/// und Licht liefert, und ein Protokoll der Ereignisse mit ihrer Wirkung. Solange das
-/// Fenster offen ist, liest der eingebaute Lichtsensor mit, auch wenn er nicht die
-/// Lichtquelle ist.
+/// und Licht liefert (und ob als Rückfall), und ein Protokoll der Ereignisse und
+/// Quellwechsel mit ihrer Wirkung. Solange das Fenster offen ist, liest der eingebaute
+/// Lichtsensor mit, auch wenn er nicht die Lichtquelle ist.
 struct SensorDebugView: View {
     static let windowID = "sensor-debug"
 
@@ -44,8 +44,9 @@ struct SensorDebugView: View {
     private func copy() {
         var lines = [
             "ScreenDim Sensor-Diagnose, \(Date().formatted(date: .numeric, time: .standard))",
-            "Lichtquelle (Einstellung): \(sensor.lightSource.rawValue)",
-            "Licht aktiv: \(sensor.activeLightOrigin?.rawValue ?? "-")",
+            "Lichtquelle (Einstellung): \(sensor.lightSource.rawValue), wirkt als \(sensor.effectiveLightSource.rawValue)",
+            "Licht aktiv: \(sensor.activeLightOrigin?.rawValue ?? "-"), Rückfall \(sensor.isLightFallback)",
+            "Verfügbar: Schreibtisch \(sensor.isDeskSensorLightAvailable), eingebaut \(sensor.isBuiltInLightAvailable)",
             "Anwesenheit aktiv: \(sensor.activePresenceOrigin?.rawValue ?? "-")",
             "Schreibtisch-Sensor: \(sensor.status), Host \(sensor.pairedHostname ?? "-"), "
                 + "Anwesenheit \(sensor.presence.map(String.init) ?? "-"), Lux \(sensor.lux.map { String($0) } ?? "-")",
@@ -58,7 +59,11 @@ struct SensorDebugView: View {
         for entry in sensor.debugLog.reversed() {
             let time = entry.date.formatted(date: .omitted, time: .standard)
             let effect = entry.effect.map { " → \($0)" } ?? ""
-            lines.append("\(time) \(entry.origin.rawValue) \(entry.event)\(effect)")
+            let what = switch entry.kind {
+            case .event(let origin, let event): "\(origin.rawValue) \(event)"
+            case .lightSourceSwitch(let from, let to): "Lichtquelle \(from?.rawValue ?? "-") → \(to?.rawValue ?? "-")"
+            }
+            lines.append("\(time) \(what)\(effect)")
         }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(lines.joined(separator: "\n"), forType: .string)
@@ -85,11 +90,25 @@ private struct ActiveSummary: View {
                 }
                 GridRow {
                     Text("Licht").foregroundStyle(.secondary)
-                    OriginLabel(origin: sensor.activeLightOrigin)
+                    HStack(spacing: 6) {
+                        OriginLabel(origin: sensor.activeLightOrigin)
+                        if sensor.isLightFallback {
+                            Text("Rückfall").font(.caption).foregroundStyle(.orange)
+                        }
+                    }
                 }
                 GridRow {
                     Text("Lichtquelle (Einstellung)").foregroundStyle(.secondary)
-                    Text(lightSourceName)
+                    Text(lightSourceName(sensor.effectiveLightSource, hasBuiltIn: sensor.hasBuiltInLightSensor))
+                }
+                GridRow {
+                    Text("Verfügbar").foregroundStyle(.secondary)
+                    HStack(spacing: 10) {
+                        AvailabilityLabel(title: "Schreibtisch-Sensor", available: sensor.isDeskSensorLightAvailable)
+                        if sensor.hasBuiltInLightSensor {
+                            AvailabilityLabel(title: "Eingebauter Lichtsensor", available: sensor.isBuiltInLightAvailable)
+                        }
+                    }
                 }
                 GridRow {
                     Text("Zuletzt gesetzt").foregroundStyle(.secondary)
@@ -115,13 +134,16 @@ private struct ActiveSummary: View {
             .padding(4)
         }
     }
+}
 
-    private var lightSourceName: LocalizedStringKey {
-        switch sensor.lightSource {
-        case .deskSensor: "Schreibtisch-Sensor"
-        case .builtIn: "Eingebauter Lichtsensor"
-        case .off: "Aus"
-        }
+/// Ob eine Quelle gerade Licht liefern kann (verbunden bzw. Deckel offen, Wert frisch).
+private struct AvailabilityLabel: View {
+    let title: LocalizedStringKey
+    let available: Bool
+
+    var body: some View {
+        Label(title, systemImage: available ? "checkmark.circle.fill" : "xmark.circle")
+            .foregroundStyle(available ? .green : .secondary)
     }
 }
 
@@ -180,9 +202,14 @@ private struct BuiltInSourceBox: View {
         GroupBox {
             Group {
                 if !sensor.hasBuiltInLightSensor {
-                    Text("Nicht verfügbar: Dieser Mac hat keinen Lichtsensor, oder die Variante darf ihn nicht lesen (App Store).")
+                    #if SCREENDIM_DIRECT
+                    Text("Dieser Mac hat keinen eingebauten Lichtsensor.")
+                        .foregroundStyle(.secondary)
+                    #else
+                    Text("Nur in ScreenDim Direct verfügbar – der App Store erlaubt keinen Zugriff auf den Lichtsensor.")
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    #endif
                 } else if sensor.isBuiltInLightSensorCovered {
                     Label("Deckel zu: Der Lichtsensor ist pausiert.", systemImage: "laptopcomputer")
                         .foregroundStyle(.orange)
@@ -223,10 +250,19 @@ private struct EventLog: View {
                         HStack(spacing: 8) {
                             Text(entry.date, format: .dateTime.hour().minute().second())
                                 .foregroundStyle(.secondary)
-                            Text(originName(entry.origin))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 130, alignment: .leading)
-                            Text(eventText(entry.event))
+                            switch entry.kind {
+                            case .event(let origin, let event):
+                                Text(originName(origin))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 130, alignment: .leading)
+                                Text(eventText(event))
+                            case .lightSourceSwitch(let from, let to):
+                                Text("Lichtquelle")
+                                    .foregroundStyle(.orange)
+                                    .frame(width: 130, alignment: .leading)
+                                Text("Wechsel: \(Text(switchName(from))) → \(Text(switchName(to)))")
+                                    .fontWeight(.semibold)
+                            }
                             if let effect = entry.effect {
                                 Text(effectText(effect)).fontWeight(.semibold)
                             }
@@ -250,6 +286,10 @@ private struct EventLog: View {
         case .connection(.pairingRequired): "Kopplung nötig"
         case .heartbeat: "Lebenszeichen"
         }
+    }
+
+    private func switchName(_ origin: SensorOrigin?) -> LocalizedStringKey {
+        origin.map(originName) ?? "keine"
     }
 
     private func effectText(_ effect: SensorDebugEntry.Effect) -> LocalizedStringKey {
