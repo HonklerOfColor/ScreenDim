@@ -53,6 +53,10 @@
 - DDC- und Gamma-Helligkeit werden getrennt gespeichert: Am Dock wurde ein per DDC
   gesetzter Wert zusätzlich als Gamma angewandt (doppelte Abdunklung).
 - Registry-Root nach der Monitorsuche freigegeben.
+- Lichtregelung: Kam der erste Lux-Wert, während ein Monitor noch per DDC geprüft wurde,
+  übernahm er ihn nicht, die Hysterese hielt ihn aber für gesetzt. Nach der Prüfung blieb
+  der Monitor auf seinem gespeicherten Wert, bis sich das Licht um mehr als 5 % änderte.
+  Jetzt holt der nächste Lux-Wert den Wert nach.
 
 ## 1.0 (Entwicklung)
 - DDC/CI-Helligkeit für externe Monitore, eingebautes Display, Master-Slider,

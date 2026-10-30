@@ -247,6 +247,55 @@ struct SensorControllerTests {
         #expect(controller.builtInLux == nil)
     }
 
+    @Test("Licht während der DDC-Prüfung: Der Monitor holt den Wert danach nach, ohne neue Lichtänderung")
+    func lightAppliedAfterProbe() async throws {
+        let gate = GatedControl()
+        let laptop = DisplayManager(
+            store: BrightnessStore(storage: preferences),
+            timing: .immediate,
+            probeRetryDelay: .zero,
+            gamma: StubDimmer(),
+            overlay: StubDimmer(),
+            blanker: blanker,
+            discover: {
+                [
+                    DiscoveredDisplay(
+                        id: 1, identity: DisplayIdentity(vendor: 1552, model: 1, serial: 1), name: "MacBook", kind: .builtIn
+                    ),
+                    DiscoveredDisplay(
+                        id: 7, identity: DisplayIdentity(vendor: 1, model: 2, serial: 3), name: "Monitor 7",
+                        kind: .external(avServiceID: 42)
+                    ),
+                ]
+            },
+            makeExternalControl: { _, _, _ in gate },
+            makeBuiltInControl: { _ in StubControl() }
+        )
+        laptop.refresh(force: true)
+        func external() -> DisplayManager.Monitor? { laptop.monitors.first { $0.id == 7 } }
+        let key = try #require(external()?.storageKey)
+        BrightnessStore(storage: preferences).setBrightness(89, for: key, mode: .software)
+        #expect(external()?.state == .probing)
+
+        let light = StubSensorSource()
+        let controller = makeController(paired: false, manager: laptop, builtInLight: light)
+        controller.start()
+        controller.setLightSource(.builtInOnly)
+        light.send(.connection(.connected), .lux(3))
+        #expect(await eventually { controller.activeLightOrigin == .builtIn })
+
+        // Die Prüfung scheitert wie bei einem Monitor hinter dem Dock: Software-Dimmung mit
+        // dem gespeicherten Wert.
+        gate.release(with: .failure(.timeout))
+        #expect(await eventually { external()?.usesSoftwareDimming == true })
+        #expect(external()?.brightness == 89)
+
+        // Gleiches Licht, innerhalb der Hysterese: Der ausstehende Wert gilt trotzdem.
+        clock.advance(by: .seconds(1))
+        light.send(.lux(4))
+        #expect(await eventually { external()?.brightness == 20 })
+    }
+
     @Test("Deckel zu: Werte des eingebauten Lichtsensors zählen nicht")
     func builtInLightIgnoredWhenLidClosed() async {
         // Der Standard-Manager kennt nur den externen Monitor, wie bei zugeklapptem Deckel.

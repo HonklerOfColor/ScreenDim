@@ -186,6 +186,9 @@ public final class SensorController {
     @ObservationIgnored private var connection: SensorConnection?
     @ObservationIgnored private var lastEventAt: ContinuousClock.Instant?
     @ObservationIgnored private var lastAppliedBrightness: Double?
+    /// Ein Monitor war beim letzten Setzen noch in der DDC-Prüfung und hat den Wert nicht
+    /// übernommen; der nächste Lux-Wert holt ihn nach, auch innerhalb der Hysterese.
+    @ObservationIgnored private var lightPending = false
     /// Letzte Lux des Schreibtisch-Sensors (ohne Demo) und des eingebauten Sensors.
     @ObservationIgnored private var deskLuxAt: ContinuousClock.Instant?
     @ObservationIgnored private var builtInLuxAt: ContinuousClock.Instant?
@@ -445,11 +448,16 @@ public final class SensorController {
         guard !manager.screensBlanked else { return nil }
         let builtIn = origin == .builtIn
         let target = AmbientLightCurve.percent(forLux: builtIn ? lux * Self.builtInLuxFactor : lux)
-        if let last = lastAppliedBrightness, abs(last - target) < Self.luxHysteresis { return nil }
+        if let last = lastAppliedBrightness, abs(last - target) < Self.luxHysteresis {
+            // Denselben Wert nachreichen: Bereite Monitore bekommen keinen neuen Write.
+            guard lightPending else { return nil }
+            lightPending = !manager.setAllBrightness(last, includingBuiltIn: !builtIn)
+            return lightPending ? nil : last
+        }
         lastAppliedBrightness = target
         lightBrightness = target
         lightBrightnessOrigin = origin
-        manager.setAllBrightness(target, includingBuiltIn: !builtIn)
+        lightPending = !manager.setAllBrightness(target, includingBuiltIn: !builtIn)
         return target
     }
 

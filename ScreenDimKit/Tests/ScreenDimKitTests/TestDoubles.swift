@@ -90,6 +90,39 @@ final class StubControl: DDCControlling {
     }
 }
 
+/// Steuerkanal, dessen Reads warten, bis `release(with:)` sie freigibt: Der Monitor bleibt
+/// so lange in der Prüfung.
+final class GatedControl: DDCControlling {
+    private struct State {
+        var result: Result<VCPReading, DDCError>?
+        var waiting: [CheckedContinuation<Void, Never>] = []
+    }
+
+    private let state = Mutex(State())
+
+    func release(with result: Result<VCPReading, DDCError>) {
+        let waiting = state.withLock { state in
+            state.result = result
+            defer { state.waiting = [] }
+            return state.waiting
+        }
+        waiting.forEach { $0.resume() }
+    }
+
+    func read(_ code: VCPCode) async throws(DDCError) -> VCPReading {
+        await withCheckedContinuation { continuation in
+            let released = state.withLock { state in
+                if state.result == nil { state.waiting.append(continuation) }
+                return state.result != nil
+            }
+            if released { continuation.resume() }
+        }
+        return try state.withLock { $0.result! }.get()
+    }
+
+    func write(_ code: VCPCode, value: UInt16) async throws(DDCError) {}
+}
+
 /// Software-Dimmung ohne Gamma-Tabellen und Fenster: merkt sich nur, was gesetzt würde.
 @MainActor
 final class StubDimmer: SoftwareDimming {
