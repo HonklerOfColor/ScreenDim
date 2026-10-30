@@ -19,12 +19,15 @@ struct DisplayManagerTests {
 
     private let setup = Setup()
 
-    private func makeManager() -> DisplayManager {
+    private func makeManager(sleeper: ManualSleeper? = nil) -> DisplayManager {
         let setup = setup
         return DisplayManager(
             store: BrightnessStore(storage: setup.preferences),
             timing: .immediate,
             probeRetryDelay: .milliseconds(1),
+            sleep: { duration in
+                if let sleeper { await sleeper.sleep(duration) } else { try? await Task.sleep(for: duration) }
+            },
             gamma: setup.gamma,
             overlay: setup.overlay,
             discover: { setup.displays },
@@ -445,6 +448,60 @@ struct DisplayManagerTests {
         manager.setDimmingMethod(.overlay, for: 1)
         #expect(setup.overlay.levels.isEmpty)
         #expect(setup.gamma.levels.isEmpty)
+    }
+
+    // MARK: Überblenden
+
+    @Test("Überblenden: in 2 s mit höchstens 40 Schritten zum Ziel, Ziel sofort gespeichert")
+    func fadeSteps() async {
+        setup.displays = [Self.external(2, avService: nil)]
+        let sleeper = ManualSleeper()
+        let manager = makeManager(sleeper: sleeper)
+        manager.refresh(force: true)
+        let key = monitor(manager, 2)!.storageKey
+        #expect(monitor(manager, 2)?.brightness == 100)
+
+        var started = sleeper.started.makeAsyncIterator()
+        #expect(manager.fadeBrightness(to: 20, for: 2))
+        #expect(monitor(manager, 2)?.brightness == 100)
+        #expect(BrightnessStore(storage: setup.preferences).brightness(for: key, mode: .software) == 20)
+
+        var seen: [Double] = []
+        while let interval = await started.next() {
+            #expect(interval == .milliseconds(50))
+            sleeper.wake()
+            let before = seen.last ?? 100
+            #expect(await eventually { monitor(manager, 2)?.brightness != before })
+            seen.append(monitor(manager, 2)!.brightness)
+            if seen.last == 20 { break }
+        }
+        #expect(seen.count == 40)
+        #expect(seen.first == 98)
+        #expect(zip(seen, seen.dropFirst()).allSatisfy { $0 > $1 })
+        #expect(setup.gamma.levels[2] == 20)
+    }
+
+    @Test("Kleine Änderung ohne Überblenden; setBrightness bricht eine Überblendung ab")
+    func fadeShortAndCancel() async {
+        setup.displays = [Self.external(2, avService: nil)]
+        let sleeper = ManualSleeper()
+        let manager = makeManager(sleeper: sleeper)
+        manager.refresh(force: true)
+
+        manager.fadeBrightness(to: 99, for: 2)
+        #expect(monitor(manager, 2)?.brightness == 99)
+
+        var started = sleeper.started.makeAsyncIterator()
+        manager.fadeBrightness(to: 39, for: 2)
+        _ = await started.next()
+        sleeper.wake()
+        #expect(await eventually { monitor(manager, 2)?.brightness == 98 }) // 99 − 60/40, gerundet
+        _ = await started.next()
+
+        manager.setBrightness(70, for: 2)
+        sleeper.wake()
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(monitor(manager, 2)?.brightness == 70)
     }
 
     @Test("Dock-Erkennung aus dem DisplayPort-Link")

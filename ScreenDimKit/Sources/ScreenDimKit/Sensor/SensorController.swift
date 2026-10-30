@@ -448,6 +448,7 @@ public final class SensorController {
 
     /// Jeder Monitor folgt seinem eigenen Lichtprofil, mit eigener Hysterese, gleich aus
     /// welcher Quelle das Licht kommt. Ein Monitor ohne „folgt dem Licht“ bleibt stehen.
+    /// Neue Werte blendet der `DisplayManager` über, statt zu springen.
     /// - Parameter only: nur diesen Monitor (`storageKey`), etwa nach geändertem Profil.
     /// - Returns: die gesetzten Helligkeiten; leer, wenn sich nichts geändert hat.
     @discardableResult
@@ -464,14 +465,14 @@ public final class SensorController {
             if let last = lastAppliedLight[key], abs(last - target) < Self.luxHysteresis {
                 // Denselben Wert nachreichen: Bereite Monitore bekommen keinen neuen Write.
                 guard pendingLight.contains(key) else { continue }
-                if manager.setBrightness(last, for: monitor.id) {
+                if manager.fadeBrightness(to: last, for: monitor.id) {
                     pendingLight.remove(key)
                     applied.append(LightLevel(storageKey: key, name: monitor.name, percent: last))
                 }
                 continue
             }
             lastAppliedLight[key] = target
-            if manager.setBrightness(target, for: monitor.id) {
+            if manager.fadeBrightness(to: target, for: monitor.id) {
                 pendingLight.remove(key)
             } else {
                 pendingLight.insert(key)

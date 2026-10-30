@@ -52,6 +52,9 @@ public final class DisplayManager {
     public typealias MakeBuiltInControl = @MainActor (_ displayID: CGDirectDisplayID) -> (any DDCControlling)?
 
     public static let hotKeyStep: Double = 10
+    /// Kürzester Abstand zweier Schritte beim Überblenden; so schnell schickt auch die
+    /// DDC-Drossel höchstens.
+    static let fadeStepInterval: Duration = .milliseconds(50)
 
     public private(set) var monitors: [Monitor] = []
     /// `false`, wenn die globalen Tastenkürzel schon von einer anderen App belegt sind.
@@ -83,11 +86,18 @@ public final class DisplayManager {
     @ObservationIgnored private let blanker: any ScreenBlanking
     /// Pause zwischen den beiden Probe-Runden eines externen Monitors.
     @ObservationIgnored private let probeRetryDelay: Duration
+    /// Dauer einer Überblendung (`fadeBrightness`), unabhängig von der Größe des Sprungs.
+    @ObservationIgnored private let fadeDuration: Duration
+    @ObservationIgnored private let sleep: @Sendable (Duration) async -> Void
+    /// Laufende Überblendung je Display.
+    @ObservationIgnored private var fades: [CGDirectDisplayID: Task<Void, Never>] = [:]
 
     public init(
         store: BrightnessStore = BrightnessStore(),
         timing: DDCTiming = .configured(from: .standard),
         probeRetryDelay: Duration = .seconds(2),
+        fadeDuration: Duration = .seconds(2),
+        sleep: @escaping @Sendable (Duration) async -> Void = { try? await Task.sleep(for: $0) },
         gamma: any SoftwareDimming = GammaDimmer(),
         overlay: any SoftwareDimming = OverlayDimmer(),
         blanker: any ScreenBlanking = ScreenBlanker(),
@@ -98,6 +108,8 @@ public final class DisplayManager {
         self.store = store
         self.timing = timing
         self.probeRetryDelay = probeRetryDelay
+        self.fadeDuration = fadeDuration
+        self.sleep = sleep
         self.gamma = gamma
         self.overlay = overlay
         self.blanker = blanker
@@ -109,6 +121,8 @@ public final class DisplayManager {
     /// Gibt allen Displays ihre ursprüngliche Kurve zurück und schließt die Overlays
     /// (beim Beenden).
     public func stop() {
+        fades.values.forEach { $0.cancel() }
+        fades = [:]
         gamma.apply([:])
         overlay.apply([:])
         blanker.blank([])
@@ -158,6 +172,9 @@ public final class DisplayManager {
         }
         guard force || changed else { return }
 
+        // Neue Monitorliste: Überblendungen enden; gespeichert ist schon ihr Zielwert.
+        fades.values.forEach { $0.cancel() }
+        fades = [:]
         knownIdentities = identities
         discovered = Dictionary(uniqueKeysWithValues: displays.map { ($0.id, $0) })
         generation += 1
@@ -260,10 +277,47 @@ public final class DisplayManager {
         return (values.reduce(0, +) / Double(values.count)).rounded()
     }
 
+    /// Setzt die Helligkeit sofort und bricht eine laufende Überblendung ab: Was der Nutzer
+    /// einstellt, gewinnt.
     /// - Returns: `false`, wenn der Monitor noch geprüft wird und den Wert deshalb nicht
     ///   übernommen hat. Nach der Prüfung steht er auf seinem gespeicherten Wert.
     @discardableResult
     public func setBrightness(_ percent: Double, for id: CGDirectDisplayID) -> Bool {
+        fades.removeValue(forKey: id)?.cancel()
+        return apply(percent, to: id, persist: true)
+    }
+
+    /// Gleitet in Schritten von höchstens einem Prozentpunkt zum Wert, statt zu springen
+    /// (Helligkeit nach Umgebungslicht). Gespeichert wird gleich der Zielwert, damit ein
+    /// Refresh mitten in der Überblendung nicht auf einem Zwischenwert landet. Eine neue
+    /// Überblendung oder `setBrightness` bricht die laufende ab.
+    /// - Returns: wie `setBrightness`.
+    @discardableResult
+    public func fadeBrightness(to percent: Double, for id: CGDirectDisplayID) -> Bool {
+        fades.removeValue(forKey: id)?.cancel()
+        guard let index = index(of: id), monitors[index].isAdjustable else {
+            return apply(percent, to: id, persist: true)
+        }
+        let start = monitors[index].brightness
+        let target = Self.clamp(percent)
+        let steps = min(Int(abs(target - start)), Int(fadeDuration / Self.fadeStepInterval))
+        guard steps > 1 else { return apply(target, to: id, persist: true) }
+        persist(target, at: index)
+        let interval = fadeDuration / steps
+        let sleep = sleep
+        fades[id] = Task { [weak self] in
+            for step in 1...steps {
+                await sleep(interval)
+                guard !Task.isCancelled, let self else { return }
+                let value = step == steps ? target : start + (target - start) * Double(step) / Double(steps)
+                self.apply(value, to: id, persist: false)
+            }
+        }
+        return true
+    }
+
+    @discardableResult
+    private func apply(_ percent: Double, to id: CGDirectDisplayID, persist: Bool) -> Bool {
         guard let index = index(of: id) else { return true }
         guard monitors[index].isAdjustable else { return monitors[index].state != .probing }
         let channel = channels[id]
@@ -271,10 +325,8 @@ public final class DisplayManager {
         let value = Self.clamp(percent)
         guard monitors[index].brightness != value else { return true }
         monitors[index].brightness = value
-        // Die Hintergrundbeleuchtung des eingebauten Displays merkt sich macOS selbst.
-        if !monitors[index].isBuiltIn || monitors[index].usesSoftwareDimming {
-            let mode: BrightnessStore.Mode = monitors[index].usesSoftwareDimming ? .software : .ddc
-            store.setBrightness(value, for: monitors[index].storageKey, mode: mode)
+        if persist {
+            self.persist(value, at: index)
         }
         if monitors[index].usesSoftwareDimming {
             syncSoftwareDimming()
@@ -282,6 +334,13 @@ public final class DisplayManager {
             channel.throttle.submit(Self.raw(fromPercent: value, maximum: channel.maximum))
         }
         return true
+    }
+
+    private func persist(_ value: Double, at index: Int) {
+        // Die Hintergrundbeleuchtung des eingebauten Displays merkt sich macOS selbst.
+        guard !monitors[index].isBuiltIn || monitors[index].usesSoftwareDimming else { return }
+        let mode: BrightnessStore.Mode = monitors[index].usesSoftwareDimming ? .software : .ddc
+        store.setBrightness(Self.clamp(value), for: monitors[index].storageKey, mode: mode)
     }
 
     /// - Parameter includingBuiltIn: `false` lässt das eingebaute Display aus, etwa wenn

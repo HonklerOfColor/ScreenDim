@@ -23,6 +23,7 @@ struct SensorControllerTests {
         manager = DisplayManager(
             store: BrightnessStore(storage: preferences),
             timing: .immediate,
+            fadeDuration: .zero,
             gamma: StubDimmer(),
             overlay: StubDimmer(),
             blanker: blanker,
@@ -69,6 +70,7 @@ struct SensorControllerTests {
         let manager = DisplayManager(
             store: BrightnessStore(storage: preferences),
             timing: .immediate,
+            fadeDuration: .zero,
             gamma: StubDimmer(),
             overlay: StubDimmer(),
             blanker: blanker,
@@ -316,6 +318,7 @@ struct SensorControllerTests {
             store: BrightnessStore(storage: preferences),
             timing: .immediate,
             probeRetryDelay: .zero,
+            fadeDuration: .zero,
             gamma: StubDimmer(),
             overlay: StubDimmer(),
             blanker: blanker,
