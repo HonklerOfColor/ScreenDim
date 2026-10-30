@@ -39,8 +39,10 @@ final class BuiltInDisplayControl: DDCControlling {
 
 /// Ob macOS das eingebaute Display selbst regelt („Helligkeit automatisch anpassen“).
 /// Privates Framework CoreBrightness: `BrightnessSystemClient` mit `copyPropertyForKey:`
-/// (Schlüssel `CBAutoBrightnessEnabled`, sonst `DisplayBrightnessAuto`). Gelesen wird nur
-/// bei Bedarf, ohne Abfragen im Takt. `nil`, wenn Framework oder Schlüssel fehlen.
+/// (Schlüssel `CBAutoBrightnessEnabled`, sonst `DisplayBrightnessAuto`). Jeder Aufruf
+/// fragt CoreBrightness; der `SensorController` merkt sich das Ergebnis und liest beim
+/// Start, wenn die App aktiv wird, und sonst höchstens alle 10 s beim nächsten Lichtwert.
+/// `nil`, wenn Framework oder Schlüssel fehlen.
 @MainActor
 enum AutoBrightness {
     private static let client: NSObject? = {

@@ -463,7 +463,7 @@ struct DisplayManagerTests {
         #expect(monitor(manager, 2)?.brightness == 100)
 
         var started = sleeper.started.makeAsyncIterator()
-        #expect(manager.fadeBrightness(to: 20, for: 2, reason: .profileChange))
+        #expect(manager.fadeBrightness(to: 20, for: 2, reason: .profileChange, duration: .seconds(2)))
         #expect(monitor(manager, 2)?.brightness == 100)
         #expect(BrightnessStore(storage: setup.preferences).brightness(for: key, mode: .software) == 20)
 
@@ -493,7 +493,7 @@ struct DisplayManagerTests {
         #expect(monitor(manager, 2)?.brightness == 99)
 
         var started = sleeper.started.makeAsyncIterator()
-        manager.fadeBrightness(to: 39, for: 2, reason: .profileChange)
+        manager.fadeBrightness(to: 39, for: 2, reason: .profileChange, duration: .seconds(2))
         _ = await started.next()
         sleeper.wake()
         #expect(await eventually { monitor(manager, 2)?.brightness == 98 }) // 99 − 60/40, gerundet
@@ -567,7 +567,7 @@ struct DisplayManagerTests {
         // macOS hat leicht nachgeregelt (2 Punkte, keine fremde Änderung): Start bei 32.
         gate.release(with: .success(VCPReading(current: 32, maximum: 100)))
         var started = sleeper.started.makeAsyncIterator()
-        #expect(manager.fadeBrightness(to: 80, for: 1, reason: .profileChange))
+        #expect(manager.fadeBrightness(to: 80, for: 1, reason: .profileChange, duration: .seconds(2)))
         _ = await started.next()
         #expect(jobs.last?.remembered == 30)
         #expect(jobs.last?.actual == 32)
@@ -598,6 +598,55 @@ struct DisplayManagerTests {
         #expect(jobs.last?.target == 75)
         #expect(monitor(manager, 1)?.brightness == 75)
         #expect(control.writes.isEmpty)
+    }
+
+    @Test("Keine fremde Änderung, wenn der Read direkt nach dem eigenen Write um höchstens 3 abweicht")
+    func smallDeviationAfterOwnWriteIsNotExternal() async {
+        let control = StubControl(read: .success(VCPReading(current: 50, maximum: 100)))
+        let manager = DisplayManager(
+            store: BrightnessStore(storage: setup.preferences),
+            timing: .immediate,
+            fadeDuration: .zero,
+            systemFadeDuration: .zero,
+            gamma: setup.gamma,
+            overlay: setup.overlay,
+            discover: { [Self.builtIn] },
+            makeBuiltInControl: { _ in control }
+        )
+        var jobs: [BrightnessJob] = []
+        manager.onBrightnessJob = { jobs.append($0) }
+        manager.refresh(force: true)
+        #expect(await eventually { monitor(manager, 1)?.state == .ready })
+
+        manager.fadeBrightness(to: 20, for: 1, reason: .profileChange)
+        #expect(await eventually { control.writes.last == 20 })
+        try? await Task.sleep(for: .milliseconds(100)) // Drossel frei
+
+        // Panel meldet 23 statt 20 (Rundung, Nachregeln): Grenze, keine fremde Änderung.
+        control.setRead(.success(VCPReading(current: 23, maximum: 100)))
+        manager.fadeBrightness(to: 80, for: 1, reason: .profileChange)
+        #expect(await eventually { control.writes.last == 80 })
+        #expect(!jobs.contains { $0.reason == .externalChange })
+        #expect(jobs.last?.actual == 23)
+        #expect(jobs.last?.target == 80)
+    }
+
+    @Test("Kein Leer-Auftrag: gleiches Ziel und Refresh ohne Änderung melden nichts")
+    func noEmptyJobs() async {
+        setup.displays = [Self.external(2, avService: nil)]
+        let manager = makeManager()
+        var jobs: [BrightnessJob] = []
+        manager.onBrightnessJob = { jobs.append($0) }
+        manager.refresh(force: true)
+        #expect(jobs.isEmpty) // ungedimmt, nichts gespeichert: schon am Ziel
+
+        manager.setBrightness(40, for: 2)
+        #expect(jobs.map(\.reason) == [.manual])
+        #expect(manager.fadeBrightness(to: 40, for: 2, reason: .profileChange))
+        #expect(manager.fadeBrightness(to: 40.3, for: 2, reason: .lux(raw: 50, filtered: 50, origin: .deskSensor)))
+        manager.refresh(force: true) // sichtbar 40, gespeichert 40
+        #expect(jobs.map(\.reason) == [.manual])
+        #expect(monitor(manager, 2)?.brightness == 40)
     }
 
     @Test("Dock-Erkennung aus dem DisplayPort-Link")

@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 import Observation
@@ -96,6 +97,9 @@ public final class SensorController {
     /// Nach einer fremden Änderung (macOS, Helligkeitstasten) ruht die Lichtregelung dieses
     /// Displays so lange.
     public static let externalChangeHold: Duration = .seconds(60)
+    /// So lange gilt der gelesene Zustand der Auto-Helligkeit; danach liest der nächste
+    /// Lichtwert neu. Wird die App aktiv (etwa die Einstellungen geöffnet), liest sie sofort.
+    public static let autoBrightnessMaxAge: Duration = .seconds(10)
     /// Faktor für die Lux des eingebauten Sensors vor der Kurve. Er sitzt hinter dem
     /// Displayglas; kalibriert ist der Wert noch nicht.
     public static let builtInLuxFactor: Double = 1.0
@@ -191,6 +195,8 @@ public final class SensorController {
     @ObservationIgnored private let makeSimulation: @MainActor (SimulationSchedule) -> SimulatedSensorSource
     @ObservationIgnored private let builtInLightSensor: (any SensorSource)?
     @ObservationIgnored private let readAutoBrightness: @MainActor () -> Bool?
+    @ObservationIgnored private var autoBrightnessReadAt: ContinuousClock.Instant?
+    @ObservationIgnored private var activationObserver: (any NSObjectProtocol)?
     @ObservationIgnored private let now: @MainActor () -> ContinuousClock.Instant
 
     @ObservationIgnored private var simulation: SimulatedSensorSource?
@@ -278,11 +284,19 @@ public final class SensorController {
     }
 
     public func start() {
+        refreshAutoBrightness()
+        activationObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshAutoBrightness() }
+        }
         restartSource()
         restartBuiltInLight()
     }
 
     public func stop() {
+        activationObserver.map(NotificationCenter.default.removeObserver)
+        activationObserver = nil
         pairingTask?.cancel()
         sourceTask?.cancel()
         sourceTask = nil
@@ -526,7 +540,9 @@ public final class SensorController {
     /// Software-Dimmung (App Store) wirkt zusätzlich zur Hintergrundbeleuchtung und stört
     /// nicht.
     private func macOSRegulates(_ monitor: DisplayManager.Monitor) -> Bool {
-        monitor.isBuiltIn && !monitor.usesSoftwareDimming && readAutoBrightness() == true
+        guard monitor.isBuiltIn, !monitor.usesSoftwareDimming else { return false }
+        refreshAutoBrightness(force: false)
+        return isMacOSAutoBrightnessEnabled == true
     }
 
     // MARK: - Pausen und Aufträge
@@ -577,9 +593,21 @@ public final class SensorController {
         return origin == .builtIn ? lux * Self.builtInLuxFactor : lux
     }
 
-    /// Ob macOS das eingebaute Display gerade selbst regelt; `nil`, wenn unbekannt.
-    public var isMacOSAutoBrightnessEnabled: Bool? {
-        readAutoBrightness()
+    /// Ob macOS das eingebaute Display selbst regelt, Stand des letzten Lesens; `nil`, wenn
+    /// unbekannt. Beobachtbar für die Einstellungen; Lesen nur über `refreshAutoBrightness`.
+    public private(set) var isMacOSAutoBrightnessEnabled: Bool?
+
+    /// Liest „Helligkeit automatisch anpassen“ neu: immer mit `force`, sonst nur, wenn der
+    /// gemerkte Zustand älter als `autoBrightnessMaxAge` ist. Kein Takt: gelesen wird beim
+    /// Start, wenn die App aktiv wird, und höchstens alle 10 s beim nächsten Lichtwert.
+    public func refreshAutoBrightness(force: Bool = true) {
+        let at = now()
+        if !force, let read = autoBrightnessReadAt, at - read < Self.autoBrightnessMaxAge { return }
+        autoBrightnessReadAt = at
+        let value = readAutoBrightness()
+        if value != isMacOSAutoBrightnessEnabled {
+            isMacOSAutoBrightnessEnabled = value
+        }
     }
 
     /// Lichtprofil eines Monitors; ohne eigenes das Standardprofil. Das eingebaute Display

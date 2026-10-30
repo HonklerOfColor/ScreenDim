@@ -64,7 +64,7 @@ struct SensorControllerTests {
             makeLiveSource: { _, _ in source },
             makeSimulation: { SimulatedSensorSource(schedule: $0, seed: 1) },
             makeBuiltInLightSensor: { builtInLight },
-            isAutoBrightnessEnabled: { [autoBrightness] in autoBrightness.value },
+            isAutoBrightnessEnabled: { [autoBrightness] in autoBrightness.read() },
             now: { [clock] in clock.instant }
         )
     }
@@ -318,6 +318,7 @@ struct SensorControllerTests {
 
         // macOS regelt selbst: kein zweiter Schreiber, auch wenn das Licht sich ändert.
         autoBrightness.value = true
+        controller.refreshAutoBrightness() // wie beim Aktivieren der App
         for _ in 1...3 { light.send(.lux(1000)) } // drei Werte: anhaltender Sprung
         #expect(await eventually { external(laptop) == 100 })
         try? await Task.sleep(for: .milliseconds(30))
@@ -616,6 +617,34 @@ struct SensorControllerTests {
         #expect(!controller.debugLog.contains { if case .lightSourceSwitch(.deskSensor?, _) = $0.kind { true } else { false } })
     }
 
+    @Test("Auto-Helligkeit wird gemerkt: höchstens alle 10 s neu gelesen, sofort beim Aktivieren")
+    func autoBrightnessIsCached() async {
+        let laptop = makeLaptopManager(builtInControl: StubControl())
+        #expect(await eventually { laptop.monitors.first { $0.isBuiltIn }?.state == .ready })
+        let macBook = laptop.monitors.first { $0.isBuiltIn }!
+        autoBrightness.value = false
+        let controller = makeController(manager: laptop)
+        controller.setLightProfile(LightProfile(followsLight: true, curve: .standard), for: macBook)
+        controller.start()
+        #expect(autoBrightness.reads == 1)
+        #expect(controller.isMacOSAutoBrightnessEnabled == false)
+
+        source.send(.connection(.connected), .lux(10), .lux(1000), .lux(10), .lux(1000))
+        #expect(await eventually { controller.lux == 1000 && external(laptop) == 100 })
+        #expect(autoBrightness.reads == 1)
+
+        clock.advance(by: .seconds(11))
+        source.send(.lux(10))
+        #expect(await eventually { external(laptop) == 20 })
+        #expect(autoBrightness.reads == 2)
+
+        // Einstellungen geöffnet bzw. App aktiv: sofort neu, beobachtbar.
+        autoBrightness.value = true
+        controller.refreshAutoBrightness()
+        #expect(autoBrightness.reads == 3)
+        #expect(controller.isMacOSAutoBrightnessEnabled == true)
+    }
+
     // MARK: Pausen
 
     @Test("Fremde Änderung am eingebauten Display: Wert übernehmen, 60 s Pause")
@@ -803,4 +832,10 @@ struct SensorControllerTests {
 @MainActor
 final class AutoBrightnessFlag {
     var value: Bool?
+    private(set) var reads = 0
+
+    func read() -> Bool? {
+        reads += 1
+        return value
+    }
 }

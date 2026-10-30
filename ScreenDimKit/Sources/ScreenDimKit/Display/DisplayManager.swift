@@ -345,7 +345,8 @@ public final class DisplayManager {
     /// zuletzt bestätigte Write, ohne zusätzlichen Read. Gespeichert wird gleich der
     /// Zielwert, damit ein Refresh mitten in der Überblendung nicht auf einem Zwischenwert
     /// landet. Eine neue Überblendung oder `setBrightness` bricht die laufende ab.
-    /// - Parameter duration: `nil` für die Dauer der Lichtregelung.
+    /// - Parameter duration: `nil`: 2 s für Licht (neuer Wert, Quellwechsel, nachgeholt
+    ///   nach der Prüfung), sonst die kurze Dauer (etwa beim Ziehen an der Kurve).
     /// - Returns: wie `setBrightness`.
     @discardableResult
     public func fadeBrightness(
@@ -358,7 +359,7 @@ public final class DisplayManager {
         guard monitors[index].isAdjustable else { return monitors[index].state != .probing }
         fades.removeValue(forKey: id)?.cancel()
         let target = Self.clamp(percent)
-        let duration = duration ?? fadeDuration
+        let duration = duration ?? defaultFadeDuration(for: reason)
         fadeTargets[id] = target
         persist(target, at: index)
         let monitor = monitors[index]
@@ -380,6 +381,13 @@ public final class DisplayManager {
             beginFade(id, to: target, reason: reason, duration: duration, actual: confirmed, detectsExternal: false)
         }
         return true
+    }
+
+    private func defaultFadeDuration(for reason: BrightnessJob.Reason) -> Duration {
+        switch reason {
+        case .lux, .sourceSwitch, .pendingAfterProbe: fadeDuration
+        default: systemFadeDuration
+        }
     }
 
     private func beginFade(
@@ -406,6 +414,12 @@ public final class DisplayManager {
         }
         let start = actual ?? monitor.brightness
         monitors[index].brightness = start
+        // Schon am Ziel: kein Auftrag, kein Eintrag (etwa Refresh ohne Änderung).
+        guard abs(target - start) >= 0.5 else {
+            apply(target, to: id, persist: false)
+            fadeTargets[id] = nil
+            return
+        }
         let steps = min(Int(abs(target - start)), Int(duration / Self.fadeStepInterval))
         report(job(reason, target: target, duration: steps > 1 ? duration : .zero))
         guard steps > 1 else {
@@ -426,8 +440,14 @@ public final class DisplayManager {
         }
     }
 
+    /// Licht-Aufträge kommen oft und bleiben auf `info`; alle anderen (Rückfall, Prüfung,
+    /// fremde Änderung, …) als `notice`, damit `log show` sie ohne `--info` behält.
     private func report(_ job: BrightnessJob) {
-        lightLog.info("\(job.logDescription, privacy: .public)")
+        if case .lux = job.reason {
+            lightLog.info("\(job.logDescription, privacy: .public)")
+        } else {
+            lightLog.notice("\(job.logDescription, privacy: .public)")
+        }
         onBrightnessJob?(job)
     }
 

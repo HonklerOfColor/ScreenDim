@@ -34,6 +34,8 @@ struct SettingsView: View {
                 }
             }
         }
+        // Auto-Helligkeit frisch lesen, damit der Hinweis zum Display stimmt.
+        .onAppear { sensor.refreshAutoBrightness() }
     }
 
     /// Kurven nur, wenn überhaupt Licht kommen kann.
@@ -303,10 +305,10 @@ private struct LightProfileEditor: View {
 
     private var profile: LightProfile { sensor.lightProfile(for: monitor) }
 
-    /// macOS regelt dieses Display (oder es ist unbekannt): ScreenDim lässt es dann aus,
-    /// damit nur einer schreibt.
+    /// macOS regelt dieses Display: ScreenDim lässt es dann aus, damit nur einer schreibt.
+    /// Unbekannt zählt wie bei der Regelung als „nein“; dann entscheidet das Profil.
     private var macOSRegulates: Bool {
-        monitor.isBuiltIn && !monitor.usesSoftwareDimming && sensor.isMacOSAutoBrightnessEnabled != false
+        monitor.isBuiltIn && !monitor.usesSoftwareDimming && sensor.isMacOSAutoBrightnessEnabled == true
     }
 
     var body: some View {
