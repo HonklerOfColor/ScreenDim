@@ -139,11 +139,14 @@ Software-Dimmung. Ursachen und Abhilfe:
 
 **Ein Schreiber fürs eingebaute Display.** Direct liest „Helligkeit automatisch anpassen“
 über das private Framework CoreBrightness (`BrightnessSystemClient`,
-`copyPropertyForKey:` mit `CBAutoBrightnessEnabled`, sonst `DisplayBrightnessAuto`), nur
-bei Bedarf, ohne Takt. Ist sie an, lässt die Lichtregelung das eingebaute Display aus,
-auch mit eigenem Profil. Unbekannt (App Store, Schlüssel fehlt): Das Profil entscheidet,
-und das eingebaute Display folgt dem Licht standardmäßig nicht. Die Einstellungen zeigen
-dann „macOS regelt dieses Display selbst …“ mit Knopf zu den Displays-Einstellungen.
+`copyPropertyForKey:` mit `CBAutoBrightnessEnabled`, sonst `DisplayBrightnessAuto`). Der
+`SensorController` merkt sich den Wert und liest neu beim Start, wenn die App aktiv wird
+(auch beim Öffnen der Einstellungen) und sonst höchstens alle 10 s beim nächsten
+Lichtwert (`autoBrightnessMaxAge`); kein eigener Takt. Ist sie an, lässt die
+Lichtregelung das eingebaute Display aus, auch mit eigenem Profil, und die Einstellungen
+zeigen „macOS regelt dieses Display selbst …“ mit Knopf zu den Displays-Einstellungen.
+Unbekannt (App Store, Schlüssel fehlt) zählt als „aus“: Das Profil entscheidet, und das
+eingebaute Display folgt dem Licht standardmäßig nicht.
 Zusätzlich: Weicht der vor einer Überblendung gelesene Wert um mehr als 3 Punkte vom
 eigenen ab, hat ein anderer Regler gewirkt (Helligkeitstasten, macOS). Der Wert wird
 übernommen, nichts geschrieben, und die Lichtregelung dieses Displays ruht 60 s

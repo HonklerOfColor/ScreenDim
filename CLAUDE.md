@@ -41,8 +41,8 @@ Eine Codebasis, zwei App-Targets aus `project.yml`:
     (Protokoll für das Fenster „Sensor-Diagnose“, läuft nur, solange es offen ist).
     Lichtquelle mit Vorrang (`LightSource`: Schreibtisch zuerst (Standard), eingebaut
     zuerst, nur Schreibtisch, nur eingebaut, aus); `LightSourceSelector` (rein) wählt nach
-    Verfügbarkeit (ESP32: verbunden, Lux ≤ 10 s; eingebaut: Deckel offen, Wert ≤ 5 s) mit
-    5 s Wechselsperre. Jeder Monitor folgt seinem Lichtprofil (`LightCurve`:
+    Verfügbarkeit (ESP32: verbunden, letztes Ereignis ≤ 45 s; eingebaut: Deckel offen,
+    Wert ≤ 5 s) mit 5 s Wechselsperre. Jeder Monitor folgt seinem Lichtprofil (`LightCurve`:
     Lux-Stützpunkte, je Monitor abschaltbar), gleich aus welcher Quelle; Anwesenheit
     kommt nur vom ESP32. Ohne eingebauten Sensor wirkt jede Wahl außer „aus“ wie „nur
     Schreibtisch“, gespeichert bleibt sie. Den eingebauten Lichtsensor reicht Direct per
