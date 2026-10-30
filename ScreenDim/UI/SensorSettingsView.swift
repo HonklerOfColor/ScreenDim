@@ -54,7 +54,7 @@ private struct SettingsPage<Content: View>: View {
     var body: some View {
         Form {
             if sensor.isDemoActive {
-                DemoBanner(sensor: sensor)
+                DemoBanner(sensor: sensor, title: "Demo-Modus aktiv: Anwesenheit und Licht sind simuliert.")
             }
             content
         }
@@ -97,19 +97,26 @@ private struct BuildYourOwnSection: View {
     }
 }
 
-private struct DemoBanner: View {
+/// Hinweis, solange der Demo-Modus läuft; im Menü und in den Einstellungen.
+struct DemoBanner: View {
     let sensor: SensorController
+    let title: LocalizedStringKey
 
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "theatermasks.fill")
-            Text("Demo-Modus aktiv: Anwesenheit und Licht sind simuliert.")
-                .fontWeight(.semibold)
-            Spacer()
+                .foregroundStyle(.orange)
+            Text(title)
+                .fontWeight(.medium)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
             Button("Beenden") { sensor.setDemoActive(false) }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
         }
-        .padding(8)
-        .background(.yellow.opacity(0.35), in: .rect(cornerRadius: 6))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(.orange.opacity(0.15), in: .rect(cornerRadius: 10))
     }
 }
 
@@ -426,11 +433,19 @@ private struct LightCurveChart: View {
     var body: some View {
         Chart {
             ForEach(samples, id: \.lux) { sample in
+                AreaMark(x: .value("Lux", sample.lux), y: .value("Helligkeit", sample.percent))
+                    .foregroundStyle(.linearGradient(
+                        colors: [.accentColor.opacity(0.25), .accentColor.opacity(0.02)],
+                        startPoint: .top, endPoint: .bottom
+                    ))
                 LineMark(x: .value("Lux", sample.lux), y: .value("Helligkeit", sample.percent))
+                    .foregroundStyle(Color.accentColor)
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
             }
             ForEach(Array(curve.points.enumerated()), id: \.offset) { _, point in
                 PointMark(x: .value("Lux", max(point.lux, 1)), y: .value("Helligkeit", point.percent))
-                    .symbolSize(50)
+                    .foregroundStyle(Color.accentColor)
+                    .symbolSize(40)
             }
             if let lux {
                 RuleMark(x: .value("Lux", min(max(lux, 1), LightCurve.maxLux)))
@@ -447,7 +462,7 @@ private struct LightCurveChart: View {
         .chartYScale(domain: 0...100)
         .chartXAxis {
             AxisMarks(values: [1, 10, 100, 1000, 10_000, 100_000]) { value in
-                AxisGridLine()
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                 AxisValueLabel {
                     if let lux = value.as(Double.self) {
                         Text("\(Int(lux)) lx")
@@ -457,7 +472,7 @@ private struct LightCurveChart: View {
         }
         .chartYAxis {
             AxisMarks(values: [0, 25, 50, 75, 100]) { value in
-                AxisGridLine()
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                 AxisValueLabel {
                     if let percent = value.as(Double.self) {
                         Text("\(Int(percent)) %")

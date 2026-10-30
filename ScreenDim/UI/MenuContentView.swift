@@ -1,6 +1,8 @@
 import ScreenDimKit
 import SwiftUI
 
+/// Fenster der Menüleiste im Stil des Kontrollzentrums: oben die Helligkeit als Karten,
+/// darunter Zeilen wie in einem Menü.
 struct MenuContentView: View {
     let manager: DisplayManager
     let sensor: SensorController
@@ -11,24 +13,71 @@ struct MenuContentView: View {
     #endif
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             if sensor.isDemoActive {
-                HStack(spacing: 6) {
-                    Image(systemName: "theatermasks.fill")
-                    Text("Demo-Modus aktiv")
-                        .fontWeight(.semibold)
-                    Spacer()
-                    Button("Beenden") { sensor.setDemoActive(false) }
-                        .buttonStyle(.link)
-                }
-                .font(.callout)
-                .padding(6)
-                .background(.yellow.opacity(0.35), in: .rect(cornerRadius: 6))
+                DemoBanner(sensor: sensor, title: "Demo-Modus aktiv")
             }
+
+            brightness
+
+            MenuDivider()
+
+            VStack(spacing: 0) {
+                loginRow
+                sensorRow
+            }
+            .buttonStyle(MenuRowStyle())
+
+            MenuDivider()
+
+            VStack(spacing: 0) {
+                Button { showSettings() } label: {
+                    MenuRowLabel("Einstellungen …", systemImage: "gearshape", shortcut: "⌘,")
+                }
+                .keyboardShortcut(",")
+                Button { manager.refresh(force: true) } label: {
+                    MenuRowLabel("Monitore neu suchen", systemImage: "arrow.clockwise")
+                }
+                #if SCREENDIM_DIRECT
+                Button {
+                    openWindow(id: DiagnosticsView.windowID)
+                    NSApplication.shared.activate()
+                } label: {
+                    MenuRowLabel("Diagnose …", systemImage: "stethoscope")
+                }
+                #endif
+            }
+            .buttonStyle(MenuRowStyle())
+
+            MenuDivider()
+
+            Button { NSApplication.shared.terminate(nil) } label: {
+                MenuRowLabel("Beenden", systemImage: "power", shortcut: "⌘Q")
+            }
+            .keyboardShortcut("q")
+            .buttonStyle(MenuRowStyle())
+        }
+        .padding(8)
+        .frame(width: 320)
+        .onAppear {
+            loginItem.reload()
+            Task { await manager.syncBuiltInBrightness() }
+        }
+    }
+
+    // MARK: - Helligkeit
+
+    private var brightness: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Helligkeit")
+                .font(.headline)
+                .padding(.horizontal, 6)
+                .padding(.top, 2)
 
             if manager.monitors.isEmpty {
                 Label("Kein Display gefunden", systemImage: "display.trianglebadge.exclamationmark")
                     .foregroundStyle(.secondary)
+                    .menuCard()
             } else {
                 if manager.monitors.count > 1 {
                     BrightnessSlider(
@@ -37,89 +86,87 @@ struct MenuContentView: View {
                         value: Binding(get: { manager.masterBrightness }, set: { manager.setAllBrightness($0) }),
                         isEnabled: manager.monitors.contains(where: \.isAdjustable)
                     )
-                    .fontWeight(.semibold)
-                    Divider()
+                    .menuCard()
                 }
                 ForEach(manager.monitors) { monitor in
                     MonitorRow(monitor: monitor, manager: manager)
+                        .menuCard()
                 }
             }
 
-            #if !SCREENDIM_DIRECT
-            if manager.monitors.contains(where: \.usesSoftwareDimming) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Diese Version dimmt per Software. Die Hintergrundbeleuchtung bleibt, wie sie ist.")
-                    if manager.monitors.contains(where: { $0.isBuiltIn && $0.usesSoftwareDimming }) {
-                        Text("Die des eingebauten Displays regelst du weiter mit den Helligkeitstasten.")
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            #endif
+            footnotes
+                .padding(.horizontal, 6)
+        }
+    }
 
-            if sensor.isEnabled && !sensor.isDemoActive {
-                HStack(spacing: 6) {
-                    Text("Sensor:")
-                    SensorStatusLabel(sensor: sensor)
+    @ViewBuilder
+    private var footnotes: some View {
+        #if !SCREENDIM_DIRECT
+        if manager.monitors.contains(where: \.usesSoftwareDimming) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Diese Version dimmt per Software. Die Hintergrundbeleuchtung bleibt, wie sie ist.")
+                if manager.monitors.contains(where: { $0.isBuiltIn && $0.usesSoftwareDimming }) {
+                    Text("Die des eingebauten Displays regelst du weiter mit den Helligkeitstasten.")
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 6) {
-                Toggle("Bei Login starten", isOn: Binding(get: { loginItem.isEnabled }, set: { loginItem.setEnabled($0) }))
-                    .toggleStyle(.checkbox)
-                if loginItem.needsApproval {
-                    Button("In den Systemeinstellungen erlauben …") { loginItem.openSystemSettings() }
-                        .buttonStyle(.link)
-                        .font(.caption)
-                }
-                if let error = loginItem.lastError {
-                    Text(verbatim: error).font(.caption).foregroundStyle(.red)
-                }
-                Group {
-                    if manager.hotKeysAvailable {
-                        Text("⌃⌥↑ / ⌃⌥↓  alle Monitore ±\(Int(DisplayManager.hotKeyStep).formatted()) %")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("Tastenkürzel ⌃⌥↑/↓ sind von einer anderen App belegt")
-                            .foregroundStyle(.orange)
-                    }
-                }
-                .font(.caption)
-            }
-
-            HStack {
-                Button("Einstellungen …") { showSettings() }
-                Spacer()
-                Button("Schreibtisch-Sensor einrichten …") { showSettings() }
-                    .buttonStyle(.link)
-                    .help("Hilfe: optionalen Anwesenheits- und Lichtsensor koppeln oder den Demo-Modus testen")
             }
             .font(.caption)
-
-            HStack {
-                Button("Monitore neu suchen") { manager.refresh(force: true) }
-                #if SCREENDIM_DIRECT
-                Button("Diagnose …") {
-                    openWindow(id: DiagnosticsView.windowID)
-                    NSApplication.shared.activate()
-                }
-                #endif
-                Spacer()
-                Button("Beenden") { NSApplication.shared.terminate(nil) }
-                    .keyboardShortcut("q")
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        #endif
+        Group {
+            if manager.hotKeysAvailable {
+                Text("⌃⌥↑ / ⌃⌥↓  alle Monitore ±\(Int(DisplayManager.hotKeyStep).formatted()) %")
+                    .foregroundStyle(.secondary)
+            } else {
+                Label("Tastenkürzel ⌃⌥↑/↓ sind von einer anderen App belegt", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
             }
         }
-        .padding(14)
-        .frame(width: 320)
-        .onAppear {
-            loginItem.reload()
-            Task { await manager.syncBuiltInBrightness() }
+        .font(.caption)
+    }
+
+    // MARK: - Zeilen
+
+    private var loginRow: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Toggle(isOn: Binding(get: { loginItem.isEnabled }, set: { loginItem.setEnabled($0) })) {
+                MenuRowLabel("Bei Login starten", systemImage: "person.crop.circle")
+            }
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .padding(.trailing, 8)
+            if loginItem.needsApproval {
+                Button("In den Systemeinstellungen erlauben …") { loginItem.openSystemSettings() }
+                    .buttonStyle(.link)
+                    .font(.caption)
+                    .padding(.leading, MenuMetrics.textInset)
+            }
+            if let error = loginItem.lastError {
+                Text(verbatim: error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .padding(.leading, MenuMetrics.textInset)
+            }
+        }
+    }
+
+    /// Mit Sensor: sein Zustand. Ohne: der Weg zur Einrichtung. Beides öffnet die Einstellungen.
+    @ViewBuilder
+    private var sensorRow: some View {
+        if sensor.isEnabled && !sensor.isDemoActive {
+            Button { showSettings() } label: {
+                MenuRowLabel("Schreibtisch-Sensor", systemImage: "sensor") {
+                    SensorStatusLabel(sensor: sensor)
+                        .font(.caption)
+                        .labelStyle(.titleAndIcon)
+                }
+            }
+        } else {
+            Button { showSettings() } label: {
+                MenuRowLabel("Schreibtisch-Sensor einrichten …", systemImage: "sensor")
+            }
+            .help("Hilfe: optionalen Anwesenheits- und Lichtsensor koppeln oder den Demo-Modus testen")
         }
     }
 }
@@ -137,17 +184,16 @@ private struct MonitorRow: View {
     let manager: DisplayManager
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
             BrightnessSlider(
                 title: monitor.name,
                 systemImage: monitor.isBuiltIn ? "laptopcomputer" : "display",
                 value: Binding(get: { monitor.brightness }, set: { manager.setBrightness($0, for: monitor.id) }),
                 isEnabled: monitor.isAdjustable
-            )
-            if let connection {
-                Label(connection, systemImage: monitor.intermediary == .dock ? "dock.rectangle" : "cable.connector")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            ) {
+                if let connection {
+                    Label(connection, systemImage: monitor.intermediary == .dock ? "dock.rectangle" : "cable.connector")
+                }
             }
             if monitor.usesSoftwareDimming {
                 dimmingPicker
@@ -178,7 +224,7 @@ private struct MonitorRow: View {
 
     /// Gamma oder Overlay. Geht Gamma bei diesem Display nicht, dimmt das Overlay.
     private var dimmingPicker: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
             Picker("Abdunkeln über", selection: Binding(
                 get: { monitor.dimming },
                 set: { manager.setDimmingMethod($0, for: monitor.id) }
@@ -231,41 +277,160 @@ private struct MonitorRow: View {
         color: Color = .orange,
         retry: Bool
     ) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Image(systemName: systemImage)
-                .foregroundStyle(color)
-            Text(text)
-                .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: systemImage)
+                    .foregroundStyle(color)
+                Text(text)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if retry {
-                Spacer(minLength: 4)
                 Button("Erneut prüfen") { manager.retry(monitor.id) }
                     .buttonStyle(.link)
+                    .padding(.leading, 18)
             }
         }
         .font(.caption)
     }
 }
 
-private struct BrightnessSlider: View {
+/// Kopf mit rundem Symbol, Name und Wert, darunter der Regler zwischen zwei Sonnen.
+private struct BrightnessSlider<Subtitle: View>: View {
     /// Schon lokalisiert bzw. Monitorname.
     let title: String
     let systemImage: String
     @Binding var value: Double
     let isEnabled: Bool
+    @ViewBuilder var subtitle: Subtitle
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Label(title, systemImage: systemImage)
-                    .lineLimit(1)
-                Spacer()
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(isEnabled ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
+                    .frame(width: 26, height: 26)
+                    .background(isEnabled ? AnyShapeStyle(.tint) : AnyShapeStyle(.quaternary), in: .circle)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(verbatim: title)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+                    subtitle
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 4)
                 Text(verbatim: "\(Int(value)) %")
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
-            Slider(value: $value, in: 0...100, step: 1)
-                .accessibilityLabel(Text("Helligkeit \(title)"))
+            Slider(value: $value, in: 0...100, step: 1) {
+                Text("Helligkeit \(title)")
+            } minimumValueLabel: {
+                Image(systemName: "sun.min")
+                    .foregroundStyle(.secondary)
+            } maximumValueLabel: {
+                Image(systemName: "sun.max")
+                    .foregroundStyle(.secondary)
+            }
+            .labelsHidden()
         }
         .disabled(!isEnabled)
+    }
+}
+
+extension BrightnessSlider where Subtitle == EmptyView {
+    init(title: String, systemImage: String, value: Binding<Double>, isEnabled: Bool) {
+        self.init(title: title, systemImage: systemImage, value: value, isEnabled: isEnabled) { EmptyView() }
+    }
+}
+
+// MARK: - Menü-Bausteine
+
+private enum MenuMetrics {
+    /// Einzug des Titels einer Menüzeile (Rand, Symbolspalte, Abstand), für Zeilen darunter.
+    static let textInset: CGFloat = 8 + 20 + 6
+}
+
+/// Inhalt einer Menüzeile: Symbol in fester Spalte, Titel, rechts Kürzel oder Zustand.
+private struct MenuRowLabel<Trailing: View>: View {
+    let title: LocalizedStringKey
+    let systemImage: String
+    @ViewBuilder var trailing: Trailing
+
+    init(_ title: LocalizedStringKey, systemImage: String, @ViewBuilder trailing: () -> Trailing) {
+        self.title = title
+        self.systemImage = systemImage
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .foregroundStyle(.secondary)
+                .frame(width: 20)
+            Text(title)
+            Spacer(minLength: 8)
+            trailing
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(.rect)
+    }
+}
+
+extension MenuRowLabel where Trailing == Text? {
+    init(_ title: LocalizedStringKey, systemImage: String, shortcut: String? = nil) {
+        self.init(title, systemImage: systemImage) {
+            shortcut.map { Text(verbatim: $0) }
+        }
+    }
+}
+
+/// Wie ein Menüeintrag: beim Überfahren hinterlegt, beim Drücken etwas dunkler.
+private struct MenuRowStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Row(configuration: configuration)
+    }
+
+    private struct Row: View {
+        let configuration: Configuration
+        @Environment(\.isEnabled) private var isEnabled
+        @State private var isHovered = false
+
+        var body: some View {
+            configuration.label
+                .background(
+                    Color.primary.opacity(highlight),
+                    in: .rect(cornerRadius: 6)
+                )
+                .opacity(isEnabled ? 1 : 0.5)
+                .onHover { isHovered = $0 }
+        }
+
+        private var highlight: Double {
+            guard isEnabled else { return 0 }
+            if configuration.isPressed { return 0.16 }
+            return isHovered ? 0.08 : 0
+        }
+    }
+}
+
+private struct MenuDivider: View {
+    var body: some View {
+        Divider().padding(.horizontal, 8)
+    }
+}
+
+private extension View {
+    /// Karte wie ein Modul im Kontrollzentrum.
+    func menuCard() -> some View {
+        padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.fill.quaternary, in: .rect(cornerRadius: 12))
     }
 }
