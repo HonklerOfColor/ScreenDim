@@ -301,16 +301,21 @@ private struct LightProfileEditor: View {
     let sensor: SensorController
     let monitor: DisplayManager.Monitor
 
-    private var profile: LightProfile { sensor.lightProfile(for: monitor.storageKey) }
+    private var profile: LightProfile { sensor.lightProfile(for: monitor) }
+
+    /// macOS regelt dieses Display (oder es ist unbekannt): ScreenDim lässt es dann aus,
+    /// damit nur einer schreibt.
+    private var macOSRegulates: Bool {
+        monitor.isBuiltIn && !monitor.usesSoftwareDimming && sensor.isMacOSAutoBrightnessEnabled != false
+    }
 
     var body: some View {
         Toggle("Folgt dem Umgebungslicht", isOn: Binding(
             get: { profile.followsLight }, set: { value in update { $0.followsLight = value } }
         ))
-        if profile.followsLight && monitor.isBuiltIn && !monitor.usesSoftwareDimming {
-            // macOS regelt das eingebaute Display sonst mit demselben Sensor dagegen.
+        if macOSRegulates {
             HStack(alignment: .firstTextBaseline) {
-                caption("Schalte „Helligkeit automatisch anpassen“ in den Displays-Einstellungen aus, sonst verstellt macOS die Helligkeit zusätzlich.")
+                caption("macOS regelt dieses Display selbst. Schalte „Helligkeit automatisch anpassen“ aus, wenn ScreenDim es regeln soll.")
                 Spacer()
                 Button("Displays …") {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Displays-Settings.extension")!)
@@ -353,7 +358,7 @@ private struct LightProfileEditor: View {
     private func update(_ change: (inout LightProfile) -> Void) {
         var profile = profile
         change(&profile)
-        sensor.setLightProfile(profile, for: monitor.storageKey)
+        sensor.setLightProfile(profile, for: monitor)
     }
 
     private func caption(_ text: LocalizedStringKey) -> some View {

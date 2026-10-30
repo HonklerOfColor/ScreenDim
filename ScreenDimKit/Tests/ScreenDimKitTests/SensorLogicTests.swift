@@ -139,6 +139,46 @@ struct PresenceGateTests {
         #expect(LightCurve(points: []) == .standard)
     }
 
+    // MARK: LuxFilter
+
+    private static func feed(_ filter: inout LuxFilter, _ values: [Double], from start: ContinuousClock.Instant, every step: Duration = .seconds(1)) -> [Double] {
+        values.enumerated().map { index, lux in filter.add(lux, at: start + step * index) }
+    }
+
+    @Test("Median filtert einzelne Ausreißer des eingebauten Sensors")
+    func medianDropsOutliers() {
+        var filter = LuxFilter(.builtIn)
+        let out = Self.feed(&filter, [100, 100, 100, 5000, 100, 2, 100], from: .now)
+        #expect(out.allSatisfy { abs($0 - 100) < 1 })
+    }
+
+    @Test("Stufensprung: kleiner gleitet mit ~4 s, großer anhaltender zieht nach drei Werten nach")
+    func emaFollowsStep() {
+        let start = ContinuousClock.now
+        var filter = LuxFilter(.builtIn)
+        _ = Self.feed(&filter, [100, 100, 100, 100, 100], from: start)
+
+        // Faktor 1,5: gleitet, nach 1 s erst ein Teil, nach 20 s fast ganz.
+        var small = filter
+        let gliding = Self.feed(&small, Array(repeating: 150, count: 20), from: start + .seconds(5))
+        #expect(gliding[2] > 100 && gliding[2] < 140)
+        #expect(abs(gliding.last! - 150) < 3)
+
+        // Faktor 10: zwei Werte ändern nichts (Median), der dritte zieht den Mittelwert nach.
+        var large = filter
+        let jump = Self.feed(&large, [1000, 1000, 1000], from: start + .seconds(5))
+        #expect(abs(jump[0] - 100) < 1)
+        #expect(abs(jump[1] - 100) < 1)
+        #expect(abs(jump[2] - 1000) < 1)
+    }
+
+    @Test("Schreibtisch-Sensor: Werte gehen unverändert durch, auch einzelne Änderungen")
+    func deskSensorPassesThrough() {
+        var filter = LuxFilter(.deskSensor)
+        let out = Self.feed(&filter, [300, 1000, 20], from: .now, every: .seconds(30))
+        #expect(out.map { $0.rounded() } == [300, 1000, 20])
+    }
+
     @Test("Backoff 1 s → 30 s, Reset nach Verbindung")
     func backoff() {
         var backoff = ReconnectBackoff()

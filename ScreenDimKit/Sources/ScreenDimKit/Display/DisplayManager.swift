@@ -55,6 +55,9 @@ public final class DisplayManager {
     /// Kürzester Abstand zweier Schritte beim Überblenden; so schnell schickt auch die
     /// DDC-Drossel höchstens.
     static let fadeStepInterval: Duration = .milliseconds(50)
+    /// Weicht der gelesene Wert des eingebauten Displays um mehr als so viele Punkte vom
+    /// eigenen ab, hat ein anderer Regler gewirkt (macOS, Helligkeitstasten).
+    public static let externalChangeThreshold: Double = 3
 
     public private(set) var monitors: [Monitor] = []
     /// `false`, wenn die globalen Tastenkürzel schon von einer anderen App belegt sind.
@@ -86,17 +89,29 @@ public final class DisplayManager {
     @ObservationIgnored private let blanker: any ScreenBlanking
     /// Pause zwischen den beiden Probe-Runden eines externen Monitors.
     @ObservationIgnored private let probeRetryDelay: Duration
-    /// Dauer einer Überblendung (`fadeBrightness`), unabhängig von der Größe des Sprungs.
+    /// Dauer einer Überblendung nach Licht, unabhängig von der Größe des Sprungs.
     @ObservationIgnored private let fadeDuration: Duration
+    /// Kürzere Überblendung für Wege des Managers selbst: Wert nach der Prüfung,
+    /// Software-Rückfall, Aufwachen und Umstecken.
+    @ObservationIgnored private let systemFadeDuration: Duration
     @ObservationIgnored private let sleep: @Sendable (Duration) async -> Void
-    /// Laufende Überblendung je Display.
+    /// Laufende Überblendung je Display (auch das Lesen des Startwerts davor).
     @ObservationIgnored private var fades: [CGDirectDisplayID: Task<Void, Never>] = [:]
+    /// Ziel der laufenden Überblendung je Display.
+    @ObservationIgnored private var fadeTargets: [CGDirectDisplayID: Double] = [:]
+
+    /// Jeder Helligkeitsauftrag (Licht, Regler, Prüfung, Rückfall, …), für Protokoll und
+    /// Pausen der Lichtregelung.
+    @ObservationIgnored public var onBrightnessJob: (@MainActor (BrightnessJob) -> Void)?
+    /// Ein Display ist nach der Prüfung regelbar (DDC bereit oder Software-Dimmung).
+    @ObservationIgnored public var onMonitorReady: (@MainActor (CGDirectDisplayID) -> Void)?
 
     public init(
         store: BrightnessStore = BrightnessStore(),
         timing: DDCTiming = .configured(from: .standard),
         probeRetryDelay: Duration = .seconds(2),
         fadeDuration: Duration = .seconds(2),
+        systemFadeDuration: Duration = .milliseconds(500),
         sleep: @escaping @Sendable (Duration) async -> Void = { try? await Task.sleep(for: $0) },
         gamma: any SoftwareDimming = GammaDimmer(),
         overlay: any SoftwareDimming = OverlayDimmer(),
@@ -109,6 +124,7 @@ public final class DisplayManager {
         self.timing = timing
         self.probeRetryDelay = probeRetryDelay
         self.fadeDuration = fadeDuration
+        self.systemFadeDuration = systemFadeDuration
         self.sleep = sleep
         self.gamma = gamma
         self.overlay = overlay
@@ -123,6 +139,7 @@ public final class DisplayManager {
     public func stop() {
         fades.values.forEach { $0.cancel() }
         fades = [:]
+        fadeTargets = [:]
         gamma.apply([:])
         overlay.apply([:])
         blanker.blank([])
@@ -172,9 +189,15 @@ public final class DisplayManager {
         }
         guard force || changed else { return }
 
-        // Neue Monitorliste: Überblendungen enden; gespeichert ist schon ihr Zielwert.
+        // Neue Monitorliste: Überblendungen enden, gespeichert ist schon ihr Zielwert. Was
+        // per Software gedimmt war, blendet von seinem sichtbaren Stand aus weiter.
         fades.values.forEach { $0.cancel() }
         fades = [:]
+        fadeTargets = [:]
+        let visible = Dictionary(
+            monitors.filter(\.usesSoftwareDimming).map { ($0.storageKey, $0.brightness) },
+            uniquingKeysWith: { $1 }
+        )
         knownIdentities = identities
         discovered = Dictionary(uniqueKeysWithValues: displays.map { ($0.id, $0) })
         generation += 1
@@ -194,12 +217,19 @@ public final class DisplayManager {
         // Wer schon per Software gedimmt wurde, bleibt es während der Probe; sonst würde
         // der Monitor kurz aufhellen. Das eingebaute Display wechselt nur ohne Kanal zur
         // Software; scheitert seine Steuerung, bleibt es beim Hinweis.
-        let softwareDimmed = Set(monitors.filter(\.usesSoftwareDimming).map(\.storageKey))
+        let softwareDimmed = Set(visible.keys)
+        var softwareTargets: [CGDirectDisplayID: Double] = [:]
         monitors = displays.map { display in
             let key = display.identity.storageKey
             let software = channels[display.id] == nil || (!display.isBuiltIn && softwareDimmed.contains(key))
+            if software {
+                softwareTargets[display.id] = store.brightness(for: key, mode: .software) ?? 100
+            }
+            // Software: zuerst der sichtbare Stand (neu angesteckt: nicht abgedunkelt), das
+            // Ziel folgt per Überblendung. Eingebaut mit Kanal: Platzhalter bis zur Prüfung,
+            // nie Startwert einer Überblendung (während der Prüfung nicht regelbar).
             let brightness: Double = if software {
-                store.brightness(for: key, mode: .software) ?? 100
+                visible[key] ?? 100
             } else if display.isBuiltIn {
                 50
             } else {
@@ -220,6 +250,9 @@ public final class DisplayManager {
         }
         syncSoftwareDimming()
         syncBlanking()
+        for (id, target) in softwareTargets {
+            fadeBrightness(to: target, for: id, reason: .wake, duration: systemFadeDuration)
+        }
         log.notice("Displays: \(displays.map { "\($0.name) [\($0.id)] AV-Service: \($0.avServiceID.map { String(format: "0x%llX", $0) } ?? "-") Kanal: \(self.channels[$0.id] != nil)" }.joined(separator: ", "), privacy: .public); \(reused) Kanäle wiederverwendet")
 
         let generation = generation
@@ -277,33 +310,110 @@ public final class DisplayManager {
         return (values.reduce(0, +) / Double(values.count)).rounded()
     }
 
+    /// Wert, auf den das Display gerade zugeht: Ziel der laufenden Überblendung, sonst der
+    /// gesetzte Wert. Bezug für die Hysterese der Lichtregelung.
+    public func brightnessTarget(for id: CGDirectDisplayID) -> Double? {
+        fadeTargets[id] ?? monitors.first { $0.id == id }?.brightness
+    }
+
     /// Setzt die Helligkeit sofort und bricht eine laufende Überblendung ab: Was der Nutzer
-    /// einstellt, gewinnt.
+    /// einstellt (Regler, Tastenkürzel), gewinnt. Meldet einen Auftrag „manual“.
     /// - Returns: `false`, wenn der Monitor noch geprüft wird und den Wert deshalb nicht
     ///   übernommen hat. Nach der Prüfung steht er auf seinem gespeicherten Wert.
     @discardableResult
     public func setBrightness(_ percent: Double, for id: CGDirectDisplayID) -> Bool {
         fades.removeValue(forKey: id)?.cancel()
-        return apply(percent, to: id, persist: true)
+        fadeTargets[id] = nil
+        guard let before = monitors.first(where: { $0.id == id }) else { return true }
+        let accepted = apply(percent, to: id, persist: true)
+        if let after = monitors.first(where: { $0.id == id }), after.brightness != before.brightness {
+            report(BrightnessJob(
+                storageKey: after.storageKey, name: after.name, reason: .manual,
+                remembered: before.brightness, actual: nil, target: after.brightness, duration: .zero
+            ))
+        }
+        return accepted
     }
 
-    /// Gleitet in Schritten von höchstens einem Prozentpunkt zum Wert, statt zu springen
-    /// (Helligkeit nach Umgebungslicht). Gespeichert wird gleich der Zielwert, damit ein
-    /// Refresh mitten in der Überblendung nicht auf einem Zwischenwert landet. Eine neue
-    /// Überblendung oder `setBrightness` bricht die laufende ab.
+    /// Gleitet in Schritten von höchstens einem Prozentpunkt zum Wert, statt zu springen.
+    /// Alle automatischen Wege laufen hierüber.
+    ///
+    /// Startwert ist der echte Wert, nicht der Merkwert: Beim eingebauten Display wird er
+    /// vorher gelesen (nur bei freier Drossel); weicht er um mehr als
+    /// `externalChangeThreshold` ab, hat ein anderer Regler gewirkt, sein Wert wird
+    /// übernommen und nichts geschrieben (Auftrag „externalChange“). Bei DDC gilt der
+    /// zuletzt bestätigte Write, ohne zusätzlichen Read. Gespeichert wird gleich der
+    /// Zielwert, damit ein Refresh mitten in der Überblendung nicht auf einem Zwischenwert
+    /// landet. Eine neue Überblendung oder `setBrightness` bricht die laufende ab.
+    /// - Parameter duration: `nil` für die Dauer der Lichtregelung.
     /// - Returns: wie `setBrightness`.
     @discardableResult
-    public func fadeBrightness(to percent: Double, for id: CGDirectDisplayID) -> Bool {
+    public func fadeBrightness(
+        to percent: Double,
+        for id: CGDirectDisplayID,
+        reason: BrightnessJob.Reason,
+        duration: Duration? = nil
+    ) -> Bool {
+        guard let index = index(of: id) else { return true }
+        guard monitors[index].isAdjustable else { return monitors[index].state != .probing }
         fades.removeValue(forKey: id)?.cancel()
-        guard let index = index(of: id), monitors[index].isAdjustable else {
-            return apply(percent, to: id, persist: true)
-        }
-        let start = monitors[index].brightness
         let target = Self.clamp(percent)
-        let steps = min(Int(abs(target - start)), Int(fadeDuration / Self.fadeStepInterval))
-        guard steps > 1 else { return apply(target, to: id, persist: true) }
+        let duration = duration ?? fadeDuration
+        fadeTargets[id] = target
         persist(target, at: index)
-        let interval = fadeDuration / steps
+        let monitor = monitors[index]
+        if !monitor.usesSoftwareDimming, monitor.isBuiltIn, let channel = channels[id] {
+            fades[id] = Task { [weak self] in
+                var actual: Double?
+                if channel.throttle.isIdle, let reading = try? await channel.control.read(.brightness),
+                   channel.throttle.isIdle {
+                    actual = Self.percent(fromRaw: reading.current, maximum: channel.maximum)
+                }
+                guard !Task.isCancelled, let self else { return }
+                self.beginFade(id, to: target, reason: reason, duration: duration, actual: actual, detectsExternal: true)
+            }
+        } else {
+            let channel = monitor.usesSoftwareDimming ? nil : channels[id]
+            let confirmed = channel.flatMap { channel in
+                channel.confirmed.map { Self.percent(fromRaw: $0, maximum: channel.maximum) }
+            }
+            beginFade(id, to: target, reason: reason, duration: duration, actual: confirmed, detectsExternal: false)
+        }
+        return true
+    }
+
+    private func beginFade(
+        _ id: CGDirectDisplayID,
+        to target: Double,
+        reason: BrightnessJob.Reason,
+        duration: Duration,
+        actual: Double?,
+        detectsExternal: Bool
+    ) {
+        guard let index = index(of: id) else { return }
+        let monitor = monitors[index]
+        func job(_ reason: BrightnessJob.Reason, target: Double, duration: Duration) -> BrightnessJob {
+            BrightnessJob(
+                storageKey: monitor.storageKey, name: monitor.name, reason: reason,
+                remembered: monitor.brightness, actual: actual, target: target, duration: duration
+            )
+        }
+        if detectsExternal, let actual, abs(actual - monitor.brightness) > Self.externalChangeThreshold {
+            monitors[index].brightness = actual
+            fadeTargets[id] = nil
+            report(job(.externalChange, target: actual, duration: .zero))
+            return
+        }
+        let start = actual ?? monitor.brightness
+        monitors[index].brightness = start
+        let steps = min(Int(abs(target - start)), Int(duration / Self.fadeStepInterval))
+        report(job(reason, target: target, duration: steps > 1 ? duration : .zero))
+        guard steps > 1 else {
+            apply(target, to: id, persist: false)
+            fadeTargets[id] = nil
+            return
+        }
+        let interval = duration / steps
         let sleep = sleep
         fades[id] = Task { [weak self] in
             for step in 1...steps {
@@ -312,8 +422,13 @@ public final class DisplayManager {
                 let value = step == steps ? target : start + (target - start) * Double(step) / Double(steps)
                 self.apply(value, to: id, persist: false)
             }
+            self?.fadeTargets[id] = nil
         }
-        return true
+    }
+
+    private func report(_ job: BrightnessJob) {
+        lightLog.info("\(job.logDescription, privacy: .public)")
+        onBrightnessJob?(job)
     }
 
     @discardableResult
@@ -415,6 +530,9 @@ public final class DisplayManager {
         let control: any DDCControlling
         let throttle: LatestValueThrottle<UInt16>
         var maximum: UInt16 = 100
+        /// Zuletzt bestätigter Wert (gelesen oder geschrieben): Startwert einer Überblendung
+        /// ohne zusätzlichen Read.
+        var confirmed: UInt16?
 
         init(key: ChannelKey, control: any DDCControlling, throttle: LatestValueThrottle<UInt16>) {
             self.key = key
@@ -434,6 +552,7 @@ public final class DisplayManager {
         let throttle = LatestValueThrottle<UInt16>(interval: .milliseconds(50)) { [weak self] raw in
             do throws(DDCError) {
                 try await control.write(.brightness, value: raw)
+                self?.channelCache[key]?.confirmed = raw
             } catch {
                 self?.writeFailed(key, raw: raw, error: error)
             }
@@ -466,12 +585,13 @@ public final class DisplayManager {
             channel.maximum = max(reading.maximum, 1)
             let current = Self.percent(fromRaw: reading.current, maximum: channel.maximum)
             log.notice("Display \(id): Helligkeit \(reading.current)/\(reading.maximum), gespeichert: \(saved ?? -1)")
+            channel.confirmed = reading.current
             monitors[index].state = .ready
             monitors[index].usesSoftwareDimming = false
-            monitors[index].brightness = saved ?? current
+            monitors[index].brightness = current
             syncSoftwareDimming()
             if let saved, saved != current {
-                channel.throttle.submit(Self.raw(fromPercent: saved, maximum: channel.maximum))
+                fadeBrightness(to: saved, for: id, reason: .probeRestore, duration: systemFadeDuration)
             }
         } else {
             monitors[index].state = lastError.map(DDCState.init(failure:)) ?? .noResponse
@@ -479,6 +599,7 @@ public final class DisplayManager {
                 switchToSoftwareDimming(index)
             }
         }
+        onMonitorReady?(id)
     }
 
     private func writeFailed(_ key: ChannelKey, raw: UInt16, error: DDCError) {
@@ -507,9 +628,11 @@ public final class DisplayManager {
         monitors[index].usesSoftwareDimming = true
         // Nur den eigenen Software-Wert übernehmen, nie den DDC-Wert: Die Hintergrund-
         // beleuchtung steht schon darauf, die Software-Dimmung käme oben drauf. Ohne
-        // gespeicherten Wert nicht abdunkeln.
-        monitors[index].brightness = store.brightness(for: monitors[index].storageKey, mode: .software) ?? 100
+        // gespeicherten Wert nicht abdunkeln. Von „nicht abgedunkelt“ aus überblenden.
+        let target = store.brightness(for: monitors[index].storageKey, mode: .software) ?? 100
+        monitors[index].brightness = 100
         syncSoftwareDimming()
+        fadeBrightness(to: target, for: monitors[index].id, reason: .softwareFallback, duration: systemFadeDuration)
     }
 
     /// Verteilt die Software-Dimmung auf Gamma und Overlay. Wo Gamma nicht greift,

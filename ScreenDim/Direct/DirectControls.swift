@@ -17,5 +17,11 @@ enum DirectControls {
     static func lightSensor() -> (any SensorSource)? {
         BuiltInLightSensor()
     }
+
+    /// „Helligkeit automatisch anpassen“ in macOS; `nil`, wenn nicht lesbar.
+    @MainActor
+    static func autoBrightness() -> Bool? {
+        AutoBrightness.isEnabled()
+    }
 }
 #endif

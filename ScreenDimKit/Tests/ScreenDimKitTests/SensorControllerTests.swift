@@ -17,6 +17,8 @@ struct SensorControllerTests {
     private let blanker = StubBlanker()
     private let source = StubSensorSource()
     private let clock = ManualNow()
+    /// Was die Fabrik für „Helligkeit automatisch anpassen“ meldet.
+    private let autoBrightness = AutoBrightnessFlag()
     private let manager: DisplayManager
 
     init() {
@@ -24,6 +26,7 @@ struct SensorControllerTests {
             store: BrightnessStore(storage: preferences),
             timing: .immediate,
             fadeDuration: .zero,
+            systemFadeDuration: .zero,
             gamma: StubDimmer(),
             overlay: StubDimmer(),
             blanker: blanker,
@@ -61,16 +64,25 @@ struct SensorControllerTests {
             makeLiveSource: { _, _ in source },
             makeSimulation: { SimulatedSensorSource(schedule: $0, seed: 1) },
             makeBuiltInLightSensor: { builtInLight },
+            isAutoBrightnessEnabled: { [autoBrightness] in autoBrightness.value },
             now: { [clock] in clock.instant }
         )
     }
 
     /// MacBook mit offenem Deckel (eingebautes Display 1) und externem Monitor 7.
-    private func makeLaptopManager(builtInControl: StubControl) -> DisplayManager {
+    private func makeLaptopManager(
+        builtInControl: StubControl,
+        fade: Duration = .zero,
+        sleeper: ManualSleeper? = nil
+    ) -> DisplayManager {
         let manager = DisplayManager(
             store: BrightnessStore(storage: preferences),
             timing: .immediate,
-            fadeDuration: .zero,
+            fadeDuration: fade,
+            systemFadeDuration: .zero,
+            sleep: { duration in
+                if let sleeper { await sleeper.sleep(duration) } else { try? await Task.sleep(for: duration) }
+            },
             gamma: StubDimmer(),
             overlay: StubDimmer(),
             blanker: blanker,
@@ -93,16 +105,9 @@ struct SensorControllerTests {
 
     private var brightness: Double? { manager.monitors.first?.brightness }
 
-    private static let macBookKey = "1552-1-1"
-
     /// Helligkeit aus dem Licht nur für Monitor 7.
     private static func monitor7(_ percent: Double) -> [LightLevel] {
         [LightLevel(storageKey: "1-2-3", name: "Monitor 7", percent: percent)]
-    }
-
-    /// Helligkeit aus dem Licht für MacBook und Monitor 7 (`makeLaptopManager`).
-    private static func laptop(_ percent: Double) -> [LightLevel] {
-        [LightLevel(storageKey: macBookKey, name: "MacBook", percent: percent)] + monitor7(percent)
     }
 
     @Test("Ohne Einstellung: kein Sensor, keine Abfrage")
@@ -193,13 +198,16 @@ struct SensorControllerTests {
         let laptop = makeLaptopManager(builtInControl: StubControl())
         #expect(await eventually { laptop.monitors.first { $0.isBuiltIn }?.state == .ready })
         func builtIn() -> Double? { laptop.monitors.first { $0.isBuiltIn }?.brightness }
-        let builtInKey = laptop.monitors.first { $0.isBuiltIn }!.storageKey
+        let macBook = laptop.monitors.first { $0.isBuiltIn }!
+        let monitor7 = laptop.monitors.first { $0.id == 7 }!
         let controller = makeController(manager: laptop)
         controller.setLightProfile(
             LightProfile(followsLight: true, curve: LightCurve(points: [.init(lux: 100, percent: 10), .init(lux: 500, percent: 70)])),
-            for: "1-2-3"
+            for: monitor7
         )
-        controller.setLightProfile(LightProfile(followsLight: false, curve: .standard), for: builtInKey)
+        // Eingebautes Display: Standard ist „folgt nicht“; ausdrücklich aus bleibt aus.
+        #expect(!controller.lightProfile(for: macBook).followsLight)
+        controller.setLightProfile(LightProfile(followsLight: false, curve: .standard), for: macBook)
         controller.start()
         let before = builtIn()
 
@@ -210,8 +218,8 @@ struct SensorControllerTests {
 
         // Profile überdauern einen Neustart des Controllers.
         let reloaded = makeController(manager: laptop)
-        #expect(reloaded.lightProfile(for: "1-2-3").curve.points.map(\.percent) == [10, 70])
-        #expect(!reloaded.lightProfile(for: builtInKey).followsLight)
+        #expect(reloaded.lightProfile(for: monitor7).curve.points.map(\.percent) == [10, 70])
+        #expect(!reloaded.lightProfile(for: macBook).followsLight)
     }
 
     @Test("Geändertes Profil gilt sofort mit dem aktuellen Licht, auch innerhalb der Hysterese")
@@ -221,13 +229,14 @@ struct SensorControllerTests {
         source.send(.connection(.connected), .lux(100))
         #expect(await eventually { brightness == 60 })
 
-        var profile = controller.lightProfile(for: "1-2-3")
+        let monitor = manager.monitors[0]
+        var profile = controller.lightProfile(for: monitor)
         profile.curve.insert(.init(lux: 100, percent: 62))
-        controller.setLightProfile(profile, for: "1-2-3")
+        controller.setLightProfile(profile, for: monitor)
         #expect(brightness == 62)
 
         // Zurück auf Standard: Der gespeicherte Eintrag verschwindet.
-        controller.setLightProfile(.standard, for: "1-2-3")
+        controller.setLightProfile(.standard, for: monitor)
         #expect(brightness == 60)
         #expect(preferences.object(forKey: "lightProfile.1-2-3") == nil)
     }
@@ -284,28 +293,35 @@ struct SensorControllerTests {
         #expect(!migrated.isBuiltInLightAvailable)
     }
 
-    @Test("Eingebauter Lichtsensor regelt alle Monitore; abgeschaltetes Profil bleibt stehen")
-    func builtInLightAdjustsAllMonitors() async {
+    @Test("Ein Schreiber: eingebautes Display standardmäßig nicht; mit Profil nur ohne macOS-Auto-Helligkeit")
+    func builtInDisplayHasOneWriter() async {
         let control = StubControl()
         let laptop = makeLaptopManager(builtInControl: control)
         #expect(await eventually { laptop.monitors.first { $0.isBuiltIn }?.state == .ready })
+        let macBook = laptop.monitors.first { $0.isBuiltIn }!
         let light = StubSensorSource()
         let controller = makeController(paired: false, manager: laptop, builtInLight: light)
         controller.start()
-        #expect(controller.hasBuiltInLightSensor)
         controller.setLightSource(.builtInFirst)
-        #expect(controller.lightSource == .builtInFirst)
 
+        // Standard: Nur der externe Monitor folgt.
         light.send(.connection(.connected), .lux(10))
-        #expect(await eventually { laptop.monitors.first { $0.id == 7 }?.brightness == 20 })
+        #expect(await eventually { external(laptop) == 20 })
         #expect(controller.builtInLux == 10)
-        #expect(await eventually { control.writes.last == 20 })
+        #expect(control.writes.isEmpty)
 
-        controller.setLightProfile(LightProfile(followsLight: false, curve: .standard), for: Self.macBookKey)
-        clock.advance(by: .seconds(1))
-        light.send(.lux(1000))
-        #expect(await eventually { laptop.monitors.first { $0.id == 7 }?.brightness == 100 })
-        #expect(laptop.monitors.first { $0.isBuiltIn }?.brightness == 20)
+        // Mit Profil und ohne Auto-Helligkeit regelt ScreenDim auch das eingebaute Display.
+        autoBrightness.value = false
+        controller.setLightProfile(LightProfile(followsLight: true, curve: .standard), for: macBook)
+        #expect(await eventually { control.writes.last == 20 })
+        let writes = control.writes.count
+
+        // macOS regelt selbst: kein zweiter Schreiber, auch wenn das Licht sich ändert.
+        autoBrightness.value = true
+        for _ in 1...3 { light.send(.lux(1000)) } // drei Werte: anhaltender Sprung
+        #expect(await eventually { external(laptop) == 100 })
+        try? await Task.sleep(for: .milliseconds(30))
+        #expect(control.writes.count == writes)
 
         controller.setLightSource(.off)
         #expect(controller.builtInLux == nil)
@@ -319,6 +335,7 @@ struct SensorControllerTests {
             timing: .immediate,
             probeRetryDelay: .zero,
             fadeDuration: .zero,
+            systemFadeDuration: .zero,
             gamma: StubDimmer(),
             overlay: StubDimmer(),
             blanker: blanker,
@@ -349,16 +366,16 @@ struct SensorControllerTests {
         light.send(.connection(.connected), .lux(3))
         #expect(await eventually { controller.activeLightOrigin == .builtIn })
 
-        // Die Prüfung scheitert wie bei einem Monitor hinter dem Dock: Software-Dimmung mit
-        // dem gespeicherten Wert.
+        controller.setDebugMonitoring(true)
+
+        // Die Prüfung scheitert wie bei einem Monitor hinter dem Dock: Software-Dimmung
+        // (vom ungedimmten Stand zum gespeicherten Wert), danach sofort der ausstehende
+        // Lichtwert, ohne neues Lux.
         gate.release(with: .failure(.timeout))
         #expect(await eventually { external()?.usesSoftwareDimming == true })
-        #expect(external()?.brightness == 89)
-
-        // Gleiches Licht, innerhalb der Hysterese: Der ausstehende Wert gilt trotzdem.
-        clock.advance(by: .seconds(1))
-        light.send(.lux(4))
         #expect(await eventually { external()?.brightness == 20 })
+        let reasons = controller.debugLog.compactMap { $0.job?.reason }
+        #expect(reasons == [.softwareFallback, .pendingAfterProbe])
     }
 
     @Test("Deckel zu: Werte des eingebauten Lichtsensors zählen nicht")
@@ -433,10 +450,14 @@ struct SensorControllerTests {
         #expect(await eventually { laptop.screensBlanked && controller.builtInLux == 10 })
         #expect(controller.activePresenceOrigin == .deskSensor)
         #expect(controller.activeLightOrigin == .builtIn)
-        #expect(controller.lightLevels == Self.laptop(20))
+        #expect(controller.lightLevels == Self.monitor7(20))
         #expect(controller.lightBrightnessOrigin == .builtIn)
 
-        #expect(controller.debugLog.contains { $0.origin == .builtIn && $0.effect == .brightness(Self.laptop(20)) })
+        #expect(controller.debugLog.contains { $0.origin == .builtIn && $0.effect == .brightness(Self.monitor7(20)) })
+        // Je Auftrag ein Eintrag mit Grund, Start und Ziel.
+        #expect(controller.debugLog.contains {
+            $0.job?.reason == .lux(raw: 10, filtered: 10, origin: .builtIn) && $0.job?.target == 20 && $0.job?.remembered == 100
+        })
         #expect(controller.debugLog.contains { $0.origin == .deskSensor && $0.effect == .screensOff })
         #expect(controller.debugLog.contains { $0.kind == .lightSourceSwitch(from: nil, to: .builtIn) })
         // Licht des Schreibtisch-Sensors steht im Protokoll, wirkt aber nicht.
@@ -455,10 +476,11 @@ struct SensorControllerTests {
         manager.monitors.first { $0.id == 7 }?.brightness
     }
 
-    @Test("Schreibtisch-Sensor fällt aus: eingebauter springt sofort ein, Hysterese neu")
+    @Test("Schreibtisch-Sensor fällt aus: eingebauter springt ein und blendet vom aktuellen Wert über, Hysterese bleibt")
     func fallsBackToBuiltIn() async {
         let control = StubControl()
-        let laptop = makeLaptopManager(builtInControl: control)
+        let sleeper = ManualSleeper()
+        let laptop = makeLaptopManager(builtInControl: control, fade: .seconds(2), sleeper: sleeper)
         #expect(await eventually { laptop.monitors.first { $0.isBuiltIn }?.state == .ready })
         let light = StubSensorSource()
         let controller = makeController(manager: laptop, builtInLight: light)
@@ -468,29 +490,52 @@ struct SensorControllerTests {
 
         source.send(.connection(.connected), .lux(1000))
         #expect(await eventually { controller.activeLightOrigin == .deskSensor })
-        // Der Schreibtisch-Sensor regelt auch das eingebaute Display.
-        #expect(await eventually { control.writes.last == 100 })
+        // 100 % ist schon der Stand: kein Auftrag, keine Überblendung.
+        #expect(external(laptop) == 100)
+        #expect(controller.debugLog.allSatisfy { $0.job == nil })
 
-        // 900 lx sind 98 %: innerhalb der Hysterese, gilt nach dem Wechsel trotzdem sofort.
-        light.send(.connection(.connected), .lux(900))
+        // 700 lx sind 94 %: außerhalb der Hysterese von 3 Punkten.
+        light.send(.connection(.connected), .lux(700))
         #expect(await eventually { controller.isBuiltInLightAvailable })
         #expect(controller.activeLightOrigin == .deskSensor)
         #expect(external(laptop) == 100)
 
+        var started = sleeper.started.makeAsyncIterator()
         source.send(.connection(.searching))
         #expect(await eventually { controller.activeLightOrigin == .builtIn })
         #expect(controller.isLightFallback)
         #expect(!controller.isDeskSensorLightAvailable)
-        #expect(await eventually { external(laptop) == 98 })
-        #expect(controller.lightBrightnessOrigin == .builtIn)
+        // Überblendung vom aktuellen Wert, nicht Sprung: erster Schritt 99 (100 → 94 in 6).
+        let job = controller.debugLog.compactMap(\.job).last
+        #expect(job?.reason == .sourceSwitch(from: .deskSensor, to: .builtIn))
+        #expect(job?.remembered == 100)
+        #expect(job?.target == 94)
+        #expect(job?.duration == .seconds(2))
+        _ = await started.next()
+        sleeper.wake()
+        #expect(await eventually { external(laptop) == 99 })
         #expect(controller.debugLog.contains {
-            $0.kind == .lightSourceSwitch(from: .deskSensor, to: .builtIn) && $0.effect == .brightness(Self.laptop(98))
+            $0.kind == .lightSourceSwitch(from: .deskSensor, to: .builtIn) && $0.effect == .brightness(Self.monitor7(94))
         })
+        #expect(control.writes.isEmpty) // eingebautes Display: Standard „folgt nicht“
+    }
 
-        // Der eingebaute Sensor regelt auch das eingebaute Display.
-        light.send(.lux(10))
-        #expect(await eventually { external(laptop) == 20 })
-        #expect(await eventually { control.writes.last == 20 })
+    @Test("Quellwechsel ohne Reset: innerhalb der Hysterese bleibt die Helligkeit stehen")
+    func sourceSwitchKeepsHysteresis() async {
+        let laptop = makeLaptopManager(builtInControl: StubControl())
+        let light = StubSensorSource()
+        let controller = makeController(manager: laptop, builtInLight: light)
+        controller.start()
+        controller.setDebugMonitoring(true)
+        source.send(.connection(.connected), .lux(1000))
+        light.send(.connection(.connected), .lux(900)) // 98 %
+        #expect(await eventually { external(laptop) == 100 && controller.isBuiltInLightAvailable })
+
+        source.send(.connection(.searching))
+        #expect(await eventually { controller.activeLightOrigin == .builtIn })
+        try? await Task.sleep(for: .milliseconds(30))
+        #expect(external(laptop) == 100)
+        #expect(controller.debugLog.allSatisfy { $0.job == nil })
     }
 
     @Test("Wechselsperre: zurück zur bevorzugten Quelle erst nach 5 s")
@@ -520,7 +565,7 @@ struct SensorControllerTests {
         #expect(await eventually { external(laptop) == 100 })
     }
 
-    @Test("Abgelaufene Quelle: ohne neues Lux nach 10 s gilt der Schreibtisch-Sensor als weg")
+    @Test("Abgelaufene Quelle: 45 s ohne jedes Ereignis gilt der Schreibtisch-Sensor als weg")
     func staleDeskSensor() async {
         let control = StubControl()
         let laptop = makeLaptopManager(builtInControl: control)
@@ -530,12 +575,12 @@ struct SensorControllerTests {
         source.send(.connection(.connected), .lux(1000))
         #expect(await eventually { controller.activeLightOrigin == .deskSensor })
         let luxAt = clock.instant
-        // Nichts zurückgehalten: Der einzige Termin ist der Ablauf knapp nach 10 s.
-        #expect(controller.lightExpiryDeadline == luxAt + .seconds(10) + .milliseconds(10))
+        // Nichts zurückgehalten: Der einzige Termin ist der Ablauf knapp nach 45 s.
+        #expect(controller.lightExpiryDeadline == luxAt + .seconds(45) + .milliseconds(10))
 
-        clock.advance(by: .seconds(10))
+        clock.advance(by: .seconds(45))
         controller.updateActiveLight()
-        #expect(controller.isDeskSensorLightAvailable) // genau 10 s: noch gültig
+        #expect(controller.isDeskSensorLightAvailable) // genau 45 s: noch gültig
 
         clock.advance(by: .seconds(1))
         controller.updateActiveLight()
@@ -546,6 +591,91 @@ struct SensorControllerTests {
         light.send(.connection(.connected), .lux(10))
         #expect(await eventually { controller.activeLightOrigin == .builtIn })
         #expect(await eventually { external(laptop) == 20 })
+    }
+
+    @Test("ESP32 mit Lux nur bei Änderung und Lebenszeichen alle 30 s bleibt aktiv")
+    func deskSensorHeartbeatKeepsSource() async {
+        let laptop = makeLaptopManager(builtInControl: StubControl())
+        let light = StubSensorSource()
+        let controller = makeController(manager: laptop, builtInLight: light)
+        controller.start()
+        controller.setDebugMonitoring(true)
+        source.send(.connection(.connected), .lux(10))
+        #expect(await eventually { controller.activeLightOrigin == .deskSensor && external(laptop) == 20 })
+        light.send(.connection(.connected), .lux(10))
+
+        // Zwei Minuten gleiches Licht: nur Lebenszeichen, der eingebaute Sensor meldet weiter.
+        for _ in 1...4 {
+            clock.advance(by: .seconds(30))
+            source.send(.heartbeat)
+            light.send(.lux(10))
+            #expect(await eventually { controller.debugLog.last?.event == .lux(10) })
+            #expect(controller.activeLightOrigin == .deskSensor)
+            #expect(controller.isDeskSensorLightAvailable)
+        }
+        #expect(!controller.debugLog.contains { if case .lightSourceSwitch(.deskSensor?, _) = $0.kind { true } else { false } })
+    }
+
+    // MARK: Pausen
+
+    @Test("Fremde Änderung am eingebauten Display: Wert übernehmen, 60 s Pause")
+    func externalChangePausesBuiltIn() async {
+        let control = StubControl()
+        let laptop = makeLaptopManager(builtInControl: control)
+        #expect(await eventually { laptop.monitors.first { $0.isBuiltIn }?.state == .ready })
+        let macBook = laptop.monitors.first { $0.isBuiltIn }!
+        func builtIn() -> Double? { laptop.monitors.first { $0.isBuiltIn }?.brightness }
+        autoBrightness.value = false
+        let controller = makeController(manager: laptop)
+        controller.setLightProfile(LightProfile(followsLight: true, curve: .standard), for: macBook)
+        controller.start()
+        controller.setDebugMonitoring(true)
+        source.send(.connection(.connected), .lux(10))
+        #expect(await eventually { builtIn() == 20 })
+        #expect(await eventually { control.writes.last == 20 })
+        try? await Task.sleep(for: .milliseconds(100)) // Drossel wieder frei, wie nach 1 s
+
+        // Helligkeitstasten: Das Display steht jetzt auf 70.
+        control.setRead(.success(VCPReading(current: 70, maximum: 100)))
+        let writes = control.writes.count
+        source.send(.lux(1000))
+        #expect(await eventually { builtIn() == 70 })
+        #expect(controller.debugLog.contains { $0.job?.reason == .externalChange && $0.job?.target == 70 })
+        #expect(control.writes.count == writes)
+
+        // Während der Pause regelt das Licht das Display nicht.
+        clock.advance(by: .seconds(59))
+        source.send(.lux(10))
+        try? await Task.sleep(for: .milliseconds(30))
+        #expect(builtIn() == 70)
+
+        clock.advance(by: .seconds(2))
+        control.setRead(.success(VCPReading(current: 70, maximum: 100)))
+        source.send(.lux(1000))
+        #expect(await eventually { builtIn() == 100 })
+    }
+
+    @Test("Wert von Hand hält: Pause bis 5 min oder Licht ändert sich um mehr als Faktor 2")
+    func manualValueHolds() async {
+        let controller = makeController()
+        controller.start()
+        source.send(.connection(.connected), .lux(1000))
+        #expect(await eventually { brightness == 100 })
+
+        manager.setBrightness(50, for: 7)
+        source.send(.lux(600)) // 91 %, Faktor < 2
+        #expect(await eventually { controller.lux == 600 })
+        #expect(brightness == 50)
+
+        // Ablauf nach 5 min.
+        clock.advance(by: .seconds(301))
+        source.send(.lux(700))
+        #expect(await eventually { brightness == 94 })
+
+        // Licht ändert sich stark: Die Pause endet sofort.
+        manager.setBrightness(50, for: 7)
+        source.send(.lux(10))
+        #expect(await eventually { brightness == 20 })
     }
 
     @Test("Eingebauter Sensor bevorzugt; Deckel zu: Schreibtisch-Sensor springt ein")
@@ -593,7 +723,7 @@ struct SensorControllerTests {
         #expect(controller.activeLightOrigin == .demo)
         #expect(!controller.isLightFallback)
         light.send(.connection(.connected), .lux(10))
-        controller.setDemoLux(1000)
+        controller.setDemoLux(10)
         #expect(await eventually { controller.lightBrightnessOrigin == .demo })
         #expect(controller.builtInLux == nil)
 
@@ -667,4 +797,10 @@ struct SensorControllerTests {
         #expect(controller.status == .searching)
         controller.stop()
     }
+}
+
+/// Antwort der Fabrik für „Helligkeit automatisch anpassen“; `nil`: unbekannt.
+@MainActor
+final class AutoBrightnessFlag {
+    var value: Bool?
 }

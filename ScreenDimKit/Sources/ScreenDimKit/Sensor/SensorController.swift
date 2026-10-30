@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Observation
 
@@ -85,9 +86,16 @@ public final class SensorController {
 
     public static let codePollInterval: Duration = .seconds(2)
     public static let pairingWindow: Duration = .seconds(180)
-    /// Mindeständerung in Prozentpunkten, bevor Licht die Helligkeit verstellt. Hält
-    /// DDC-Writes selten.
-    public static let luxHysteresis: Double = 5
+    /// Mindestabstand in Prozentpunkten zwischen neuem Ziel und dem Wert, auf den der
+    /// Monitor gerade zugeht, bevor Licht ihn verstellt. Hält DDC-Writes selten.
+    public static let lightHysteresis: Double = 3
+    /// Nach Regler oder Tastenkürzel ruht die Lichtregelung dieses Monitors so lange, oder
+    /// bis sich das Licht um mehr als `manualHoldLuxFactor` ändert.
+    public static let manualHold: Duration = .seconds(300)
+    nonisolated public static let manualHoldLuxFactor: Double = 2
+    /// Nach einer fremden Änderung (macOS, Helligkeitstasten) ruht die Lichtregelung dieses
+    /// Displays so lange.
+    public static let externalChangeHold: Duration = .seconds(60)
     /// Faktor für die Lux des eingebauten Sensors vor der Kurve. Er sitzt hinter dem
     /// Displayglas; kalibriert ist der Wert noch nicht.
     public static let builtInLuxFactor: Double = 1.0
@@ -103,7 +111,9 @@ public final class SensorController {
     public private(set) var demoLux: Double?
     /// Letzte Meldungen des Sensors; `nil` ohne Verbindung.
     public private(set) var presence: Bool?
+    /// Letztes Lux, roh und geglättet (`LuxFilter`); geglättet geht es in die Kurven.
     public private(set) var lux: Double?
+    public private(set) var filteredLux: Double?
     /// Gespeicherte Wahl. Sie bleibt erhalten, auch wenn dieser Mac sie nicht kann; was
     /// wirkt, steht in `effectiveLightSource`.
     public private(set) var lightSource: LightSource
@@ -115,12 +125,12 @@ public final class SensorController {
     /// Letzter Wert des eingebauten Lichtsensors; `nil`, solange er nicht läuft (weder
     /// Lichtquelle noch Sensor-Diagnose offen) oder der Deckel zu ist.
     public private(set) var builtInLux: Double?
+    public private(set) var builtInFilteredLux: Double?
     /// Zeit des letzten Ereignisses vom Schreibtisch-Sensor bzw. der Demo und vom
     /// eingebauten Lichtsensor.
     public private(set) var lastEventDate: Date?
     public private(set) var builtInLastEventDate: Date?
-    /// Zuletzt aus Licht gesetzte Helligkeit (Prozent) und woher das Licht kam.
-    /// Letzte Helligkeit aus dem Licht je angeschlossenem Monitor.
+    /// Letzte Helligkeit aus dem Licht je angeschlossenem Monitor und woher das Licht kam.
     public private(set) var lightLevels: [LightLevel] = []
     public private(set) var lightBrightnessOrigin: SensorOrigin?
     /// Geänderte Lichtprofile dieser Sitzung; die übrigen liegen in `profileStore`.
@@ -180,6 +190,7 @@ public final class SensorController {
     @ObservationIgnored private let makeLiveSource: @MainActor (SensorEndpoint, PairingCode) -> any SensorSource
     @ObservationIgnored private let makeSimulation: @MainActor (SimulationSchedule) -> SimulatedSensorSource
     @ObservationIgnored private let builtInLightSensor: (any SensorSource)?
+    @ObservationIgnored private let readAutoBrightness: @MainActor () -> Bool?
     @ObservationIgnored private let now: @MainActor () -> ContinuousClock.Instant
 
     @ObservationIgnored private var simulation: SimulatedSensorSource?
@@ -189,13 +200,15 @@ public final class SensorController {
     @ObservationIgnored private var watchdog: Task<Void, Never>?
     @ObservationIgnored private var connection: SensorConnection?
     @ObservationIgnored private var lastEventAt: ContinuousClock.Instant?
-    /// Letzte Helligkeit aus dem Licht je Monitor (`storageKey`), für die Hysterese.
-    @ObservationIgnored private var lastAppliedLight: [String: Double] = [:]
+    @ObservationIgnored private var deskFilter = LuxFilter(.deskSensor)
+    @ObservationIgnored private var builtInFilter = LuxFilter(.builtIn)
+    /// Pausen der Lichtregelung je Monitor (`storageKey`).
+    @ObservationIgnored private var holds: [String: LightHold] = [:]
     /// Monitore, die beim letzten Setzen noch in der DDC-Prüfung waren und den Wert nicht
     /// übernommen haben; der nächste Lux-Wert holt ihn nach, auch innerhalb der Hysterese.
     @ObservationIgnored private var pendingLight: Set<String> = []
-    /// Letzte Lux des Schreibtisch-Sensors (ohne Demo) und des eingebauten Sensors.
-    @ObservationIgnored private var deskLuxAt: ContinuousClock.Instant?
+    /// Letzter Wert des eingebauten Sensors. Beim Schreibtisch-Sensor zählt jedes
+    /// Ereignis (`lastEventAt`).
     @ObservationIgnored private var builtInLuxAt: ContinuousClock.Instant?
     @ObservationIgnored private var lightSwitchedAt: ContinuousClock.Instant?
     /// Ein einzelner Schlaf bis zum nächsten Zeitpunkt, an dem eine Quelle abläuft oder die
@@ -204,11 +217,15 @@ public final class SensorController {
     @ObservationIgnored private(set) var lightExpiryDeadline: ContinuousClock.Instant?
     @ObservationIgnored private var nextDebugID = 0
 
-    /// - Parameter makeBuiltInLightSensor: eingebauter Lichtsensor; `nil` ohne Sensor
-    ///   (Mac mini, Mac Studio) und in der App-Store-Variante.
+    /// - Parameters:
+    ///   - makeBuiltInLightSensor: eingebauter Lichtsensor; `nil` ohne Sensor (Mac mini,
+    ///     Mac Studio) und in der App-Store-Variante.
+    ///   - isAutoBrightnessEnabled: ob macOS das eingebaute Display selbst regelt
+    ///     („Helligkeit automatisch anpassen“); `nil`, wenn unbekannt (App Store).
     public convenience init(
         manager: DisplayManager,
-        makeBuiltInLightSensor: @MainActor () -> (any SensorSource)? = { nil }
+        makeBuiltInLightSensor: @MainActor () -> (any SensorSource)? = { nil },
+        isAutoBrightnessEnabled: @escaping @MainActor () -> Bool? = { nil }
     ) {
         self.init(
             manager: manager,
@@ -219,7 +236,8 @@ public final class SensorController {
             demoAtLaunch: UserDefaults.standard.bool(forKey: Keys.demo),
             makeLiveSource: { SSESensorSource(endpoint: $0, code: $1) },
             makeSimulation: { SimulatedSensorSource(schedule: $0) },
-            makeBuiltInLightSensor: makeBuiltInLightSensor
+            makeBuiltInLightSensor: makeBuiltInLightSensor,
+            isAutoBrightnessEnabled: isAutoBrightnessEnabled
         )
     }
 
@@ -233,6 +251,7 @@ public final class SensorController {
         makeLiveSource: @escaping @MainActor (SensorEndpoint, PairingCode) -> any SensorSource,
         makeSimulation: @escaping @MainActor (SimulationSchedule) -> SimulatedSensorSource,
         makeBuiltInLightSensor: @MainActor () -> (any SensorSource)? = { nil },
+        isAutoBrightnessEnabled: @escaping @MainActor () -> Bool? = { nil },
         now: @escaping @MainActor () -> ContinuousClock.Instant = { .now }
     ) {
         self.manager = manager
@@ -245,6 +264,7 @@ public final class SensorController {
         self.makeSimulation = makeSimulation
         self.now = now
         builtInLightSensor = makeBuiltInLightSensor()
+        readAutoBrightness = isAutoBrightnessEnabled
         isEnabled = preferences.object(forKey: Keys.enabled) as? Bool ?? false
         // Ohne Lichtsensor wirkt „eingebaut“ wie der Schreibtisch-Sensor (`effectiveLightSource`);
         // gespeichert bleibt die Wahl trotzdem.
@@ -253,6 +273,8 @@ public final class SensorController {
         pairedHostname = preferences.string(forKey: Keys.hostname)
         // Der Demo-Modus ist nach jedem Start aus, außer per Startargument.
         isDemoActive = demoAtLaunch
+        manager.onBrightnessJob = { [weak self] job in self?.handleJob(job) }
+        manager.onMonitorReady = { [weak self] id in self?.monitorReady(id) }
     }
 
     public func start() {
@@ -350,9 +372,10 @@ public final class SensorController {
         connection = nil
         presence = nil
         lux = nil
+        filteredLux = nil
+        deskFilter.reset()
         lastEventAt = nil
         lastEventDate = nil
-        deskLuxAt = nil
         if lightBrightnessOrigin != .builtIn {
             lightLevels = []
             lightBrightnessOrigin = nil
@@ -407,7 +430,6 @@ public final class SensorController {
             guard connection == .connected else {
                 // Getrennt: Normalzustand, nichts mehr ausschalten.
                 lastEventAt = nil
-                deskLuxAt = nil
                 presence = nil
                 restoreScreens()
                 updateActiveLight()
@@ -432,10 +454,11 @@ public final class SensorController {
         case .lux(let value):
             lastEventAt = now()
             lux = value
-            if !isDemoActive { deskLuxAt = now() }
+            let filtered = deskFilter.add(value, at: now())
+            filteredLux = filtered
             updateActiveLight(trigger: origin)
             if activeLightOrigin == origin {
-                applied = applyAmbientLight(value, from: origin)
+                applied = applyAmbientLight(filtered, from: origin, reason: .lux(raw: value, filtered: filtered, origin: origin))
             }
         case .heartbeat:
             lastEventAt = now()
@@ -446,33 +469,43 @@ public final class SensorController {
         lastEventAt.map { now() - $0 }
     }
 
-    /// Jeder Monitor folgt seinem eigenen Lichtprofil, mit eigener Hysterese, gleich aus
-    /// welcher Quelle das Licht kommt. Ein Monitor ohne „folgt dem Licht“ bleibt stehen.
-    /// Neue Werte blendet der `DisplayManager` über, statt zu springen.
-    /// - Parameter only: nur diesen Monitor (`storageKey`), etwa nach geändertem Profil.
-    /// - Returns: die gesetzten Helligkeiten; leer, wenn sich nichts geändert hat.
+    /// Jeder Monitor folgt seinem eigenen Lichtprofil, gleich aus welcher Quelle das Licht
+    /// kommt. Ausgelassen werden Monitore ohne „folgt dem Licht“, in einer Pause (Regler,
+    /// fremde Änderung) und das eingebaute Display, solange macOS es selbst regelt: Es gibt
+    /// nur einen Schreiber. Die Hysterese gilt gegen den Wert, auf den der Monitor gerade
+    /// zugeht; neue Werte blendet der `DisplayManager` vom echten Wert aus über.
+    /// - Parameters:
+    ///   - lux: geglättetes Lux der Quelle.
+    ///   - only: nur diesen Monitor (`storageKey`), etwa nach geändertem Profil.
+    ///   - ignoresHysteresis: neues Profil oder nachgeholter Wert nach der Prüfung.
+    /// - Returns: die beauftragten Helligkeiten; leer, wenn sich nichts geändert hat.
     @discardableResult
-    private func applyAmbientLight(_ lux: Double, from origin: SensorOrigin, only: String? = nil) -> [LightLevel] {
+    private func applyAmbientLight(
+        _ lux: Double,
+        from origin: SensorOrigin,
+        reason: BrightnessJob.Reason,
+        only: String? = nil,
+        ignoresHysteresis: Bool = false
+    ) -> [LightLevel] {
         guard !manager.screensBlanked else { return [] }
         let value = origin == .builtIn ? lux * Self.builtInLuxFactor : lux
+        let at = now()
         var applied: [LightLevel] = []
         for monitor in manager.monitors {
             let key = monitor.storageKey
-            guard only == nil || only == key else { continue }
-            let profile = lightProfile(for: key)
-            guard profile.followsLight else { continue }
-            let target = profile.curve.percent(forLux: value)
-            if let last = lastAppliedLight[key], abs(last - target) < Self.luxHysteresis {
-                // Denselben Wert nachreichen: Bereite Monitore bekommen keinen neuen Write.
-                guard pendingLight.contains(key) else { continue }
-                if manager.fadeBrightness(to: last, for: monitor.id) {
-                    pendingLight.remove(key)
-                    applied.append(LightLevel(storageKey: key, name: monitor.name, percent: last))
-                }
+            guard only == nil || only == key, lightProfile(for: monitor).followsLight,
+                  !macOSRegulates(monitor)
+            else { continue }
+            if let hold = holds[key] {
+                if hold.isActive(at: at, lux: value) { continue }
+                holds[key] = nil
+            }
+            let target = lightProfile(for: monitor).curve.percent(forLux: value)
+            let reference = manager.brightnessTarget(for: monitor.id) ?? monitor.brightness
+            if abs(reference - target) < Self.lightHysteresis, !ignoresHysteresis, !pendingLight.contains(key) {
                 continue
             }
-            lastAppliedLight[key] = target
-            if manager.fadeBrightness(to: target, for: monitor.id) {
+            if manager.fadeBrightness(to: target, for: monitor.id, reason: reason) {
                 pendingLight.remove(key)
             } else {
                 pendingLight.insert(key)
@@ -489,27 +522,86 @@ public final class SensorController {
         return applied
     }
 
+    /// macOS regelt das eingebaute Display selbst („Helligkeit automatisch anpassen“).
+    /// Software-Dimmung (App Store) wirkt zusätzlich zur Hintergrundbeleuchtung und stört
+    /// nicht.
+    private func macOSRegulates(_ monitor: DisplayManager.Monitor) -> Bool {
+        monitor.isBuiltIn && !monitor.usesSoftwareDimming && readAutoBrightness() == true
+    }
+
+    // MARK: - Pausen und Aufträge
+
+    /// Pause der Lichtregelung eines Monitors.
+    struct LightHold {
+        let until: ContinuousClock.Instant
+        /// Licht beim Beginn; ändert es sich um mehr als den Faktor, endet die Pause.
+        let lux: Double?
+
+        func isActive(at instant: ContinuousClock.Instant, lux current: Double) -> Bool {
+            guard instant < until else { return false }
+            guard let lux else { return true }
+            let ratio = (current + 1) / (lux + 1)
+            return ratio <= SensorController.manualHoldLuxFactor && ratio >= 1 / SensorController.manualHoldLuxFactor
+        }
+    }
+
+    /// Jeder Auftrag des `DisplayManager`: protokollieren; Regler und fremde Änderungen
+    /// pausieren die Lichtregelung dieses Monitors, ihr Wert ist der neue Bezug.
+    func handleJob(_ job: BrightnessJob) {
+        switch job.reason {
+        case .manual:
+            holds[job.storageKey] = LightHold(until: now() + Self.manualHold, lux: activeLux)
+            pendingLight.remove(job.storageKey)
+        case .externalChange:
+            holds[job.storageKey] = LightHold(until: now() + Self.externalChangeHold, lux: nil)
+        default:
+            break
+        }
+        appendDebug(.brightnessJob(job), effect: nil)
+    }
+
+    /// Nach der Prüfung: Licht, das währenddessen kam, gilt jetzt.
+    private func monitorReady(_ id: CGDirectDisplayID) {
+        guard let monitor = manager.monitors.first(where: { $0.id == id }), pendingLight.contains(monitor.storageKey),
+              let origin = activeLightOrigin, let lux = currentLux(of: origin)
+        else { return }
+        applyAmbientLight(lux, from: origin, reason: .pendingAfterProbe, only: monitor.storageKey, ignoresHysteresis: true)
+    }
+
     // MARK: - Lichtprofile
 
-    /// Lux der aktiven Lichtquelle, so wie sie in die Kurven eingehen; `nil` ohne Quelle.
+    /// Geglättetes Lux der aktiven Lichtquelle, so wie es in die Kurven eingeht; `nil` ohne
+    /// Quelle.
     public var activeLux: Double? {
         guard let origin = activeLightOrigin, let lux = currentLux(of: origin) else { return nil }
         return origin == .builtIn ? lux * Self.builtInLuxFactor : lux
     }
 
-    /// Lichtprofil eines Monitors; ohne eigenes das Standardprofil.
-    public func lightProfile(for storageKey: String) -> LightProfile {
-        lightProfiles[storageKey] ?? profileStore.profile(for: storageKey) ?? .standard
+    /// Ob macOS das eingebaute Display gerade selbst regelt; `nil`, wenn unbekannt.
+    public var isMacOSAutoBrightnessEnabled: Bool? {
+        readAutoBrightness()
+    }
+
+    /// Lichtprofil eines Monitors; ohne eigenes das Standardprofil. Das eingebaute Display
+    /// folgt dem Licht standardmäßig nicht: Es regelt meist macOS.
+    public func lightProfile(for monitor: DisplayManager.Monitor) -> LightProfile {
+        lightProfiles[monitor.storageKey] ?? profileStore.profile(for: monitor.storageKey) ?? Self.defaultProfile(for: monitor)
+    }
+
+    static func defaultProfile(for monitor: DisplayManager.Monitor) -> LightProfile {
+        monitor.isBuiltIn ? LightProfile(followsLight: false, curve: .standard) : .standard
     }
 
     /// Speichert das Profil und wendet es sofort mit dem aktuellen Licht an, ohne Hysterese.
-    public func setLightProfile(_ profile: LightProfile, for storageKey: String) {
-        guard profile != lightProfile(for: storageKey) else { return }
-        lightProfiles[storageKey] = profile
-        profileStore.setProfile(profile == .standard ? nil : profile, for: storageKey)
-        lastAppliedLight[storageKey] = nil
+    /// Eine Pause dieses Monitors endet.
+    public func setLightProfile(_ profile: LightProfile, for monitor: DisplayManager.Monitor) {
+        let key = monitor.storageKey
+        guard profile != lightProfile(for: monitor) else { return }
+        lightProfiles[key] = profile
+        profileStore.setProfile(profile == Self.defaultProfile(for: monitor) ? nil : profile, for: key)
+        holds[key] = nil
         if let origin = activeLightOrigin, let lux = currentLux(of: origin) {
-            applyAmbientLight(lux, from: origin, only: storageKey)
+            applyAmbientLight(lux, from: origin, reason: .profileChange, only: key, ignoresHysteresis: true)
         }
     }
 
@@ -523,7 +615,7 @@ public final class SensorController {
         let at = now()
         isDeskSensorLightAvailable = LightSourceSelector.isDeskSensorAvailable(
             connected: status == .connected,
-            luxAge: deskLuxAt.map { at - $0 }
+            eventAge: lux == nil ? nil : lastEventAt.map { at - $0 }
         )
         isBuiltInLightAvailable = LightSourceSelector.isBuiltInAvailable(
             present: hasBuiltInLightSensor,
@@ -545,11 +637,11 @@ public final class SensorController {
             let previous = activeLightOrigin
             activeLightOrigin = selected
             lightSwitchedAt = at
-            // Hysterese neu: Der erste Wert der neuen Quelle gilt sofort.
-            lastAppliedLight = [:]
+            // Die Hysterese bleibt: Die neue Quelle blendet mit ihrem geglätteten Wert vom
+            // aktuellen Stand aus über, nur wenn er deutlich abweicht.
             var applied: [LightLevel] = []
             if let selected, selected != trigger, let value = currentLux(of: selected) {
-                applied = applyAmbientLight(value, from: selected)
+                applied = applyAmbientLight(value, from: selected, reason: .sourceSwitch(from: previous, to: selected))
             }
             sensorLog.notice(
                 "Lichtquelle: \(previous?.rawValue ?? "-", privacy: .public) → \(selected?.rawValue ?? "-", privacy: .public)"
@@ -561,10 +653,11 @@ public final class SensorController {
         scheduleLightExpiry(at: at, held: held)
     }
 
+    /// Geglättetes Lux einer Quelle.
     private func currentLux(of origin: SensorOrigin) -> Double? {
         switch origin {
-        case .deskSensor, .demo: lux
-        case .builtIn: builtInLux
+        case .deskSensor, .demo: filteredLux
+        case .builtIn: builtInFilteredLux
         }
     }
 
@@ -576,8 +669,8 @@ public final class SensorController {
         // Knapp nach der Grenze, denn genau auf ihr gilt die Quelle noch.
         let margin: Duration = .milliseconds(10)
         var deadlines: [ContinuousClock.Instant] = []
-        if isDeskSensorLightAvailable, let deskLuxAt {
-            deadlines.append(deskLuxAt + LightSourceSelector.deskSensorMaxAge + margin)
+        if isDeskSensorLightAvailable, let lastEventAt {
+            deadlines.append(lastEventAt + LightSourceSelector.deskSensorMaxAge + margin)
         }
         if isBuiltInLightAvailable, let builtInLuxAt {
             deadlines.append(builtInLuxAt + LightSourceSelector.builtInMaxAge + margin)
@@ -619,6 +712,14 @@ public final class SensorController {
 
     private func appendDebug(_ kind: SensorDebugEntry.Kind, effect: SensorDebugEntry.Effect?) {
         guard isDebugMonitoring else { return }
+        // Ein gezogener Regler meldet viele manuelle Aufträge: nur den letzten behalten.
+        if case .brightnessJob(let job) = kind, job.reason == .manual, let last = debugLog.last?.job,
+           last.reason == .manual, last.storageKey == job.storageKey {
+            debugLog[debugLog.count - 1] = SensorDebugEntry(
+                id: debugLog[debugLog.count - 1].id, date: Date(), kind: kind, effect: effect
+            )
+            return
+        }
         nextDebugID += 1
         debugLog.append(SensorDebugEntry(id: nextDebugID, date: Date(), kind: kind, effect: effect))
         if debugLog.count > Self.debugLogLimit {
@@ -635,6 +736,8 @@ public final class SensorController {
         builtInLightTask?.cancel()
         builtInLightTask = nil
         builtInLux = nil
+        builtInFilteredLux = nil
+        builtInFilter.reset()
         builtInLuxAt = nil
         builtInLastEventDate = nil
         if lightBrightnessOrigin == .builtIn {
@@ -659,16 +762,21 @@ public final class SensorController {
         // abdunkeln. Ist er wieder offen, gilt der nächste Wert.
         guard !isBuiltInLightSensorCovered else {
             builtInLux = nil
+            builtInFilteredLux = nil
+            builtInFilter.reset()
             builtInLuxAt = nil
             updateActiveLight()
             return
         }
         builtInLux = value
         builtInLuxAt = now()
+        // Auch in Bereitschaft filtern: Springt der Sensor ein, ist sein Mittel schon da.
+        let filtered = builtInFilter.add(value, at: now())
+        builtInFilteredLux = filtered
         updateActiveLight(trigger: .builtIn)
         // Sonst nur Diagnose oder Rückfall in Bereitschaft: anzeigen, nicht regeln.
         if activeLightOrigin == .builtIn {
-            applied = applyAmbientLight(value, from: .builtIn)
+            applied = applyAmbientLight(filtered, from: .builtIn, reason: .lux(raw: value, filtered: filtered, origin: .builtIn))
         }
     }
 

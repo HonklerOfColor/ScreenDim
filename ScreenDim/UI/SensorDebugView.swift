@@ -62,6 +62,7 @@ struct SensorDebugView: View {
             let what = switch entry.kind {
             case .event(let origin, let event): "\(origin.rawValue) \(event)"
             case .lightSourceSwitch(let from, let to): "Lichtquelle \(from?.rawValue ?? "-") → \(to?.rawValue ?? "-")"
+            case .brightnessJob(let job): "Auftrag \(job.logDescription)"
             }
             lines.append("\(time) \(what)\(effect)")
         }
@@ -220,6 +221,10 @@ private struct BuiltInSourceBox: View {
                             LuxText(lux: sensor.builtInLux)
                         }
                         GridRow {
+                            Text("Geglättet").foregroundStyle(.secondary)
+                            LuxText(lux: sensor.builtInFilteredLux)
+                        }
+                        GridRow {
                             Text("Letztes Ereignis").foregroundStyle(.secondary)
                             EventAge(date: sensor.builtInLastEventDate)
                         }
@@ -246,10 +251,18 @@ private struct EventLog: View {
                     .padding(4)
             } else {
                 LazyVStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 8) {
+                        Text("Zeit").frame(width: 58, alignment: .leading)
+                        Text("Quelle / Grund").frame(width: 130, alignment: .leading)
+                        Text("Was")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
                     ForEach(sensor.debugLog.reversed()) { entry in
                         HStack(spacing: 8) {
                             Text(entry.date, format: .dateTime.hour().minute().second())
                                 .foregroundStyle(.secondary)
+                                .frame(width: 58, alignment: .leading)
                             switch entry.kind {
                             case .event(let origin, let event):
                                 Text(originName(origin))
@@ -262,6 +275,15 @@ private struct EventLog: View {
                                     .frame(width: 130, alignment: .leading)
                                 Text("Wechsel: \(Text(switchName(from))) → \(Text(switchName(to)))")
                                     .fontWeight(.semibold)
+                            case .brightnessJob(let job):
+                                Text(reasonName(job.reason))
+                                    .foregroundStyle(.blue)
+                                    .frame(width: 130, alignment: .leading)
+                                if case .lux(let raw, let filtered, _) = job.reason {
+                                    Text("\(Int(raw.rounded())) → \(Int(filtered.rounded())) lx")
+                                        .foregroundStyle(.secondary)
+                                }
+                                Text(jobText(job))
                             }
                             if let effect = entry.effect {
                                 Text(effectText(effect)).fontWeight(.semibold)
@@ -286,6 +308,31 @@ private struct EventLog: View {
         case .connection(.pairingRequired): "Kopplung nötig"
         case .heartbeat: "Lebenszeichen"
         }
+    }
+
+    private func reasonName(_ reason: BrightnessJob.Reason) -> LocalizedStringKey {
+        switch reason {
+        case .lux: "Licht"
+        case .sourceSwitch: "Quellwechsel"
+        case .profileChange: "Profil"
+        case .pendingAfterProbe: "Nach der Prüfung"
+        case .manual: "Von Hand"
+        case .probeRestore: "Gespeicherter Wert"
+        case .softwareFallback: "Software-Dimmung"
+        case .wake: "Aufwachen/Umstecken"
+        case .externalChange: "Fremde Änderung"
+        }
+    }
+
+    /// „Monitor 7: 50/47 → 80 % · 2 s“: Merkwert, echter Wert (falls abweichend), Ziel, Dauer.
+    private func jobText(_ job: BrightnessJob) -> LocalizedStringKey {
+        let start = if let actual = job.actual, Int(actual) != Int(job.remembered) {
+            "\(Int(job.remembered))/\(Int(actual))"
+        } else {
+            "\(Int(job.remembered))"
+        }
+        let duration = job.duration.formatted(.units(allowed: [.seconds, .milliseconds], width: .narrow))
+        return "\(job.name): \(start) → \(Int(job.target)) % · \(duration)"
     }
 
     private func switchName(_ origin: SensorOrigin?) -> LocalizedStringKey {

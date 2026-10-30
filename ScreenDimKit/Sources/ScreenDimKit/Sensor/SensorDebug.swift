@@ -17,6 +17,8 @@ public struct SensorDebugEntry: Identifiable, Equatable, Sendable {
         case event(SensorOrigin, SensorEvent)
         /// Die aktive Lichtquelle wechselt; `nil`: keine.
         case lightSourceSwitch(from: SensorOrigin?, to: SensorOrigin?)
+        /// Ein Helligkeitsauftrag an einen Monitor, mit Grund.
+        case brightnessJob(BrightnessJob)
     }
 
     public enum Effect: Equatable, Sendable {
@@ -32,7 +34,11 @@ public struct SensorDebugEntry: Identifiable, Equatable, Sendable {
     /// `nil`: Das Ereignis hat nichts verändert (Hysterese, nicht die Lichtquelle, …).
     public let effect: Effect?
 
-    /// Quelle eines Ereignisses; `nil` bei einem Quellwechsel.
+    public var job: BrightnessJob? {
+        if case .brightnessJob(let job) = kind { job } else { nil }
+    }
+
+    /// Quelle eines Ereignisses; `nil` bei einem Quellwechsel oder Auftrag.
     public var origin: SensorOrigin? {
         if case .event(let origin, _) = kind { origin } else { nil }
     }

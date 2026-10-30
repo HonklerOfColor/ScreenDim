@@ -31,13 +31,14 @@ struct LightSourceSelectorTests {
         #expect(Choice(storedValue: "sonne") == nil)
     }
 
-    @Test("Schreibtisch-Sensor: verbunden und Lux höchstens 10 s alt")
+    @Test("Schreibtisch-Sensor: verbunden und letztes Ereignis höchstens 45 s alt (über dem 30-s-Takt der Firmware)")
     func deskAvailability() {
-        #expect(LightSourceSelector.isDeskSensorAvailable(connected: true, luxAge: .zero))
-        #expect(LightSourceSelector.isDeskSensorAvailable(connected: true, luxAge: .seconds(10)))
-        #expect(!LightSourceSelector.isDeskSensorAvailable(connected: true, luxAge: .seconds(10) + .milliseconds(1)))
-        #expect(!LightSourceSelector.isDeskSensorAvailable(connected: true, luxAge: nil))
-        #expect(!LightSourceSelector.isDeskSensorAvailable(connected: false, luxAge: .zero))
+        #expect(LightSourceSelector.isDeskSensorAvailable(connected: true, eventAge: .zero))
+        #expect(LightSourceSelector.isDeskSensorAvailable(connected: true, eventAge: .seconds(31)))
+        #expect(LightSourceSelector.isDeskSensorAvailable(connected: true, eventAge: .seconds(45)))
+        #expect(!LightSourceSelector.isDeskSensorAvailable(connected: true, eventAge: .seconds(45) + .milliseconds(1)))
+        #expect(!LightSourceSelector.isDeskSensorAvailable(connected: true, eventAge: nil))
+        #expect(!LightSourceSelector.isDeskSensorAvailable(connected: false, eventAge: .zero))
     }
 
     @Test("Eingebauter Sensor: vorhanden, Deckel offen, Wert höchstens 5 s alt")
@@ -62,7 +63,7 @@ struct LightSourceSelectorTests {
     func allCombinations(desk: Desk, builtIn: BuiltIn) {
         let deskOK = LightSourceSelector.isDeskSensorAvailable(
             connected: desk != .disconnected,
-            luxAge: desk == .stale ? .seconds(11) : .seconds(1)
+            eventAge: desk == .stale ? .seconds(46) : .seconds(1)
         )
         let builtInOK = LightSourceSelector.isBuiltInAvailable(
             present: builtIn != .missing,

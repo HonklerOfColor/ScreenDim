@@ -20,6 +20,8 @@ public final class OverlayDimmer: SoftwareDimming {
 
     private let makeWindow: MakeWindow
     private var windows: [CGDirectDisplayID: any OverlayWindow] = [:]
+    /// Gezeigte Stufe je Fenster; nur Änderungen fassen ein Fenster an (Überblendung).
+    private var shown: [CGDirectDisplayID: Double] = [:]
 
     public convenience init() {
         self.init(makeWindow: { DimmingPanel(displayID: $0) })
@@ -39,15 +41,17 @@ public final class OverlayDimmer: SoftwareDimming {
         let levels = levels.filter { $0.value < 100 }
         for id in windows.keys where levels[id] == nil {
             windows.removeValue(forKey: id)?.close()
+            shown[id] = nil
         }
         var failed: Set<CGDirectDisplayID> = []
-        for (id, level) in levels {
+        for (id, level) in levels where shown[id] != level {
             guard let window = windows[id] ?? makeWindow(id) else {
                 ddcLog.error("Kein Bildschirm für Overlay auf Display \(id)")
                 failed.insert(id)
                 continue
             }
             windows[id] = window
+            shown[id] = level
             window.show(alpha: Self.alpha(forPercent: level))
         }
         return failed

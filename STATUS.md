@@ -52,7 +52,7 @@ Machbarkeit und Messungen: `docs/EingebauterLichtsensor.md`.
       Eingebauter Lichtsensor“ mit Grund; wieder verbinden → nach ≥ 5 s zurück.
 - [ ] Deckel zu (Clamshell): „Deckel zu“, ESP32 springt ein bzw. Monitore bleiben;
       aufklappen → wieder Werte.
-- [ ] ESP32 bei ruhigem Licht: kommt Lux mindestens alle 10 s? Sonst springt der
+- [ ] ESP32 bei ruhigem Licht: Lebenszeichen mindestens alle 45 s? Sonst springt der
       eingebaute Sensor ungewollt ein.
 - [ ] Mac Studio: nur „Schreibtisch-Sensor“ und „Aus“.
 

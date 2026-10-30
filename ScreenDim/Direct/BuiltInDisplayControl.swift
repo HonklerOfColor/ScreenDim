@@ -37,6 +37,31 @@ final class BuiltInDisplayControl: DDCControlling {
     }
 }
 
+/// Ob macOS das eingebaute Display selbst regelt („Helligkeit automatisch anpassen“).
+/// Privates Framework CoreBrightness: `BrightnessSystemClient` mit `copyPropertyForKey:`
+/// (Schlüssel `CBAutoBrightnessEnabled`, sonst `DisplayBrightnessAuto`). Gelesen wird nur
+/// bei Bedarf, ohne Abfragen im Takt. `nil`, wenn Framework oder Schlüssel fehlen.
+@MainActor
+enum AutoBrightness {
+    private static let client: NSObject? = {
+        guard dlopen("/System/Library/PrivateFrameworks/CoreBrightness.framework/CoreBrightness", RTLD_NOW) != nil,
+              let type = NSClassFromString("BrightnessSystemClient") as? NSObject.Type
+        else { return nil }
+        return type.init()
+    }()
+
+    static func isEnabled() -> Bool? {
+        let selector = NSSelectorFromString("copyPropertyForKey:")
+        guard let client, client.responds(to: selector) else { return nil }
+        for key in ["CBAutoBrightnessEnabled", "DisplayBrightnessAuto"] {
+            if let value = client.perform(selector, with: key)?.takeRetainedValue() as? NSNumber {
+                return value.boolValue
+            }
+        }
+        return nil
+    }
+}
+
 private struct DisplayServicesAPI: @unchecked Sendable {
     // @unchecked: reine C-Funktionszeiger, unveränderlich nach dem Laden.
     typealias GetBrightness = @convention(c) (CGDirectDisplayID, UnsafeMutablePointer<Float>) -> Int32

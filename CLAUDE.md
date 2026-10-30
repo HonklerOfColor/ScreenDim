@@ -47,6 +47,20 @@ Eine Codebasis, zwei App-Targets aus `project.yml`:
     kommt nur vom ESP32. Ohne eingebauten Sensor wirkt jede Wahl außer „aus“ wie „nur
     Schreibtisch“, gespeichert bleibt sie. Den eingebauten Lichtsensor reicht Direct per
     Fabrik (`makeBuiltInLightSensor`, Quelle `Direct/BuiltInLightSensor.swift`).
+- Lichtregelung (Details `docs/EingebauterLichtsensor.md`, „Lichtregelung“):
+  - Ein Schreiber: Das eingebaute Display regelt ScreenDim nur, wenn sein Profil es will
+    (Standard: nein) und macOS-Auto-Helligkeit aus ist (Direct liest sie per
+    CoreBrightness, Fabrik `isAutoBrightnessEnabled`). Weicht der echte Wert um > 3 Punkte
+    vom eigenen ab: übernehmen, 60 s Pause.
+  - Alle automatischen Wege laufen über `DisplayManager.fadeBrightness` (Licht 2 s,
+    Prüfung/Rückfall/Aufwachen 0,5 s), Start beim echten Wert (eingebaut: lesen bei
+    freier Drossel; DDC: zuletzt bestätigter Write, kein Read). Nur `setBrightness`
+    (Regler, Tasten) setzt sofort und pausiert die Lichtregelung des Monitors.
+  - Lux über `LuxFilter` (eingebaut: Median 5 + EMA 4 s im Log-Raum; ESP32 durchgereicht),
+    Hysterese 3 Punkte gegen das laufende Ziel. Schreibtisch-Sensor frisch durch jedes
+    Ereignis (45 s), kein Reset beim Quellwechsel.
+  - Je Auftrag ein `BrightnessJob` mit Grund: Protokoll der Sensor-Diagnose und
+    `log.info`, Kategorie `light`.
 - `ScreenDim/` (App): `App/` (Einstieg, Varianten-Auswahl), `UI/`, `System/` (Tastenkürzel,
   Login-Item), `Direct/` (private API), `Resources/` (Asset-Katalog, String-Katalog,
   Privacy-Manifest).

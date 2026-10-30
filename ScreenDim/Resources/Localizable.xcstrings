@@ -32,6 +32,16 @@
         }
       }
     },
+    "%@: %@ → %lld %% · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: %@ → %lld%% · %@"
+          }
+        }
+      }
+    },
     "%lld %%" : {
       "localizations" : {
         "en" : {
@@ -144,6 +154,16 @@
         }
       }
     },
+    "%lld → %lld lx" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld → %lld lx"
+          }
+        }
+      }
+    },
     "AV-Service" : {
       "localizations" : {
         "en" : {
@@ -252,6 +272,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Presence"
+          }
+        }
+      }
+    },
+    "Aufwachen/Umstecken" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wake/replug"
           }
         }
       }
@@ -748,6 +778,16 @@
         }
       }
     },
+    "Fremde Änderung" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "External change"
+          }
+        }
+      }
+    },
     "Gamma" : {
       "localizations" : {
         "en" : {
@@ -778,6 +818,16 @@
         }
       }
     },
+    "Geglättet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smoothed"
+          }
+        }
+      }
+    },
     "Gekoppelt mit" : {
       "localizations" : {
         "en" : {
@@ -794,6 +844,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Active now"
+          }
+        }
+      }
+    },
+    "Gespeicherter Wert" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved value"
           }
         }
       }
@@ -1341,6 +1401,16 @@
         }
       }
     },
+    "Nach der Prüfung" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "After probe"
+          }
+        }
+      }
+    },
     "Nicht gekoppelt" : {
       "localizations" : {
         "en" : {
@@ -1412,6 +1482,16 @@
         }
       }
     },
+    "Profil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profile"
+          }
+        }
+      }
+    },
     "Protokoll" : {
       "localizations" : {
         "en" : {
@@ -1472,6 +1552,26 @@
         }
       }
     },
+    "Quelle / Grund" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source / reason"
+          }
+        }
+      }
+    },
+    "Quellwechsel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source switch"
+          }
+        }
+      }
+    },
     "Read OK: %lld/%lld, %lld ms" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1510,16 +1610,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Turn on the desk sensor or demo mode, and ambient light will control the brightness of each monitor."
-          }
-        }
-      }
-    },
-    "Schalte „Helligkeit automatisch anpassen“ in den Displays-Einstellungen aus, sonst verstellt macOS die Helligkeit zusätzlich." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Turn off “Automatically adjust brightness” in Displays settings, otherwise macOS adjusts the brightness as well."
           }
         }
       }
@@ -1715,6 +1805,16 @@
         }
       }
     },
+    "Software-Dimmung" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Software dimming"
+          }
+        }
+      }
+    },
     "Software-Dimmung (Gamma)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1848,12 +1948,32 @@
         }
       }
     },
+    "Von Hand" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manual"
+          }
+        }
+      }
+    },
     "Warte auf den Sensor …" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Waiting for the sensor…"
+          }
+        }
+      }
+    },
+    "Was" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What"
           }
         }
       }
@@ -1926,6 +2046,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "While demo mode is on, the light level is simulated."
+          }
+        }
+      }
+    },
+    "Zeit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Time"
           }
         }
       }
@@ -2062,6 +2192,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "macOS doesn’t allow brightness control for this display. Software dimming active."
+          }
+        }
+      }
+    },
+    "macOS regelt dieses Display selbst. Schalte „Helligkeit automatisch anpassen“ aus, wenn ScreenDim es regeln soll." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS controls this display itself. Turn off “Automatically adjust brightness” if you want ScreenDim to control it."
           }
         }
       }

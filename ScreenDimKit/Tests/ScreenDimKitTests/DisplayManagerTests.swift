@@ -19,12 +19,13 @@ struct DisplayManagerTests {
 
     private let setup = Setup()
 
-    private func makeManager(sleeper: ManualSleeper? = nil) -> DisplayManager {
+    private func makeManager(sleeper: ManualSleeper? = nil, systemFade: Duration = .zero) -> DisplayManager {
         let setup = setup
         return DisplayManager(
             store: BrightnessStore(storage: setup.preferences),
             timing: .immediate,
             probeRetryDelay: .milliseconds(1),
+            systemFadeDuration: systemFade,
             sleep: { duration in
                 if let sleeper { await sleeper.sleep(duration) } else { try? await Task.sleep(for: duration) }
             },
@@ -426,7 +427,7 @@ struct DisplayManagerTests {
         // Neustart: Wert und Verfahren kommen zurück, nur als Software-Wert.
         let restarted = makeStoreManager()
         restarted.refresh(force: true)
-        #expect(monitor(restarted, 1)?.brightness == 40)
+        #expect(await eventually { monitor(restarted, 1)?.brightness == 40 }) // blendet vom ungedimmten Stand aus über
         #expect(monitor(restarted, 1)?.dimming == .overlay)
         #expect(BrightnessStore(storage: setup.preferences).brightness(for: Self.builtIn.identity.storageKey, mode: .ddc) == nil)
     }
@@ -462,7 +463,7 @@ struct DisplayManagerTests {
         #expect(monitor(manager, 2)?.brightness == 100)
 
         var started = sleeper.started.makeAsyncIterator()
-        #expect(manager.fadeBrightness(to: 20, for: 2))
+        #expect(manager.fadeBrightness(to: 20, for: 2, reason: .profileChange))
         #expect(monitor(manager, 2)?.brightness == 100)
         #expect(BrightnessStore(storage: setup.preferences).brightness(for: key, mode: .software) == 20)
 
@@ -488,11 +489,11 @@ struct DisplayManagerTests {
         let manager = makeManager(sleeper: sleeper)
         manager.refresh(force: true)
 
-        manager.fadeBrightness(to: 99, for: 2)
+        manager.fadeBrightness(to: 99, for: 2, reason: .profileChange)
         #expect(monitor(manager, 2)?.brightness == 99)
 
         var started = sleeper.started.makeAsyncIterator()
-        manager.fadeBrightness(to: 39, for: 2)
+        manager.fadeBrightness(to: 39, for: 2, reason: .profileChange)
         _ = await started.next()
         sleeper.wake()
         #expect(await eventually { monitor(manager, 2)?.brightness == 98 }) // 99 − 60/40, gerundet
@@ -502,6 +503,101 @@ struct DisplayManagerTests {
         sleeper.wake()
         try? await Task.sleep(for: .milliseconds(20))
         #expect(monitor(manager, 2)?.brightness == 70)
+    }
+
+    @Test("DDC scheitert: Software-Dimmung blendet vom ungedimmten Stand zum gespeicherten Wert über")
+    func softwareFallbackFades() async {
+        setup.displays = [Self.external(2, avService: 0x100)]
+        setup.makeControl = { _ in StubControl(read: .failure(.timeout)) }
+        BrightnessStore(storage: setup.preferences).setBrightness(
+            40, for: Self.external(2, avService: nil).identity.storageKey, mode: .software
+        )
+        let sleeper = ManualSleeper()
+        let manager = makeManager(sleeper: sleeper, systemFade: .milliseconds(500))
+        var jobs: [BrightnessJob] = []
+        manager.onBrightnessJob = { jobs.append($0) }
+        var started = sleeper.started.makeAsyncIterator()
+        manager.refresh(force: true)
+
+        // Probe-Pause zwischen zwei Runden, dann der erste Schritt der Überblendung.
+        var interval = await started.next()
+        while interval == .milliseconds(1) {
+            sleeper.wake()
+            interval = await started.next()
+        }
+        #expect(monitor(manager, 2)?.usesSoftwareDimming == true)
+        #expect(monitor(manager, 2)?.brightness == 100)
+        #expect(jobs.map(\.reason) == [.softwareFallback])
+        #expect(jobs.first?.target == 40)
+        #expect(jobs.first?.duration == .milliseconds(500))
+        sleeper.wake()
+        #expect(await eventually { monitor(manager, 2)?.brightness == 94 })
+        while monitor(manager, 2)?.brightness != 40 {
+            _ = await started.next()
+            sleeper.wake()
+            try? await Task.sleep(for: .milliseconds(1))
+        }
+        #expect(setup.gamma.levels[2] == 40)
+    }
+
+    @Test("Überblendung beginnt beim echten Wert des eingebauten Displays, nie beim Platzhalter der Prüfung")
+    func fadeStartsAtRealValue() async {
+        let gate = GatedControl()
+        let sleeper = ManualSleeper()
+        let manager = DisplayManager(
+            store: BrightnessStore(storage: setup.preferences),
+            timing: .immediate,
+            sleep: { await sleeper.sleep($0) },
+            gamma: setup.gamma,
+            overlay: setup.overlay,
+            discover: { [Self.builtIn] },
+            makeBuiltInControl: { _ in gate }
+        )
+        var jobs: [BrightnessJob] = []
+        manager.onBrightnessJob = { jobs.append($0) }
+        manager.refresh(force: true)
+        #expect(monitor(manager, 1)?.brightness == 50) // Platzhalter
+        #expect(!manager.fadeBrightness(to: 80, for: 1, reason: .profileChange))
+        #expect(jobs.isEmpty)
+
+        gate.release(with: .success(VCPReading(current: 30, maximum: 100)))
+        #expect(await eventually { monitor(manager, 1)?.state == .ready })
+        #expect(monitor(manager, 1)?.brightness == 30)
+
+        // macOS hat leicht nachgeregelt (2 Punkte, keine fremde Änderung): Start bei 32.
+        gate.release(with: .success(VCPReading(current: 32, maximum: 100)))
+        var started = sleeper.started.makeAsyncIterator()
+        #expect(manager.fadeBrightness(to: 80, for: 1, reason: .profileChange))
+        _ = await started.next()
+        #expect(jobs.last?.remembered == 30)
+        #expect(jobs.last?.actual == 32)
+        #expect(monitor(manager, 1)?.brightness == 32)
+        sleeper.wake()
+        #expect(await eventually { monitor(manager, 1)?.brightness == 33 }) // 32 + 48/40
+    }
+
+    @Test("Fremde Änderung: echter Wert weicht um mehr als 3 Punkte ab, wird übernommen, nichts geschrieben")
+    func externalChangeAdopted() async {
+        let control = StubControl(read: .success(VCPReading(current: 50, maximum: 100)))
+        let manager = DisplayManager(
+            store: BrightnessStore(storage: setup.preferences),
+            timing: .immediate,
+            gamma: setup.gamma,
+            overlay: setup.overlay,
+            discover: { [Self.builtIn] },
+            makeBuiltInControl: { _ in control }
+        )
+        var jobs: [BrightnessJob] = []
+        manager.onBrightnessJob = { jobs.append($0) }
+        manager.refresh(force: true)
+        #expect(await eventually { monitor(manager, 1)?.state == .ready })
+
+        control.setRead(.success(VCPReading(current: 75, maximum: 100)))
+        manager.fadeBrightness(to: 20, for: 1, reason: .profileChange)
+        #expect(await eventually { jobs.last?.reason == .externalChange })
+        #expect(jobs.last?.target == 75)
+        #expect(monitor(manager, 1)?.brightness == 75)
+        #expect(control.writes.isEmpty)
     }
 
     @Test("Dock-Erkennung aus dem DisplayPort-Link")

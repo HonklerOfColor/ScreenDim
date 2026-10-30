@@ -51,7 +51,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     #endif
     /// Optionaler Schreibtisch-Sensor; ohne Einstellung passiert nichts.
     #if SCREENDIM_DIRECT
-    lazy var sensor = SensorController(manager: manager, makeBuiltInLightSensor: DirectControls.lightSensor)
+    lazy var sensor = SensorController(
+        manager: manager,
+        makeBuiltInLightSensor: DirectControls.lightSensor,
+        isAutoBrightnessEnabled: DirectControls.autoBrightness
+    )
     #else
     lazy var sensor = SensorController(manager: manager)
     #endif

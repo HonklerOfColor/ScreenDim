@@ -1,7 +1,8 @@
 # Eingebauter Lichtsensor als Lichtquelle
 
 Stand: 2026-10-29, Prototyp, nur „ScreenDim Direct“. Vorrang und Rückfall zwischen beiden
-Lichtquellen: ebenfalls 2026-10-29.
+Lichtquellen: ebenfalls 2026-10-29. Glättung, ein Schreiber fürs eingebaute Display und
+Überblendung auf allen automatischen Wegen: 2026-10-30.
 
 ## Ergebnis
 
@@ -52,8 +53,8 @@ Messungen:
 Der Sensor meldet einem Client nichts von selbst; Ereignisse gibt es nur im angeforderten
 Takt. Echte Änderungsmeldungen gibt es also nicht, aber auch kein eigenes Polling: Die
 Werte schiebt das HID-System auf eine Dispatch-Queue. 1 s ist für Raumlicht schnell
-genug. Die Helligkeit ändert sich trotzdem selten: `AmbientLightCurve` und 5 % Hysterese
-im `SensorController` lassen nur deutliche Lichtwechsel durch, DDC-Writes bleiben rar.
+genug. Die Helligkeit ändert sich trotzdem selten: `LuxFilter` glättet die Werte, und die
+Hysterese von 3 Punkten lässt nur deutliche Lichtwechsel durch; DDC-Writes bleiben rar.
 
 ## Erkennung
 
@@ -91,25 +92,26 @@ verworfen. Abschalten und wieder Anmelden lohnt bei einem Ereignis pro Sekunde n
   eingebauten Sensor wirkt jede Wahl außer „aus“ wie `deskSensorOnly`
   (`effectiveLightSource`).
 - `LightSourceSelector` (rein, getestet) wählt die aktive Quelle:
-  - Schreibtisch-Sensor verfügbar: verbunden und letztes Lux höchstens 10 s alt.
+  - Schreibtisch-Sensor verfügbar: verbunden, ein Lux-Wert liegt vor, und das letzte
+    Ereignis (Lux, Anwesenheit oder Lebenszeichen) ist höchstens 45 s alt. Die Firmware
+    meldet Lux nur bei 3 % Änderung oder im 30-s-Takt; mit 10 s auf Lux galt der Sensor
+    bei ruhigem Licht regelmäßig als ausgefallen, die Quelle wechselte hin und her.
   - Eingebaut verfügbar: Sensor vorhanden, Deckel offen, letzter Wert höchstens 5 s alt.
   - Aktiv ist die bevorzugte Quelle, wenn verfügbar, sonst die andere, sonst keine.
   - Sperre gegen Hin-und-her: Eine verfügbare aktive Quelle bleibt mindestens 5 s, bevor
     die bevorzugte sie wieder ablöst. Fällt die aktive aus, wird sofort gewechselt.
-  - Beim Wechsel beginnt die Hysterese neu, und der letzte Wert der neuen Quelle gilt
-    sofort. `activeLightOrigin` ist die tatsächlich aktive Quelle, `isLightFallback`
-    sagt, ob sie einspringt.
+  - Beim Wechsel bleibt die Hysterese: Die neue Quelle bringt ihren geglätteten Wert mit
+    (ihr Filter lief schon mit) und blendet vom aktuellen Stand aus über, nur wenn er um
+    mindestens 3 Punkte abweicht. `activeLightOrigin` ist die tatsächlich aktive Quelle,
+    `isLightFallback` sagt, ob sie einspringt.
   - Geprüft wird nach jedem Ereignis und jeder Einstellung. Für das Ablaufen ohne neues
     Ereignis gibt es einen einzelnen, neu gesetzten Task-Sleep bis zum nächsten Termin
     (Ablauf einer Quelle oder Ende einer Sperre, die gerade einen Wechsel zurückhält);
     kein Polling.
-- Lux vom Schreibtisch-Sensor regeln alle Monitore samt eingebautem Display. Lux vom
-  eingebauten Sensor regeln **nur die externen Monitore**
-  (`setAllBrightness(_:includingBuiltIn: false)`). Das eingebaute Display regelt macOS mit
-  demselben Sensor; beide gleichzeitig würden gegeneinander arbeiten. Anwesenheit kommt
-  nur vom Schreibtisch-Sensor. Kurve und Hysterese sind für beide Quellen gleich;
-  `SensorController.builtInLuxFactor` (1,0, ohne UI) korrigiert den eingebauten Sensor
-  hinter dem Glas, sobald er kalibriert ist.
+- Jeder Monitor folgt seinem Lichtprofil (`LightCurve`), gleich aus welcher Quelle das
+  Licht kommt; siehe „Lichtregelung“ unten. Anwesenheit kommt nur vom
+  Schreibtisch-Sensor. `SensorController.builtInLuxFactor` (1,0, ohne UI) korrigiert den
+  eingebauten Sensor hinter dem Glas, sobald er kalibriert ist.
 - Der eingebaute Sensor liest nur, wenn die (wirksame) Wahl ihn enthält und keine Demo
   läuft, oder wenn die Sensor-Diagnose offen ist. Mit dem Standard `deskSensorFirst` liest
   er auf einem MacBook also immer mit, damit er sofort einspringen kann.
@@ -120,6 +122,57 @@ verworfen. Abschalten und wieder Anmelden lohnt bei einem Ereignis pro Sekunde n
 - Demo-Modus: Das simulierte Licht ersetzt jede Lichtquelle außer „aus“; der eingebaute
   Sensor ist dann getrennt.
 - `scripts/check-mas-binary.sh` sucht zusätzlich nach den privaten HID-Namen.
+
+## Lichtregelung
+
+Befund (2026-10-30): „Manchmal springt die Helligkeit“, mit „nur eingebauter
+Lichtsensor“, eingeschalteter Auto-Helligkeit von macOS und externen Monitoren per
+Software-Dimmung. Ursachen und Abhilfe:
+
+| Ursache | Abhilfe |
+|---|---|
+| ScreenDim und macOS regelten das eingebaute Display gleichzeitig. | Ein Schreiber, siehe unten. |
+| Die Überblendung begann beim Merkwert, nicht beim echten Wert. | Eingebaut: echten Wert vorher lesen (nur bei freier Drossel). DDC: zuletzt bestätigter Write, kein zusätzlicher Read. Der Platzhalter 50 während der Prüfung ist nie Startwert (Display dann nicht regelbar, Wert wird nachgeholt). |
+| Prüfung, Software-Rückfall und Refresh setzten Werte ohne Überblendung. | Alle automatischen Wege laufen über `DisplayManager.fadeBrightness`; Wege des Managers mit 0,5 s, Licht mit 2 s. Ein Refresh setzt Software-Dimmung vom sichtbaren Stand aus fort (neu angesteckt: vom ungedimmten). |
+| Lux des eingebauten Sensors ungeglättet, Hysterese gegen den letzten Lichtwert. | `LuxFilter`; Hysterese 3 Punkte gegen den Wert, auf den der Monitor gerade zugeht. |
+| Quelle wechselte bei ruhigem Licht (10 s auf Lux), mit Reset der Hysterese. | 45 s auf jedes Ereignis, kein Reset beim Wechsel. |
+
+**Ein Schreiber fürs eingebaute Display.** Direct liest „Helligkeit automatisch anpassen“
+über das private Framework CoreBrightness (`BrightnessSystemClient`,
+`copyPropertyForKey:` mit `CBAutoBrightnessEnabled`, sonst `DisplayBrightnessAuto`), nur
+bei Bedarf, ohne Takt. Ist sie an, lässt die Lichtregelung das eingebaute Display aus,
+auch mit eigenem Profil. Unbekannt (App Store, Schlüssel fehlt): Das Profil entscheidet,
+und das eingebaute Display folgt dem Licht standardmäßig nicht. Die Einstellungen zeigen
+dann „macOS regelt dieses Display selbst …“ mit Knopf zu den Displays-Einstellungen.
+Zusätzlich: Weicht der vor einer Überblendung gelesene Wert um mehr als 3 Punkte vom
+eigenen ab, hat ein anderer Regler gewirkt (Helligkeitstasten, macOS). Der Wert wird
+übernommen, nichts geschrieben, und die Lichtregelung dieses Displays ruht 60 s
+(Grund „fremde Änderung“). Geprüft am MacBook Air M4: Beide Schlüssel lieferten 1 bei
+eingeschalteter Auto-Helligkeit; das Umschalten selbst ist nicht geprüft.
+
+**Glättung (`LuxFilter`, rein, getestet).** Eingebauter Sensor: Median über 5 Werte, dann
+EMA im Log-Raum mit Zeitkonstante 4 s, zeitbasiert. Ein großer anhaltender Sprung
+(mehr als Faktor 3, drei Werte in Folge) zieht den Mittelwert sofort nach, damit Licht
+an/aus nicht träge wirkt. Schreibtisch-Sensor und Demo: durchgereicht. Die Firmware glättet
+schon und meldet nur bei Änderung; jeder Median oder EMA würde eine einzelne Änderung bis
+zur nächsten Meldung (bis 30 s) zurückhalten. Beide Filter laufen mit, auch wenn ihre
+Quelle gerade nicht aktiv ist.
+
+**Pausen.** Regler oder Tastenkürzel setzen sofort; der Wert ist der neue Bezug, und die
+Lichtregelung dieses Monitors ruht 5 min oder bis sich das Licht um mehr als Faktor 2
+ändert (`SensorController.manualHold`, `manualHoldLuxFactor`, ohne UI). Eine Pause endet
+auch, wenn der Nutzer das Profil des Monitors ändert. Geprüft wird beim nächsten
+Lux-Wert, ohne Timer.
+
+**Diagnose.** Je Auftrag (nicht je Schritt) ein Eintrag im Protokoll der Sensor-Diagnose
+(Spalte „Quelle / Grund“) und `log.info` (Subsystem `com.andreastrabi.ScreenDim`,
+Kategorie `light`): Monitor, Merkwert und echter Wert, Ziel, Dauer. Gründe: `lux` (roh,
+geglättet, Quelle), `sourceSwitch`, `profileChange`, `pendingAfterProbe`, `manual`,
+`probeRestore`, `softwareFallback`, `wake`, `externalChange`. Ansehen:
+`/usr/bin/log stream --predicate 'subsystem == "com.andreastrabi.ScreenDim" && category == "light"' --info`.
+
+**Software-Dimmung.** Gamma schreibt je Schritt nur Displays mit geändertem Wert, das
+Overlay fasst ebenfalls nur geänderte Fenster an.
 
 ## Alternative ohne ALS-API: externe Monitore folgen dem eingebauten Display („Sync“)
 
@@ -160,8 +213,9 @@ die Signatur der DisplayServices-Benachrichtigung prüfen.
       kalibrieren (gleiche Lampe, ESP32 und MacBook nebeneinander).
 - [ ] Deckel zu und wieder auf (Clamshell mit externem Monitor): Rückfall auf den
       Schreibtisch-Sensor bzw. „Deckel zu“, danach wieder Werte.
-- [ ] ESP32-Firmware: Lux mindestens alle 10 s melden (`update_interval`, kein Filter, der
-      gleiche Werte unterdrückt). Sonst gilt der Schreibtisch-Sensor bei ruhigem Licht als
-      abgelaufen, und der eingebaute Sensor springt ein.
+- [x] ESP32 bei ruhigem Licht: Statt Lux alle 10 s zählt jedes Ereignis, Grenze 45 s
+      (über dem 30-s-Takt der Firmware).
+- [ ] Erkennung der Auto-Helligkeit: Folgt `CBAutoBrightnessEnabled` dem Schalter in den
+      Systemeinstellungen sofort? Im notarisierten Build (Hardened Runtime) lesbar?
 - [ ] Mac Studio: nur „Schreibtisch-Sensor“ und „Aus“ wählbar.
 - [ ] Notarisierter Direct-Build: Lesen weiterhin ohne Rückfrage.
