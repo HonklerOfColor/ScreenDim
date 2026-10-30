@@ -6,8 +6,8 @@ import Observation
 /// die Helligkeit. Ohne Sensor passiert nichts; Standard ist „aus“.
 ///
 /// Das Licht kann außer vom Schreibtisch-Sensor auch vom eingebauten Lichtsensor des Macs
-/// kommen (MacBook, iMac; nur „ScreenDim Direct“, Quelle per Fabrik). Dann regelt es nur
-/// die externen Monitore. Welche Quelle gilt, entscheidet `LightSourceSelector` nach Wahl
+/// kommen (MacBook, iMac; nur „ScreenDim Direct“, Quelle per Fabrik). Welche Quelle gilt,
+/// entscheidet `LightSourceSelector` nach Wahl
 /// (`LightSource`) und Verfügbarkeit; die andere springt bei Ausfall ein.
 ///
 /// Gekoppelt ist höchstens ein Sensor. Sein Hostname steht in UserDefaults, der Code nur
@@ -446,18 +446,16 @@ public final class SensorController {
         lastEventAt.map { now() - $0 }
     }
 
-    /// Lux vom Schreibtisch-Sensor (oder der Demo) regeln alle Monitore, Lux vom eingebauten
-    /// Sensor nur die externen: Das eingebaute Display regelt macOS mit demselben Sensor.
-    /// Jeder Monitor folgt seinem eigenen Lichtprofil, mit eigener Hysterese.
+    /// Jeder Monitor folgt seinem eigenen Lichtprofil, mit eigener Hysterese, gleich aus
+    /// welcher Quelle das Licht kommt. Ein Monitor ohne „folgt dem Licht“ bleibt stehen.
     /// - Parameter only: nur diesen Monitor (`storageKey`), etwa nach geändertem Profil.
     /// - Returns: die gesetzten Helligkeiten; leer, wenn sich nichts geändert hat.
     @discardableResult
     private func applyAmbientLight(_ lux: Double, from origin: SensorOrigin, only: String? = nil) -> [LightLevel] {
         guard !manager.screensBlanked else { return [] }
-        let builtIn = origin == .builtIn
-        let value = builtIn ? lux * Self.builtInLuxFactor : lux
+        let value = origin == .builtIn ? lux * Self.builtInLuxFactor : lux
         var applied: [LightLevel] = []
-        for monitor in manager.monitors where !(builtIn && monitor.isBuiltIn) {
+        for monitor in manager.monitors {
             let key = monitor.storageKey
             guard only == nil || only == key else { continue }
             let profile = lightProfile(for: key)
@@ -496,12 +494,6 @@ public final class SensorController {
     public var activeLux: Double? {
         guard let origin = activeLightOrigin, let lux = currentLux(of: origin) else { return nil }
         return origin == .builtIn ? lux * Self.builtInLuxFactor : lux
-    }
-
-    /// Ob die aktive Lichtquelle diesen Monitor regeln darf (der eingebaute Sensor regelt
-    /// das eingebaute Display nie).
-    public func lightRegulates(_ monitor: DisplayManager.Monitor) -> Bool {
-        !(monitor.isBuiltIn && activeLightOrigin == .builtIn)
     }
 
     /// Lichtprofil eines Monitors; ohne eigenes das Standardprofil.

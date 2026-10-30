@@ -42,8 +42,9 @@ Eine Codebasis, zwei App-Targets aus `project.yml`:
     Lichtquelle mit Vorrang (`LightSource`: Schreibtisch zuerst (Standard), eingebaut
     zuerst, nur Schreibtisch, nur eingebaut, aus); `LightSourceSelector` (rein) wählt nach
     Verfügbarkeit (ESP32: verbunden, Lux ≤ 10 s; eingebaut: Deckel offen, Wert ≤ 5 s) mit
-    5 s Wechselsperre. Eingebautes Licht regelt nur externe Monitore, Anwesenheit kommt
-    nur vom ESP32. Ohne eingebauten Sensor wirkt jede Wahl außer „aus“ wie „nur
+    5 s Wechselsperre. Jeder Monitor folgt seinem Lichtprofil (`LightCurve`:
+    Lux-Stützpunkte, je Monitor abschaltbar), gleich aus welcher Quelle; Anwesenheit
+    kommt nur vom ESP32. Ohne eingebauten Sensor wirkt jede Wahl außer „aus“ wie „nur
     Schreibtisch“, gespeichert bleibt sie. Den eingebauten Lichtsensor reicht Direct per
     Fabrik (`makeBuiltInLightSensor`, Quelle `Direct/BuiltInLightSensor.swift`).
 - `ScreenDim/` (App): `App/` (Einstieg, Varianten-Auswahl), `UI/`, `System/` (Tastenkürzel,

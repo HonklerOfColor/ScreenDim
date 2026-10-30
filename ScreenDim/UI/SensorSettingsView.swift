@@ -2,53 +2,96 @@ import Charts
 import ScreenDimKit
 import SwiftUI
 
-/// Einstellungsfenster: Sensor, Lichtquelle und die Helligkeit je Monitor nach Licht.
+/// Einstellungsfenster in zwei Tabs: „Sensor“ (Kopplung, Demo, Diagnose) und
+/// „Helligkeit“ (Lichtquelle, Kurven je Monitor). Jeder Tab ist so hoch wie sein Inhalt,
+/// gescrollt wird nicht.
 struct SettingsView: View {
     let sensor: SensorController
     let manager: DisplayManager
-    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Form {
-            if sensor.isDemoActive {
-                DemoBanner(sensor: sensor)
+        TabView {
+            Tab("Sensor", systemImage: "sensor") {
+                SettingsPage(sensor: sensor) {
+                    SensorSection(sensor: sensor)
+                    DemoSection(sensor: sensor)
+                    DiagnosticsSection()
+                    BuildYourOwnSection()
+                }
             }
-            SensorSection(sensor: sensor)
-            LightSection(sensor: sensor)
-            if showsLightCurves {
-                LightCurveSection(sensor: sensor, manager: manager)
-            }
-            DemoSection(sensor: sensor)
-            Section {
-                HStack {
-                    Text("Messwerte und aktive Quellen live ansehen")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Sensor-Diagnose …") {
-                        openWindow(id: SensorDebugView.windowID)
-                        NSApplication.shared.activate()
+            Tab("Helligkeit", systemImage: "sun.max") {
+                SettingsPage(sensor: sensor) {
+                    LightSection(sensor: sensor)
+                    if showsLightCurves {
+                        LightCurveSection(sensor: sensor, manager: manager)
+                    } else {
+                        Section {
+                            Text("Schalte den Schreibtisch-Sensor oder den Demo-Modus ein, dann regelt das Umgebungslicht die Helligkeit jedes Monitors.")
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
             }
-            Section {
-                VStack(alignment: .leading, spacing: 4) {
-                    Link("Bau dir deinen eigenen Sensor (ca. 30 €, 15 min)", destination: SensorLinks.flashPage)
-                    Text("Die Hardware ist nicht im Kauf enthalten. Der Sensor ist optional; ScreenDim funktioniert vollständig ohne ihn.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
         }
-        .formStyle(.grouped)
-        .frame(width: 500)
-        .frame(minHeight: 420)
     }
 
     /// Kurven nur, wenn überhaupt Licht kommen kann.
     private var showsLightCurves: Bool {
         sensor.effectiveLightSource != .off
             && (sensor.isEnabled || sensor.isDemoActive || sensor.hasBuiltInLightSensor)
+    }
+}
+
+/// Ein Tab: Formular in fester Breite und so hoch wie sein Inhalt; oben der Hinweis auf den
+/// Demo-Modus, solange er läuft.
+private struct SettingsPage<Content: View>: View {
+    let sensor: SensorController
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        Form {
+            if sensor.isDemoActive {
+                DemoBanner(sensor: sensor)
+            }
+            content
+        }
+        .formStyle(.grouped)
+        .scrollDisabled(true)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 500)
+    }
+}
+
+private struct DiagnosticsSection: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Section {
+            HStack {
+                Text("Messwerte und aktive Quellen live ansehen")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Sensor-Diagnose …") {
+                    openWindow(id: SensorDebugView.windowID)
+                    NSApplication.shared.activate()
+                }
+            }
+        }
+    }
+}
+
+private struct BuildYourOwnSection: View {
+    var body: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 4) {
+                Link("Bau dir deinen eigenen Sensor (ca. 30 €, 15 min)", destination: SensorLinks.flashPage)
+                Text("Die Hardware ist nicht im Kauf enthalten. Der Sensor ist optional; ScreenDim funktioniert vollständig ohne ihn.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }
 
@@ -121,10 +164,6 @@ private struct LightSection: View {
         sensor.hasBuiltInLightSensor || deskSensorConnected
     }
 
-    private var usesBuiltIn: Bool {
-        sensor.effectiveLightSource.order.contains(.builtIn)
-    }
-
     var body: some View {
         #if SCREENDIM_DIRECT
         if showsChoice { section }
@@ -146,9 +185,6 @@ private struct LightSection: View {
                 }
                 if sensor.effectiveLightSource != .off {
                     activeStatus
-                }
-                if usesBuiltIn && !sensor.isDemoActive {
-                    caption("Der eingebaute Sensor regelt nur die externen Monitore. Das eingebaute Display regelt macOS (Automatische Helligkeit).")
                 }
             }
             #if !SCREENDIM_DIRECT
@@ -271,8 +307,15 @@ private struct LightProfileEditor: View {
         Toggle("Folgt dem Umgebungslicht", isOn: Binding(
             get: { profile.followsLight }, set: { value in update { $0.followsLight = value } }
         ))
-        if !sensor.lightRegulates(monitor) {
-            caption("Gerade gilt der eingebaute Lichtsensor; dieses Display regelt dann macOS.")
+        if profile.followsLight && monitor.isBuiltIn && !monitor.usesSoftwareDimming {
+            // macOS regelt das eingebaute Display sonst mit demselben Sensor dagegen.
+            HStack(alignment: .firstTextBaseline) {
+                caption("Schalte „Helligkeit automatisch anpassen“ in den Displays-Einstellungen aus, sonst verstellt macOS die Helligkeit zusätzlich.")
+                Spacer()
+                Button("Displays …") {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Displays-Settings.extension")!)
+                }
+            }
         }
         if profile.followsLight {
             LightCurveChart(curve: profile.curve, lux: sensor.activeLux, current: monitor.brightness)
@@ -291,7 +334,7 @@ private struct LightProfileEditor: View {
                     if let point = profile.curve.suggestedPoint() { update { $0.curve.insert(point) } }
                 }
                 .disabled(profile.curve.suggestedPoint() == nil)
-                if let lux = sensor.activeLux, monitor.isAdjustable, sensor.lightRegulates(monitor) {
+                if let lux = sensor.activeLux, monitor.isAdjustable {
                     Button("Aktuelle Helligkeit merken") {
                         update { $0.curve.insert(LightCurve.Point(lux: lux, percent: monitor.brightness)) }
                     }

@@ -538,16 +538,6 @@
         }
       }
     },
-    "Der eingebaute Sensor regelt nur die externen Monitore. Das eingebaute Display regelt macOS (Automatische Helligkeit)." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The built-in sensor adjusts external displays only. macOS adjusts the built-in display (automatic brightness)."
-          }
-        }
-      }
-    },
     "Diagnose kopieren" : {
       "localizations" : {
         "en" : {
@@ -614,6 +604,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "This Mac has no built-in light sensor."
+          }
+        }
+      }
+    },
+    "Displays …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Displays…"
           }
         }
       }
@@ -794,16 +794,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Active now"
-          }
-        }
-      }
-    },
-    "Gerade gilt der eingebaute Lichtsensor; dieses Display regelt dann macOS." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The built-in light sensor is active right now; macOS controls this display."
           }
         }
       }
@@ -1510,6 +1500,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fallback"
+          }
+        }
+      }
+    },
+    "Schalte den Schreibtisch-Sensor oder den Demo-Modus ein, dann regelt das Umgebungslicht die Helligkeit jedes Monitors." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on the desk sensor or demo mode, and ambient light will control the brightness of each monitor."
+          }
+        }
+      }
+    },
+    "Schalte „Helligkeit automatisch anpassen“ in den Displays-Einstellungen aus, sonst verstellt macOS die Helligkeit zusätzlich." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn off “Automatically adjust brightness” in Displays settings, otherwise macOS adjusts the brightness as well."
           }
         }
       }
