@@ -1,9 +1,11 @@
+import Charts
 import ScreenDimKit
 import SwiftUI
 
-/// Einstellungsfenster. Bisher nur der Abschnitt „Sensor“.
+/// Einstellungsfenster: Sensor, Lichtquelle und die Helligkeit je Monitor nach Licht.
 struct SettingsView: View {
     let sensor: SensorController
+    let manager: DisplayManager
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -13,6 +15,9 @@ struct SettingsView: View {
             }
             SensorSection(sensor: sensor)
             LightSection(sensor: sensor)
+            if showsLightCurves {
+                LightCurveSection(sensor: sensor, manager: manager)
+            }
             DemoSection(sensor: sensor)
             Section {
                 HStack {
@@ -36,8 +41,14 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460)
+        .frame(width: 500)
         .frame(minHeight: 420)
+    }
+
+    /// Kurven nur, wenn überhaupt Licht kommen kann.
+    private var showsLightCurves: Bool {
+        sensor.effectiveLightSource != .off
+            && (sensor.isEnabled || sensor.isDemoActive || sensor.hasBuiltInLightSensor)
     }
 }
 
@@ -212,6 +223,202 @@ func lightSourceName(_ source: SensorController.LightSource, hasBuiltIn: Bool) -
     case .off: "Aus"
     }
 }
+
+// MARK: - Helligkeit je Monitor
+/// Bei welchem Umgebungslicht welcher Monitor wie hell ist. Jeder Monitor hat eine eigene
+/// Kurve aus Stützpunkten; zwischen den Punkten gleitet die Helligkeit.
+struct LightCurveSection: View {
+    let sensor: SensorController
+    let manager: DisplayManager
+    @State private var selectedKey: String?
+
+    private var monitor: DisplayManager.Monitor? {
+        manager.monitors.first { $0.storageKey == selectedKey } ?? manager.monitors.first
+    }
+
+    var body: some View {
+        Section("Helligkeit je Monitor") {
+            if let monitor {
+                if manager.monitors.count > 1 {
+                    Picker("Monitor", selection: Binding(get: { monitor.storageKey }, set: { selectedKey = $0 })) {
+                        ForEach(manager.monitors) { monitor in
+                            Text(verbatim: displayName(monitor)).tag(monitor.storageKey)
+                        }
+                    }
+                }
+                LightProfileEditor(sensor: sensor, monitor: monitor)
+            } else {
+                Text("Kein Monitor gefunden.").foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// Zwei gleiche Monitore heißen gleich; dann hilft die Nummer.
+    private func displayName(_ monitor: DisplayManager.Monitor) -> String {
+        let twins = manager.monitors.filter { $0.name == monitor.name }
+        guard twins.count > 1, let index = twins.firstIndex(of: monitor) else { return monitor.name }
+        return "\(monitor.name) (\(index + 1))"
+    }
+}
+
+private struct LightProfileEditor: View {
+    let sensor: SensorController
+    let monitor: DisplayManager.Monitor
+
+    private var profile: LightProfile { sensor.lightProfile(for: monitor.storageKey) }
+
+    var body: some View {
+        Toggle("Folgt dem Umgebungslicht", isOn: Binding(
+            get: { profile.followsLight }, set: { value in update { $0.followsLight = value } }
+        ))
+        if !sensor.lightRegulates(monitor) {
+            caption("Gerade gilt der eingebaute Lichtsensor; dieses Display regelt dann macOS.")
+        }
+        if profile.followsLight {
+            LightCurveChart(curve: profile.curve, lux: sensor.activeLux, current: monitor.brightness)
+                .frame(height: 150)
+                .padding(.vertical, 4)
+            ForEach(Array(profile.curve.points.enumerated()), id: \.offset) { index, point in
+                PointRow(
+                    point: point,
+                    canRemove: profile.curve.points.count > 1,
+                    onChange: { new in update { $0.curve.setPoint(new, at: index) } },
+                    onRemove: { update { $0.curve.removePoint(at: index) } }
+                )
+            }
+            HStack {
+                Button("Punkt hinzufügen") {
+                    if let point = profile.curve.suggestedPoint() { update { $0.curve.insert(point) } }
+                }
+                .disabled(profile.curve.suggestedPoint() == nil)
+                if let lux = sensor.activeLux, monitor.isAdjustable, sensor.lightRegulates(monitor) {
+                    Button("Aktuelle Helligkeit merken") {
+                        update { $0.curve.insert(LightCurve.Point(lux: lux, percent: monitor.brightness)) }
+                    }
+                    .help("Legt einen Punkt an: \(Int(lux.rounded())) lx → \(Int(monitor.brightness)) %")
+                    .disabled(profile.curve.points.count >= LightCurve.maxPoints
+                        && !profile.curve.points.contains { $0.lux == lux.rounded() })
+                }
+                Spacer()
+                Button("Standard") { update { $0.curve = .standard } }
+                    .disabled(profile.curve == .standard)
+            }
+            caption("Zwischen zwei Punkten gleitet die Helligkeit, unter dem ersten und über dem letzten bleibt sie stehen. Höchstens \(LightCurve.maxPoints) Punkte.")
+        }
+    }
+
+    private func update(_ change: (inout LightProfile) -> Void) {
+        var profile = profile
+        change(&profile)
+        sensor.setLightProfile(profile, for: monitor.storageKey)
+    }
+
+    private func caption(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Ein Stützpunkt: Lux als Zahl, Helligkeit per Slider.
+private struct PointRow: View {
+    let point: LightCurve.Point
+    let canRemove: Bool
+    let onChange: (LightCurve.Point) -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            TextField("Lux", value: Binding(
+                get: { point.lux }, set: { onChange(LightCurve.Point(lux: $0, percent: point.percent)) }
+            ), format: .number.precision(.fractionLength(0)))
+                .labelsHidden()
+                .multilineTextAlignment(.trailing)
+                .frame(width: 72)
+            Text("lx").foregroundStyle(.secondary)
+            Image(systemName: "arrow.right").foregroundStyle(.tertiary)
+            Slider(value: Binding(
+                get: { point.percent }, set: { onChange(LightCurve.Point(lux: point.lux, percent: $0)) }
+            ), in: 0...100) {
+                Text("Helligkeit")
+            }
+            .labelsHidden()
+            Text("\(Int(point.percent)) %")
+                .monospacedDigit()
+                .frame(width: 44, alignment: .trailing)
+            Button(action: onRemove) {
+                Image(systemName: "minus.circle")
+            }
+            .buttonStyle(.borderless)
+            .disabled(!canRemove)
+            .help("Punkt entfernen")
+        }
+    }
+}
+
+/// Die Kurve auf logarithmischer Lux-Achse, dazu das aktuelle Licht.
+private struct LightCurveChart: View {
+    let curve: LightCurve
+    let lux: Double?
+    let current: Double
+
+    private static let luxRange: ClosedRange<Double> = 1...LightCurve.maxLux
+
+    /// 20 Werte je Zehnerpotenz.
+    private var samples: [(lux: Double, percent: Double)] {
+        stride(from: 0.0, through: 5, by: 0.05).map { exponent in
+            let lux = pow(10, exponent)
+            return (lux, curve.percent(forLux: lux))
+        }
+    }
+
+    var body: some View {
+        Chart {
+            ForEach(samples, id: \.lux) { sample in
+                LineMark(x: .value("Lux", sample.lux), y: .value("Helligkeit", sample.percent))
+            }
+            ForEach(Array(curve.points.enumerated()), id: \.offset) { _, point in
+                PointMark(x: .value("Lux", max(point.lux, 1)), y: .value("Helligkeit", point.percent))
+                    .symbolSize(50)
+            }
+            if let lux {
+                RuleMark(x: .value("Lux", min(max(lux, 1), LightCurve.maxLux)))
+                    .foregroundStyle(.orange)
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                    .annotation(position: .top, alignment: .center, spacing: 2) {
+                        Text("\(Int(lux.rounded())) lx · \(Int(current)) %")
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.orange)
+                    }
+            }
+        }
+        .chartXScale(domain: Self.luxRange, type: .log)
+        .chartYScale(domain: 0...100)
+        .chartXAxis {
+            AxisMarks(values: [1, 10, 100, 1000, 10_000, 100_000]) { value in
+                AxisGridLine()
+                AxisValueLabel {
+                    if let lux = value.as(Double.self) {
+                        Text("\(Int(lux)) lx")
+                    }
+                }
+            }
+        }
+        .chartYAxis {
+            AxisMarks(values: [0, 25, 50, 75, 100]) { value in
+                AxisGridLine()
+                AxisValueLabel {
+                    if let percent = value.as(Double.self) {
+                        Text("\(Int(percent)) %")
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Sensor
 
 struct SensorStatusLabel: View {
     let sensor: SensorController

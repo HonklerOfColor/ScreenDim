@@ -52,7 +52,7 @@ struct SensorDebugView: View {
                 + "Anwesenheit \(sensor.presence.map(String.init) ?? "-"), Lux \(sensor.lux.map { String($0) } ?? "-")",
             "Eingebaut: vorhanden \(sensor.hasBuiltInLightSensor), Deckel zu \(sensor.isBuiltInLightSensorCovered), "
                 + "Lux \(sensor.builtInLux.map { String($0) } ?? "-")",
-            "Zuletzt gesetzt: \(sensor.lightBrightness.map { "\(Int($0)) %" } ?? "-") "
+            "Zuletzt gesetzt: \(sensor.lightLevels.isEmpty ? "-" : levelsText(sensor.lightLevels)) "
                 + "(\(sensor.lightBrightnessOrigin?.rawValue ?? "-")), Bildschirme aus: \(sensor.screensBlanked)",
             "",
         ]
@@ -112,9 +112,9 @@ private struct ActiveSummary: View {
                 }
                 GridRow {
                     Text("Zuletzt gesetzt").foregroundStyle(.secondary)
-                    if let percent = sensor.lightBrightness, let origin = sensor.lightBrightnessOrigin {
+                    if !sensor.lightLevels.isEmpty, let origin = sensor.lightBrightnessOrigin {
                         HStack(spacing: 4) {
-                            Text("\(Int(percent)) %").monospacedDigit()
+                            Text(verbatim: levelsText(sensor.lightLevels)).monospacedDigit()
                             Text("aus \(Text(originName(origin)))").foregroundStyle(.secondary)
                         }
                     } else {
@@ -294,7 +294,7 @@ private struct EventLog: View {
 
     private func effectText(_ effect: SensorDebugEntry.Effect) -> LocalizedStringKey {
         switch effect {
-        case .brightness(let percent): "→ \(Int(percent)) %"
+        case .brightness(let levels): "→ \(levelsText(levels))"
         case .screensOff: "→ Bildschirme aus"
         case .screensOn: "→ Bildschirme an"
         }
@@ -375,4 +375,9 @@ private func originName(_ origin: SensorOrigin) -> LocalizedStringKey {
     case .demo: "Demo-Modus"
     case .builtIn: "Eingebauter Lichtsensor"
     }
+}
+
+/// „Monitor 7 80 %, MacBook 50 %“
+private func levelsText(_ levels: [LightLevel]) -> String {
+    levels.map { "\($0.name) \(Int($0.percent)) %" }.joined(separator: ", ")
 }

@@ -97,13 +97,46 @@ struct PresenceGateTests {
         #expect(PresenceGate.isStale(connected: true, lastEventAge: nil))
     }
 
-    @Test("Licht → Helligkeit logarithmisch zwischen 20 und 100 %")
+    @Test("Standardkurve: Licht → Helligkeit logarithmisch zwischen 20 und 100 %")
     func ambientCurve() {
-        #expect(AmbientLightCurve.percent(forLux: 0) == 20)
-        #expect(AmbientLightCurve.percent(forLux: 10) == 20)
-        #expect(AmbientLightCurve.percent(forLux: 100) == 60)
-        #expect(AmbientLightCurve.percent(forLux: 1000) == 100)
-        #expect(AmbientLightCurve.percent(forLux: 50_000) == 100)
+        let curve = LightCurve.standard
+        #expect(curve.percent(forLux: 0) == 20)
+        #expect(curve.percent(forLux: 10) == 20)
+        #expect(curve.percent(forLux: 100) == 60)
+        #expect(curve.percent(forLux: 1000) == 100)
+        #expect(curve.percent(forLux: 50_000) == 100)
+    }
+
+    @Test("Eigene Kurve: sortiert, mehrere Abschnitte, auch fallend; 0 lx zählt wie 1 lx")
+    func customCurve() {
+        let curve = LightCurve(points: [
+            .init(lux: 1000, percent: 40), .init(lux: 0, percent: 10), .init(lux: 100, percent: 80),
+        ])
+        #expect(curve.points.map(\.lux) == [0, 100, 1000])
+        #expect(curve.percent(forLux: 0) == 10)
+        #expect(curve.percent(forLux: 10) == 45)
+        #expect(curve.percent(forLux: 100) == 80)
+        #expect(curve.percent(forLux: 316) == 60)
+        #expect(curve.percent(forLux: 5000) == 40)
+        // Zwei Punkte bei denselben Lux: kein Teilen durch null.
+        #expect(LightCurve(points: [.init(lux: 50, percent: 30), .init(lux: 50, percent: 90)]).percent(forLux: 60) == 90)
+    }
+
+    @Test("Kurve bearbeiten: Grenzen, mindestens ein Punkt, höchstens acht, Vorschlag in der größten Lücke")
+    func editCurve() throws {
+        var curve = LightCurve.standard
+        let suggestion = try #require(curve.suggestedPoint())
+        #expect(suggestion == .init(lux: 100, percent: 60))
+        curve.insert(.init(lux: 10, percent: 35)) // ersetzt den Punkt bei 10 lx
+        #expect(curve.points == [.init(lux: 10, percent: 35), .init(lux: 1000, percent: 100)])
+        curve.setPoint(.init(lux: 500_000, percent: 120), at: 1)
+        #expect(curve.points.last == .init(lux: LightCurve.maxLux, percent: 100))
+        curve.removePoint(at: 0)
+        curve.removePoint(at: 0)
+        #expect(curve.points.count == 1)
+        while let point = curve.suggestedPoint() { curve.insert(point) }
+        #expect(curve.points.count == LightCurve.maxPoints)
+        #expect(LightCurve(points: []) == .standard)
     }
 
     @Test("Backoff 1 s → 30 s, Reset nach Verbindung")

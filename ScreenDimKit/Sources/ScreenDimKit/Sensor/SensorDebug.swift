@@ -20,8 +20,8 @@ public struct SensorDebugEntry: Identifiable, Equatable, Sendable {
     }
 
     public enum Effect: Equatable, Sendable {
-        /// Neue Helligkeit aus dem Licht, in Prozent.
-        case brightness(Double)
+        /// Neue Helligkeit aus dem Licht, je Monitor.
+        case brightness([LightLevel])
         case screensOff
         case screensOn
     }
@@ -39,5 +39,19 @@ public struct SensorDebugEntry: Identifiable, Equatable, Sendable {
 
     public var event: SensorEvent? {
         if case .event(_, let event) = kind { event } else { nil }
+    }
+}
+
+/// Helligkeit, die das Licht einem Monitor gegeben hat.
+public struct LightLevel: Equatable, Sendable {
+    public let storageKey: String
+    public let name: String
+    /// 0…100
+    public let percent: Double
+
+    public init(storageKey: String, name: String, percent: Double) {
+        self.storageKey = storageKey
+        self.name = name
+        self.percent = percent
     }
 }

@@ -260,12 +260,16 @@ public final class DisplayManager {
         return (values.reduce(0, +) / Double(values.count)).rounded()
     }
 
-    public func setBrightness(_ percent: Double, for id: CGDirectDisplayID) {
-        guard let index = index(of: id), monitors[index].isAdjustable else { return }
+    /// - Returns: `false`, wenn der Monitor noch geprüft wird und den Wert deshalb nicht
+    ///   übernommen hat. Nach der Prüfung steht er auf seinem gespeicherten Wert.
+    @discardableResult
+    public func setBrightness(_ percent: Double, for id: CGDirectDisplayID) -> Bool {
+        guard let index = index(of: id) else { return true }
+        guard monitors[index].isAdjustable else { return monitors[index].state != .probing }
         let channel = channels[id]
-        guard monitors[index].usesSoftwareDimming || channel != nil else { return }
+        guard monitors[index].usesSoftwareDimming || channel != nil else { return true }
         let value = Self.clamp(percent)
-        guard monitors[index].brightness != value else { return }
+        guard monitors[index].brightness != value else { return true }
         monitors[index].brightness = value
         // Die Hintergrundbeleuchtung des eingebauten Displays merkt sich macOS selbst.
         if !monitors[index].isBuiltIn || monitors[index].usesSoftwareDimming {
@@ -277,6 +281,7 @@ public final class DisplayManager {
         } else if let channel {
             channel.throttle.submit(Self.raw(fromPercent: value, maximum: channel.maximum))
         }
+        return true
     }
 
     /// - Parameter includingBuiltIn: `false` lässt das eingebaute Display aus, etwa wenn
@@ -287,8 +292,7 @@ public final class DisplayManager {
     public func setAllBrightness(_ percent: Double, includingBuiltIn: Bool = true) -> Bool {
         var complete = true
         for monitor in monitors where includingBuiltIn || !monitor.isBuiltIn {
-            if monitor.state == .probing && !monitor.isAdjustable { complete = false }
-            setBrightness(percent, for: monitor.id)
+            if !setBrightness(percent, for: monitor.id) { complete = false }
         }
         return complete
     }

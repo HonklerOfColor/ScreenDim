@@ -18,7 +18,7 @@ struct ScreenDimApp: App {
         .menuBarExtraStyle(.window)
 
         Settings {
-            SettingsView(sensor: appDelegate.sensor)
+            SettingsView(sensor: appDelegate.sensor, manager: appDelegate.manager)
         }
 
         Window("Sensor-Diagnose", id: SensorDebugView.windowID) {

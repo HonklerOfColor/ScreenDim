@@ -93,6 +93,16 @@
         }
       }
     },
+    "%lld lx · %lld %%" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld lx · %lld%%"
+          }
+        }
+      }
+    },
     "%lld offene Aufrufe" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -192,6 +202,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Active"
+          }
+        }
+      }
+    },
+    "Aktuelle Helligkeit merken" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remember current brightness"
           }
         }
       }
@@ -698,6 +718,16 @@
         }
       }
     },
+    "Folgt dem Umgebungslicht" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Follows ambient light"
+          }
+        }
+      }
+    },
     "Frage Monitor per DDC/CI ab …" : {
       "localizations" : {
         "en" : {
@@ -768,6 +798,26 @@
         }
       }
     },
+    "Gerade gilt der eingebaute Lichtsensor; dieses Display regelt dann macOS." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The built-in light sensor is active right now; macOS controls this display."
+          }
+        }
+      }
+    },
+    "Helligkeit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brightness"
+          }
+        }
+      }
+    },
     "Helligkeit %@" : {
       "localizations" : {
         "en" : {
@@ -795,6 +845,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Adjust brightness using"
+          }
+        }
+      }
+    },
+    "Helligkeit je Monitor" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brightness per monitor"
           }
         }
       }
@@ -953,6 +1013,16 @@
         }
       }
     },
+    "Kein Monitor gefunden." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No monitor found."
+          }
+        }
+      }
+    },
     "Kein Steuerkanal" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1050,6 +1120,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Heartbeat"
+          }
+        }
+      }
+    },
+    "Legt einen Punkt an: %lld lx → %lld %%" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adds a point: %lld lx → %lld%%"
           }
         }
       }
@@ -1220,6 +1300,16 @@
         }
       }
     },
+    "Monitor" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monitor"
+          }
+        }
+      }
+    },
     "Monitor %lld" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1368,6 +1458,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Check"
+          }
+        }
+      }
+    },
+    "Punkt entfernen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove point"
+          }
+        }
+      }
+    },
+    "Punkt hinzufügen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add point"
           }
         }
       }
@@ -1617,6 +1727,16 @@
         }
       }
     },
+    "Standard" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default"
+          }
+        }
+      }
+    },
     "Status" : {
       "localizations" : {
         "en" : {
@@ -1831,6 +1951,16 @@
         }
       }
     },
+    "Zwischen zwei Punkten gleitet die Helligkeit, unter dem ersten und über dem letzten bleibt sie stehen. Höchstens %lld Punkte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brightness glides between two points and stays put below the first and above the last. At most %lld points."
+          }
+        }
+      }
+    },
     "aus %@" : {
       "localizations" : {
         "en" : {
@@ -1902,6 +2032,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "no bytes"
+          }
+        }
+      }
+    },
+    "lx" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "lx"
           }
         }
       }
@@ -1988,12 +2128,12 @@
         }
       }
     },
-    "→ %lld %%" : {
+    "→ %@" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "→ %lld%%"
+            "value" : "→ %@"
           }
         }
       }

@@ -91,6 +91,11 @@ struct SensorControllerTests {
 
     private var brightness: Double? { manager.monitors.first?.brightness }
 
+    /// Helligkeit aus dem Licht nur für Monitor 7.
+    private static func monitor7(_ percent: Double) -> [LightLevel] {
+        [LightLevel(storageKey: "1-2-3", name: "Monitor 7", percent: percent)]
+    }
+
     @Test("Ohne Einstellung: kein Sensor, keine Abfrage")
     func offByDefault() {
         let controller = makeController(paired: false)
@@ -172,6 +177,50 @@ struct SensorControllerTests {
         source.send(.lux(1000))
         #expect(await eventually { controller.lux == 1000 })
         #expect(brightness == 20)
+    }
+
+    @Test("Jeder Monitor folgt seinem eigenen Profil; eins ohne Licht bleibt stehen")
+    func perMonitorProfiles() async {
+        let laptop = makeLaptopManager(builtInControl: StubControl())
+        #expect(await eventually { laptop.monitors.first { $0.isBuiltIn }?.state == .ready })
+        func builtIn() -> Double? { laptop.monitors.first { $0.isBuiltIn }?.brightness }
+        let builtInKey = laptop.monitors.first { $0.isBuiltIn }!.storageKey
+        let controller = makeController(manager: laptop)
+        controller.setLightProfile(
+            LightProfile(followsLight: true, curve: LightCurve(points: [.init(lux: 100, percent: 10), .init(lux: 500, percent: 70)])),
+            for: "1-2-3"
+        )
+        controller.setLightProfile(LightProfile(followsLight: false, curve: .standard), for: builtInKey)
+        controller.start()
+        let before = builtIn()
+
+        source.send(.connection(.connected), .lux(1000))
+        #expect(await eventually { external(laptop) == 70 })
+        #expect(builtIn() == before)
+        #expect(controller.lightLevels == Self.monitor7(70))
+
+        // Profile überdauern einen Neustart des Controllers.
+        let reloaded = makeController(manager: laptop)
+        #expect(reloaded.lightProfile(for: "1-2-3").curve.points.map(\.percent) == [10, 70])
+        #expect(!reloaded.lightProfile(for: builtInKey).followsLight)
+    }
+
+    @Test("Geändertes Profil gilt sofort mit dem aktuellen Licht, auch innerhalb der Hysterese")
+    func profileChangeAppliesImmediately() async {
+        let controller = makeController()
+        controller.start()
+        source.send(.connection(.connected), .lux(100))
+        #expect(await eventually { brightness == 60 })
+
+        var profile = controller.lightProfile(for: "1-2-3")
+        profile.curve.insert(.init(lux: 100, percent: 62))
+        controller.setLightProfile(profile, for: "1-2-3")
+        #expect(brightness == 62)
+
+        // Zurück auf Standard: Der gespeicherte Eintrag verschwindet.
+        controller.setLightProfile(.standard, for: "1-2-3")
+        #expect(brightness == 60)
+        #expect(preferences.object(forKey: "lightProfile.1-2-3") == nil)
     }
 
     @Test("Alter Schalter „Helligkeit anpassen: aus“ wird zu Lichtquelle „aus“")
@@ -368,10 +417,10 @@ struct SensorControllerTests {
         #expect(await eventually { laptop.screensBlanked && controller.builtInLux == 10 })
         #expect(controller.activePresenceOrigin == .deskSensor)
         #expect(controller.activeLightOrigin == .builtIn)
-        #expect(controller.lightBrightness == 20)
+        #expect(controller.lightLevels == Self.monitor7(20))
         #expect(controller.lightBrightnessOrigin == .builtIn)
 
-        #expect(controller.debugLog.contains { $0.origin == .builtIn && $0.effect == .brightness(20) })
+        #expect(controller.debugLog.contains { $0.origin == .builtIn && $0.effect == .brightness(Self.monitor7(20)) })
         #expect(controller.debugLog.contains { $0.origin == .deskSensor && $0.effect == .screensOff })
         #expect(controller.debugLog.contains { $0.kind == .lightSourceSwitch(from: nil, to: .builtIn) })
         // Licht des Schreibtisch-Sensors steht im Protokoll, wirkt aber nicht.
@@ -420,7 +469,7 @@ struct SensorControllerTests {
         #expect(await eventually { external(laptop) == 98 })
         #expect(controller.lightBrightnessOrigin == .builtIn)
         #expect(controller.debugLog.contains {
-            $0.kind == .lightSourceSwitch(from: .deskSensor, to: .builtIn) && $0.effect == .brightness(98)
+            $0.kind == .lightSourceSwitch(from: .deskSensor, to: .builtIn) && $0.effect == .brightness(Self.monitor7(98))
         })
 
         // Der eingebaute Sensor regelt nie das eingebaute Display.

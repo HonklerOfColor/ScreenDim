@@ -32,15 +32,6 @@ public enum PresenceGate {
     }
 }
 
-/// Umgebungslicht → Helligkeit.
-public enum AmbientLightCurve {
-    /// 10 lx → 20 %, 1000 lx → 100 %, dazwischen logarithmisch (so empfindet das Auge).
-    public static func percent(forLux lux: Double) -> Double {
-        let fraction = log10(max(lux, 1) / 10) / 2
-        return (20 + 80 * min(max(fraction, 0), 1)).rounded()
-    }
-}
-
 /// Eingaben an Maus und Tastatur. In Tests ersetzbar.
 @MainActor
 public protocol InputActivityMonitoring: AnyObject {
