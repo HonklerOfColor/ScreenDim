@@ -95,9 +95,10 @@ private struct ShortcutSection: View {
     }
 }
 
-/// Je Monitor das Dimmverfahren; der Hinweis zur Software-Dimmung steht einmal darunter.
+/// Je Monitor das Verfahren (DDC/CI, Gamma, Overlay); der Hinweis dazu steht einmal darunter.
 private struct MonitorSection: View {
     let manager: DisplayManager
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Section {
@@ -107,14 +108,21 @@ private struct MonitorSection: View {
             ForEach(manager.monitors) { monitor in
                 MonitorRow(monitor: monitor, manager: manager)
             }
-            HStack {
-                Text("ScreenDim dimmt per Software. Die Hintergrundbeleuchtung bleibt, wie sie ist; die des eingebauten Displays regelst du mit den Helligkeitstasten.")
+            HStack(alignment: .top) {
+                Text("DDC/CI stellt die Hintergrundbeleuchtung des Monitors ein. Gamma und Overlay dimmen per Software; die Hintergrundbeleuchtung bleibt dann, wie sie ist. Die des eingebauten Displays regelst du mit den Helligkeitstasten.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer()
-                Button("Neu suchen") { manager.refresh(force: true) }
-                    .help("Monitore neu suchen, z. B. nach dem Umstecken")
+                VStack(alignment: .trailing, spacing: 6) {
+                    Button("Neu suchen") { manager.refresh(force: true) }
+                        .help("Monitore neu suchen, z. B. nach dem Umstecken")
+                    Button("Diagnose …") {
+                        openWindow(id: DiagnosticsView.windowID)
+                        NSApplication.shared.activate()
+                    }
+                    .help("DDC-Kanal, Link und die letzten I2C-Ergebnisse je Monitor")
+                }
             }
         } header: {
             Text("Monitore")
@@ -128,18 +136,27 @@ private struct MonitorRow: View {
 
     var body: some View {
         LabeledContent {
-            if monitor.usesSoftwareDimming {
-                Picker("Abdunkeln über", selection: Binding(
-                    get: { monitor.dimming },
-                    set: { manager.setDimmingMethod($0, for: monitor.id) }
-                )) {
-                    Text("Gamma").tag(DimmingMethod.gamma)
-                    Text("Overlay").tag(DimmingMethod.overlay)
+            HStack(spacing: 8) {
+                if showsRetry {
+                    Button("Erneut prüfen") { manager.retry(monitor.id) }
+                        .controlSize(.small)
                 }
-                .labelsHidden()
-                .fixedSize()
-                .disabled(monitor.gammaUnavailable)
-                .help("Gamma skaliert die Farbkurve des Displays. Overlay legt ein halbtransparentes Fenster darüber.")
+                if monitor.canUseDDC || monitor.usesSoftwareDimming {
+                    Picker("Helligkeit regeln über", selection: Binding(
+                        get: { monitor.preferredMethod },
+                        set: { manager.setBrightnessMethod($0, for: monitor.id) }
+                    )) {
+                        if monitor.canUseDDC {
+                            Text("DDC/CI").tag(BrightnessMethod.ddc)
+                        }
+                        Text("Gamma").tag(BrightnessMethod.gamma)
+                        Text("Overlay").tag(BrightnessMethod.overlay)
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                    .disabled(monitor.gammaUnavailable && !monitor.canUseDDC)
+                    .help("DDC/CI regelt die Hintergrundbeleuchtung des Monitors. Gamma skaliert die Farbkurve des Displays, Overlay legt ein halbtransparentes Fenster darüber.")
+                }
             }
         } label: {
             Label {
@@ -148,7 +165,8 @@ private struct MonitorRow: View {
                     if let detail {
                         Text(detail)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(detailIsWarning ? Color.orange : Color.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             } icon: {
@@ -157,8 +175,24 @@ private struct MonitorRow: View {
         }
     }
 
-    /// Anschlussweg und, falls Gamma nicht geht, warum das Overlay dimmt.
+    /// DDC/CI ist gewählt, kommt aber nicht durch: Die Software dimmt als Rückfall.
+    private var ddcFallback: Bool {
+        monitor.preferredMethod == .ddc && monitor.usesSoftwareDimming && monitor.state != .probing
+    }
+
+    private var showsRetry: Bool {
+        ddcFallback || (monitor.isBuiltIn && monitor.state.isFailure)
+    }
+
+    private var detailIsWarning: Bool {
+        ddcFallback || (monitor.isBuiltIn && monitor.state.isFailure) || monitor.gammaUnavailable
+    }
+
+    /// Was gerade wirkt und warum: Prüfung, DDC-Rückfall, Overlay statt Gamma, Anschlussweg.
     private var detail: LocalizedStringKey? {
+        if monitor.preferredMethod == .ddc, monitor.state == .probing { return "DDC/CI wird geprüft …" }
+        if ddcFallback { return fallbackReason }
+        if monitor.isBuiltIn, monitor.state.isFailure { return "Helligkeit lässt sich gerade nicht lesen oder setzen." }
         if monitor.gammaUnavailable { return "Gamma-Tabelle nicht nutzbar, Overlay aktiv." }
         guard let intermediary = monitor.intermediary else { return nil }
         return switch (intermediary, monitor.branchVendor) {
@@ -166,6 +200,18 @@ private struct MonitorRow: View {
         case (.dock, nil): "Über Dock"
         case (.adapter, let vendor?): "Über Adapter (\(vendor))"
         case (.adapter, nil): "Über Adapter"
+        }
+    }
+
+    private var fallbackReason: LocalizedStringKey {
+        let software = monitor.dimming == .gamma ? String(localized: "Gamma dimmt") : String(localized: "Overlay dimmt")
+        return switch (monitor.intermediary, monitor.state) {
+        case (.dock, _): "DDC/CI kommt über das Dock nicht durch, \(software)."
+        case (.adapter, _): "DDC/CI kommt über den Adapter nicht durch, \(software)."
+        case (nil, .nullReply): "Monitor antwortet leer – DDC/CI im Monitor-Menü aus? \(software)."
+        case (nil, .i2cTimeout): "DDC/CI-Verbindung blockiert, \(software)."
+        case (nil, .ioError(let status)): "I2C-Fehler \(IOReturnDescription.name(status)), \(software)."
+        case (nil, _): "Monitor reagiert nicht auf DDC/CI, \(software)."
         }
     }
 }
@@ -213,7 +259,7 @@ private struct BuildYourOwnSection: View {
         Section {
             VStack(alignment: .leading, spacing: 4) {
                 Link("Bau dir deinen eigenen Sensor (ca. 30 €, 15 min)", destination: SensorLinks.flashPage)
-                Text("Die Hardware ist nicht im Kauf enthalten. Der Sensor ist optional; ScreenDim funktioniert vollständig ohne ihn.")
+                Text("Der Sensor ist optional; ScreenDim funktioniert vollständig ohne ihn.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

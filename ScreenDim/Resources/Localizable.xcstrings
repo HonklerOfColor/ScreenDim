@@ -1,77 +1,6 @@
 {
   "sourceLanguage" : "de",
   "strings" : {
-    "Alle Monitore dunkler" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "All displays darker"
-          }
-        }
-      }
-    },
-    "Alle Monitore heller" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "All displays brighter"
-          }
-        }
-      }
-    },
-    "Allgemein" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "General"
-          }
-        }
-      }
-    },
-    "Anmeldeobjekte …" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Login Items…"
-          }
-        }
-      }
-    },
-    "Der Start wartet auf deine Erlaubnis in den Systemeinstellungen." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Launching awaits your approval in System Settings."
-          }
-        }
-      }
-    },
-    "Die Kürzel sind von einer anderen App belegt." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Another app has claimed these shortcuts."
-          }
-        }
-      }
-    },
-    "– (eingebautes Display)" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "– (built-in display)"
-          }
-        }
-      }
-    },
     "%@ (eingebaut)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -79,46 +8,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ (built-in)"
-          }
-        }
-      }
-    },
-    "Gemessen" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Measured"
-          }
-        }
-      }
-    },
-    "Helligkeit dem Umgebungslicht anpassen" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adjust brightness to ambient light"
-          }
-        }
-      }
-    },
-    "Jeder Druck ändert die Helligkeit um %lld %%." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Each press changes the brightness by %lld%%."
-          }
-        }
-      }
-    },
-    "Kein Display gefunden." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No display found."
           }
         }
       }
@@ -143,53 +32,13 @@
         }
       }
     },
-    "%lld → %lld lx" : {
+    "%lld Lanes" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld → %lld lx"
-          }
-        }
-      }
-    },
-    "%lld Lanes" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld Lane"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld Lanes"
-                }
-              }
-            }
-          }
-        },
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld lane"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld lanes"
-                }
-              }
-            }
+            "value" : "%lld lanes"
           }
         }
       }
@@ -217,70 +66,41 @@
     "%lld offene Aufrufe" : {
       "extractionState" : "manual",
       "localizations" : {
-        "de" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld offener Aufruf"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld offene Aufrufe"
-                }
-              }
-            }
-          }
-        },
         "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld open call"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld open calls"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld pending calls"
           }
         }
       }
     },
-    "→ %@" : {
+    "%lld → %lld lx" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "→ %@"
+            "value" : "%lld → %lld lx"
           }
         }
       }
     },
-    "→ Bildschirme an" : {
+    "AV-Service" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "→ screens on"
+            "value" : "AV service"
           }
         }
       }
     },
-    "→ Bildschirme aus" : {
+    "AV-Service: %@" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "→ screens off"
+            "value" : "AV service: %@"
           }
         }
       }
@@ -336,12 +156,52 @@
         }
       }
     },
+    "Alle Monitore dunkler" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All displays darker"
+          }
+        }
+      }
+    },
+    "Alle Monitore heller" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All displays brighter"
+          }
+        }
+      }
+    },
+    "Allgemein" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "General"
+          }
+        }
+      }
+    },
     "An" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "On"
+          }
+        }
+      }
+    },
+    "Anmeldeobjekte …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Login Items…"
           }
         }
       }
@@ -392,27 +252,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Off (nobody there)"
-          }
-        }
-      }
-    },
-    "aus %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "from %@"
-          }
-        }
-      }
-    },
-    "AV-Service: %@" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AV service: %@"
           }
         }
       }
@@ -468,6 +307,16 @@
         }
       }
     },
+    "Branch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Branch"
+          }
+        }
+      }
+    },
     "Branch: %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -475,6 +324,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Branch: %@"
+          }
+        }
+      }
+    },
+    "CGDirectDisplayID" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CGDirectDisplayID"
           }
         }
       }
@@ -495,6 +354,107 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Code, e.g. ABCD-EFGH"
+          }
+        }
+      }
+    },
+    "DDC-Kanal, Link und die letzten I2C-Ergebnisse je Monitor" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DDC channel, link and the latest I2C results per display"
+          }
+        }
+      }
+    },
+    "DDC-Timing: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DDC timing: %@"
+          }
+        }
+      }
+    },
+    "DDC/CI" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DDC/CI"
+          }
+        }
+      }
+    },
+    "DDC/CI ausgeschaltet" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DDC/CI off"
+          }
+        }
+      }
+    },
+    "DDC/CI kommt über das Dock nicht durch, %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DDC/CI does not get through the dock, %@."
+          }
+        }
+      }
+    },
+    "DDC/CI kommt über den Adapter nicht durch, %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DDC/CI does not get through the adapter, %@."
+          }
+        }
+      }
+    },
+    "DDC/CI regelt die Hintergrundbeleuchtung des Monitors. Gamma skaliert die Farbkurve des Displays, Overlay legt ein halbtransparentes Fenster darüber." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DDC/CI controls the display's backlight. Gamma scales the display's color curve, Overlay places a semi-transparent window over it."
+          }
+        }
+      }
+    },
+    "DDC/CI stellt die Hintergrundbeleuchtung des Monitors ein. Gamma und Overlay dimmen per Software; die Hintergrundbeleuchtung bleibt dann, wie sie ist. Die des eingebauten Displays regelst du mit den Helligkeitstasten." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DDC/CI sets the display's backlight. Gamma and Overlay dim in software; the backlight then stays as it is. The built-in display's backlight is controlled with the brightness keys."
+          }
+        }
+      }
+    },
+    "DDC/CI wird geprüft …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking DDC/CI…"
+          }
+        }
+      }
+    },
+    "DDC/CI-Verbindung blockiert, %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DDC/CI connection blocked, %@."
           }
         }
       }
@@ -599,6 +559,46 @@
         }
       }
     },
+    "Der Sensor ist optional; ScreenDim funktioniert vollständig ohne ihn." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The sensor is optional; ScreenDim works fully without it."
+          }
+        }
+      }
+    },
+    "Der Start wartet auf deine Erlaubnis in den Systemeinstellungen." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launching awaits your approval in System Settings."
+          }
+        }
+      }
+    },
+    "Diagnose kopieren" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy Diagnostics"
+          }
+        }
+      }
+    },
+    "Diagnose …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnostics…"
+          }
+        }
+      }
+    },
     "Die Bildschirme gehen nach 3 s aus. Maus oder Tastatur weckt sie sofort." : {
       "localizations" : {
         "en" : {
@@ -619,6 +619,16 @@
         }
       }
     },
+    "Die Kürzel sind von einer anderen App belegt." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Another app has claimed these shortcuts."
+          }
+        }
+      }
+    },
     "Displays …" : {
       "localizations" : {
         "en" : {
@@ -635,6 +645,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Briefly press the BOOT button on the sensor (LED blinks)."
+          }
+        }
+      }
+    },
+    "EDID" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "EDID"
           }
         }
       }
@@ -675,6 +695,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Unpair"
+          }
+        }
+      }
+    },
+    "Erneut prüfen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check Again"
           }
         }
       }
@@ -739,6 +769,16 @@
         }
       }
     },
+    "Gamma dimmt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gamma is dimming"
+          }
+        }
+      }
+    },
     "Gamma skaliert die Farbkurve des Displays. Overlay legt ein halbtransparentes Fenster darüber." : {
       "localizations" : {
         "en" : {
@@ -759,34 +799,22 @@
         }
       }
     },
-    "gefunden, RegistryEntryID %@" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "found, RegistryEntryID %@"
-          }
-        }
-      }
-    },
-    "gefunden, RegistryEntryID %@, Kanal nicht erzeugt" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "found, RegistryEntryID %@, channel not created"
-          }
-        }
-      }
-    },
     "Gekoppelt mit" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Paired with"
+          }
+        }
+      }
+    },
+    "Gemessen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measured"
           }
         }
       }
@@ -807,28 +835,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Saved value"
-          }
-        }
-      }
-    },
-    "getunnelt (USB4/TB)" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "tunneled (USB4/TB)"
-          }
-        }
-      }
-    },
-    "hängt seit %@ s" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "hung for %@ s"
           }
         }
       }
@@ -864,12 +870,32 @@
         }
       }
     },
+    "Helligkeit dem Umgebungslicht anpassen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjust brightness to ambient light"
+          }
+        }
+      }
+    },
     "Helligkeit je Monitor" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Brightness per monitor"
+          }
+        }
+      }
+    },
+    "Helligkeit regeln über" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Control brightness via"
           }
         }
       }
@@ -905,6 +931,26 @@
         }
       }
     },
+    "I2C-Fehler %1$@, %2$@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I2C error %1$@, %2$@."
+          }
+        }
+      }
+    },
+    "I2C-Read" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I2C read"
+          }
+        }
+      }
+    },
     "I2C-Timeout, Kanal blockiert" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -912,6 +958,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "I2C timeout, channel blocked"
+          }
+        }
+      }
+    },
+    "I2C-Write" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I2C write"
+          }
+        }
+      }
+    },
+    "Jeder Druck ändert die Helligkeit um %lld %%." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each press changes the brightness by %lld%%."
+          }
+        }
+      }
+    },
+    "Kanal" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel"
           }
         }
       }
@@ -943,6 +1019,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "No display found"
+          }
+        }
+      }
+    },
+    "Kein Display gefunden." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No display found."
           }
         }
       }
@@ -989,33 +1075,12 @@
         }
       }
     },
-    "keine" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "none"
-          }
-        }
-      }
-    },
     "Keine" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "None"
-          }
-        }
-      }
-    },
-    "keine Bytes" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "no bytes"
           }
         }
       }
@@ -1112,6 +1177,16 @@
         }
       }
     },
+    "Letzter Read" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last read"
+          }
+        }
+      }
+    },
     "Letzter Read: %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1119,6 +1194,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Last read: %@"
+          }
+        }
+      }
+    },
+    "Letzter Write" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last write"
           }
         }
       }
@@ -1215,16 +1300,6 @@
         }
       }
     },
-    "lx" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "lx"
-          }
-        }
-      }
-    },
     "MacBook-Display" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1232,16 +1307,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "MacBook Display"
-          }
-        }
-      }
-    },
-    "macOS regelt dieses Display selbst. Schalte „Helligkeit automatisch anpassen“ aus, wenn ScreenDim es regeln soll." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "macOS controls this display itself. Turn off “Automatically adjust brightness” if you want ScreenDim to control it."
           }
         }
       }
@@ -1266,26 +1331,6 @@
         }
       }
     },
-    "Monitore" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Displays"
-          }
-        }
-      }
-    },
-    "Monitore neu suchen, z. B. nach dem Umstecken" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rescan displays, e.g. after replugging"
-          }
-        }
-      }
-    },
     "Monitor %lld" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1297,12 +1342,52 @@
         }
       }
     },
+    "Monitor antwortet leer – DDC/CI im Monitor-Menü aus? %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Display replies empty – DDC/CI off in the display's menu? %@."
+          }
+        }
+      }
+    },
+    "Monitor reagiert nicht auf DDC/CI, %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Display does not respond to DDC/CI, %@."
+          }
+        }
+      }
+    },
+    "Monitore" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Displays"
+          }
+        }
+      }
+    },
     "Monitore neu suchen" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rescan Displays"
+          }
+        }
+      }
+    },
+    "Monitore neu suchen, z. B. nach dem Umstecken" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rescan displays, e.g. after replugging"
           }
         }
       }
@@ -1323,17 +1408,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rescan"
-          }
-        }
-      }
-    },
-    "nicht gefunden" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "not found"
           }
         }
       }
@@ -1369,12 +1443,12 @@
         }
       }
     },
-    "nur Anzeige" : {
+    "Nur Schreibtisch-Sensor" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "display only"
+            "value" : "Desk sensor only"
           }
         }
       }
@@ -1389,22 +1463,22 @@
         }
       }
     },
-    "Nur Schreibtisch-Sensor" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Desk sensor only"
-          }
-        }
-      }
-    },
     "Overlay" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Overlay"
+          }
+        }
+      }
+    },
+    "Overlay dimmt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overlay is dimming"
           }
         }
       }
@@ -1499,17 +1573,6 @@
         }
       }
     },
-    "Read fehlgeschlagen: %@, %lld ms" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Read failed: %@, %lld ms"
-          }
-        }
-      }
-    },
     "Read OK: %lld/%lld, %lld ms" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1517,6 +1580,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Read OK: %lld/%lld, %lld ms"
+          }
+        }
+      }
+    },
+    "Read fehlgeschlagen: %@, %lld ms" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read failed: %@, %lld ms"
           }
         }
       }
@@ -1537,6 +1611,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Turn on the desk sensor or demo mode in the “Sensor” tab first."
+          }
+        }
+      }
+    },
+    "Schreibt einmal den Wert, den der Slider zeigt: %@ von 100." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Writes the slider value once: %@ of 100."
           }
         }
       }
@@ -1611,6 +1695,16 @@
         }
       }
     },
+    "ScreenDim Diagnose" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ScreenDim Diagnostics"
+          }
+        }
+      }
+    },
     "ScreenDim Diagnose, %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1668,17 +1762,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sensor Diagnostics…"
-          }
-        }
-      }
-    },
-    "Sensor:" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sensor:"
           }
         }
       }
@@ -1765,22 +1848,22 @@
         }
       }
     },
-    "Suche …" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Searching…"
-          }
-        }
-      }
-    },
     "Suche Sensoren im Netzwerk …" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Looking for sensors on the network…"
+          }
+        }
+      }
+    },
+    "Suche …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Searching…"
           }
         }
       }
@@ -1805,42 +1888,22 @@
         }
       }
     },
-    "Über Adapter" : {
+    "Test: Read 0x10" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Via adapter"
+            "value" : "Test: Read 0x10"
           }
         }
       }
     },
-    "Über Adapter (%@)" : {
+    "Test: Write 0x10 = aktueller Wert" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Via adapter (%@)"
-          }
-        }
-      }
-    },
-    "Über Dock" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Via dock"
-          }
-        }
-      }
-    },
-    "Über Dock (%@)" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Via dock (%@)"
+            "value" : "Test: Write 0x10 = current value"
           }
         }
       }
@@ -1896,16 +1959,6 @@
         }
       }
     },
-    "Während des Demo-Modus ist der echte Sensor getrennt." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The real sensor is disconnected while demo mode is on."
-          }
-        }
-      }
-    },
     "Warte auf den Sensor …" : {
       "localizations" : {
         "en" : {
@@ -1956,6 +2009,17 @@
         }
       }
     },
+    "Write %lld OK, %lld ms" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write %lld OK, %lld ms"
+          }
+        }
+      }
+    },
     "Write %lld fehlgeschlagen: %@, %lld ms" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1967,13 +2031,12 @@
         }
       }
     },
-    "Write %lld OK, %lld ms" : {
-      "extractionState" : "manual",
+    "Während des Demo-Modus ist der echte Sensor getrennt." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Write %lld OK, %lld ms"
+            "value" : "The real sensor is disconnected while demo mode is on."
           }
         }
       }
@@ -2029,23 +2092,199 @@
         }
       }
     },
-    "DDC/CI ausgeschaltet" : {
+    "aus %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "from %@"
+          }
+        }
+      }
+    },
+    "gefunden, RegistryEntryID %@" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DDC/CI off"
+            "value" : "found, RegistryEntryID %@"
           }
         }
       }
     },
-    "Externe Monitore" : {
+    "gefunden, RegistryEntryID %@, Kanal nicht erzeugt" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "External Displays"
+            "value" : "found, RegistryEntryID %@, channel not created"
+          }
+        }
+      }
+    },
+    "getunnelt (USB4/TB)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "tunneled (USB4/TB)"
+          }
+        }
+      }
+    },
+    "hängt seit %@ s" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "hung for %@ s"
+          }
+        }
+      }
+    },
+    "keine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "none"
+          }
+        }
+      }
+    },
+    "keine Bytes" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no bytes"
+          }
+        }
+      }
+    },
+    "lx" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "lx"
+          }
+        }
+      }
+    },
+    "macOS regelt dieses Display selbst. Schalte „Helligkeit automatisch anpassen“ aus, wenn ScreenDim es regeln soll." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS controls this display itself. Turn off “Automatically adjust brightness” if you want ScreenDim to control it."
+          }
+        }
+      }
+    },
+    "nicht gefunden" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "not found"
+          }
+        }
+      }
+    },
+    "nur Anzeige" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "display only"
+          }
+        }
+      }
+    },
+    "Über Adapter" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Via adapter"
+          }
+        }
+      }
+    },
+    "Über Adapter (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Via adapter (%@)"
+          }
+        }
+      }
+    },
+    "Über Dock" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Via dock"
+          }
+        }
+      }
+    },
+    "Über Dock (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Via dock (%@)"
+          }
+        }
+      }
+    },
+    "– (eingebautes Display)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "– (built-in display)"
+          }
+        }
+      }
+    },
+    "→ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "→ %@"
+          }
+        }
+      }
+    },
+    "→ Bildschirme an" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "→ screens on"
+          }
+        }
+      }
+    },
+    "→ Bildschirme aus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "→ screens off"
           }
         }
       }

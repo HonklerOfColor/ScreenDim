@@ -29,7 +29,7 @@ public enum LightSourceSelector {
         return luxAge <= builtInMaxAge
     }
 
-    /// Ohne eingebauten Sensor (App Store, Mac mini, Mac Studio) bleibt nur der
+    /// Ohne eingebauten Sensor (keine Fabrik, Mac mini, Mac Studio) bleibt nur der
     /// Schreibtisch-Sensor; jede Wahl außer „aus“ wirkt dann wie „nur Schreibtisch-Sensor“.
     public static func effectiveChoice(
         _ choice: SensorController.LightSource,

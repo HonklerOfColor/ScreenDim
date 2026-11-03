@@ -6,7 +6,7 @@ public enum SensorOrigin: String, Sendable, CaseIterable {
     case deskSensor
     /// Simulierter Sensor des Demo-Modus.
     case demo
-    /// Eingebauter Lichtsensor des Macs (nur Direct).
+    /// Eingebauter Lichtsensor des Macs (derzeit ohne Fabrik, also ungenutzt).
     case builtIn
 }
 

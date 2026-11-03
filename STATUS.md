@@ -1,19 +1,25 @@
 # Status
 
-Stand: 2026-11-03. Ein Target (`ScreenDim`, App Store); die Direct-Variante und der
-eingebaute Lichtsensor sind entfernt. Baut ohne Warnungen, Paket-Tests grün,
-`check-mas-binary.sh`: OK (Debug).
+Stand: 2026-11-03. Ein Target (`ScreenDim`, Developer ID, ohne Sandbox, Open Source);
+DDC/CI über `IOAVService` ist wieder drin und Standard je Monitor, Gamma/Overlay sind
+Rückfall oder Wahl. Eingebautes Display per Software; Steuerung über `DisplayServices` und
+eingebauter Lichtsensor bleiben entfernt. Baut ohne Warnungen, Paket-Tests grün.
 
 ## Offene Hardware-Tests
 
 Auf echter Hardware noch nicht geprüft. Die Tests decken nur die Logik ab.
 
 ### Mac Studio + JapanNext 6K (USB-C/Thunderbolt)
+- [ ] DDC/CI: Picker zeigt „DDC/CI“ und ist Standard; Regler stellt die
+      Hintergrundbeleuchtung; nach „Gamma“ kein I2C-Verkehr mehr (Diagnose), nach „DDC/CI“
+      neuer Kanal und gespeicherter Wert.
+- [ ] DDC-Rückfall: DDC/CI im Monitor-Menü aus → Hinweis „antwortet leer“, Software dimmt,
+      „Erneut prüfen“ holt DDC zurück.
 - [ ] Gamma-Dimmung bei 100 %, 50 %, 0 % (Untergrenze 10 %), Farben bleiben kalibriert.
 - [ ] Umschalter auf Overlay: deckt Menüleiste, alle Spaces und Vollbild-Apps ab,
       Mausklicks gehen durch, kein Fokuswechsel.
-- [ ] Sandbox: Prüfen, ob Gamma-Tabelle, Tastenkürzel und Login-Item in der signierten
-      Sandbox-App funktionieren.
+- [ ] Signiert (Developer ID, Hardened Runtime): Gamma-Tabelle, Tastenkürzel, Login-Item
+      und `IOAVService` funktionieren.
 
 ### Dock-Betrieb (StarTech TB4, Realtek-MST)
 - [ ] Gespeicherte Werte: Wechsel direkt ↔ Dock ohne doppelte Abdunklung.
@@ -41,21 +47,24 @@ Auf echter Hardware noch nicht geprüft. Die Tests decken nur die Logik ab.
 - [ ] ESP32 bei ruhigem Licht: Lebenszeichen mindestens alle 45 s? Sonst gilt der Sensor
       als ausgefallen und die Lichtregelung stoppt.
 
-## Offene Punkte für die Einreichung
+## Offene Punkte für die Veröffentlichung (GitHub, Developer ID)
 
+- [ ] **Lizenz:** `LICENSE` fehlt noch (Wahl offen, z. B. MIT).
 - [ ] **Sensor-Links:** `SensorLinks.flashPage` ist ein Platzhalter
-      (`screendim.example.com`); Videolink in `docs/AppReviewNotes.md` fehlt.
+      (`screendim.example.com`).
 
 - [ ] **App-Icon:** Slot `AppIcon` in `ScreenDim/Resources/Assets.xcassets` ist leer
       (Icon kommt von Andreas).
-- [ ] **Team-ID und Signatur:** `DEVELOPMENT_TEAM` ist leer, Signatur ad hoc. App Store:
-      Apple Distribution + Provisioning-Profil.
+- [ ] **Team-ID und Signatur:** `DEVELOPMENT_TEAM` ist leer, Signatur ad hoc. Release:
+      Developer ID Application + Notarisierung (`notarytool`), Verteilung als DMG oder ZIP
+      über GitHub Releases; Update-Weg (z. B. Sparkle) offen.
 - [ ] **Englische Texte** gegenlesen (`Localizable.xcstrings`).
 - [x] **Eingebautes Display:** per Software (Gamma/Overlay) regelbar; die
       Hintergrundbeleuchtung bleibt bei den Helligkeitstasten.
 - [ ] Gamma-Dimmung des eingebauten Displays mit True Tone und Night Shift auf echter
       Hardware prüfen.
-- [ ] **Aufräumen in `ScreenDimKit`:** DDC-Stack und Lichtquelle „eingebaut“ sind ohne
-      Direct-Variante toter Code (siehe `CLAUDE.md`).
+- [ ] **Aufräumen in `ScreenDimKit`:** Lichtquelle „eingebaut“ (`LightSource` mit
+      `builtIn…`, `LuxFilter`-Zweig, Fabrik `makeBuiltInLightSensor`) ist ohne Sensor toter
+      Code, ebenso `makeBuiltInControl`, solange die App nichts hereinreicht.
 - [ ] Alte Test-Plists `ScreenDimTests.*.plist` in `~/Library/Preferences` (37 Stück, aus
       Testläufen vor dem Umbau) können gelöscht werden; neue entstehen nicht mehr.

@@ -76,7 +76,7 @@ public struct DiscoveredDisplay: Identifiable, Sendable {
 @MainActor
 public enum DisplayDiscovery {
     /// - Parameter scanRegistry: `false` überspringt die IORegistry (DDC-Kanäle und
-    ///   DisplayPort-Links); die Variante ohne DDC braucht beides nicht.
+    ///   DisplayPort-Links), etwa für Tests oder einen Betrieb ganz ohne DDC.
     public static func displays(scanRegistry: Bool = true) -> [DiscoveredDisplay] {
         let online = onlineDisplayIDs()
         let builtIn = online.filter { CGDisplayIsBuiltin($0) != 0 }.map { id in

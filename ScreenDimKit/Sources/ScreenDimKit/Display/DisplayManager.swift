@@ -7,10 +7,11 @@ private let log = ddcLog
 
 /// Hält die Displays (eingebautes und externe), ihren Steuerzustand und ihre Helligkeit.
 ///
-/// Die Steuerkanäle kommen über Fabriken von außen: Die Direct-Variante der App reicht
-/// DDC und die Steuerung des eingebauten Displays herein, die App-Store-Variante nichts.
-/// Displays ohne Kanal dimmt der Manager per Software (Gamma oder Overlay), in der
-/// App-Store-Variante also auch das eingebaute.
+/// Die Steuerkanäle kommen über Fabriken von außen: Die App reicht DDC/CI für externe
+/// Monitore herein (`IOAVService`), optional die Steuerung des eingebauten Displays.
+/// Displays ohne Kanal dimmt der Manager per Software (Gamma oder Overlay), ebenso
+/// externe Monitore, bei denen DDC nicht durchkommt oder die der Nutzer auf Gamma oder
+/// Overlay gestellt hat.
 @MainActor
 @Observable
 public final class DisplayManager {
@@ -32,9 +33,18 @@ public final class DisplayManager {
         public var preferredDimming: DimmingMethod = .gamma
         /// Die Gamma-Tabelle ließ sich nicht lesen oder setzen; dann bleibt das Overlay.
         public var gammaUnavailable = false
+        /// Ein DDC-Kanal ist da oder ließe sich anlegen (externer Monitor mit AV-Service).
+        public var canUseDDC = false
+        /// DDC/CI für diesen Monitor erlaubt (Einstellung, Standard: ja).
+        public var ddcEnabled = true
 
         /// Verfahren, das tatsächlich dimmt.
         public var dimming: DimmingMethod { gammaUnavailable ? .overlay : preferredDimming }
+
+        /// Verfahren, das der Nutzer gewählt hat: DDC/CI, solange es möglich und nicht
+        /// abgewählt ist, sonst das Software-Verfahren. Bei DDC/CI sagt
+        /// `usesSoftwareDimming`, ob gerade die Software als Rückfall dimmt.
+        public var preferredMethod: BrightnessMethod { canUseDDC && ddcEnabled ? .ddc : BrightnessMethod(dimming) }
 
         public var isAdjustable: Bool { usesSoftwareDimming || state.isAdjustable }
     }
@@ -64,10 +74,6 @@ public final class DisplayManager {
     public var hotKeysAvailable = true
     /// Alle Bildschirme schwarz, weil der Schreibtisch-Sensor „weg“ meldet.
     public private(set) var screensBlanked = false
-    /// DDC/CI für externe Monitore (Einstellung, Standard: an). Aus: kein DDC-Kanal, kein
-    /// I2C-Verkehr, externe Monitore laufen per Software-Dimmung wie in der
-    /// App-Store-Variante. Das eingebaute Display bleibt bei seiner Steuerung.
-    public private(set) var isDDCEnabled: Bool
 
     public let timing: DDCTiming
 
@@ -141,7 +147,6 @@ public final class DisplayManager {
         self.discover = discover
         self.makeExternalControl = makeExternalControl
         self.makeBuiltInControl = makeBuiltInControl
-        self.isDDCEnabled = store.isDDCEnabled
     }
 
     /// Gibt allen Displays ihre ursprüngliche Kurve zurück und schließt die Overlays
@@ -232,6 +237,7 @@ public final class DisplayManager {
         monitors = displays.map { display in
             let key = display.identity.storageKey
             let software = channels[display.id] == nil || (!display.isBuiltIn && softwareDimmed.contains(key))
+            let ddcEnabled = store.isDDCEnabled(for: key)
             if software {
                 softwareTargets[display.id] = store.brightness(for: key, mode: .software) ?? 100
             }
@@ -255,7 +261,10 @@ public final class DisplayManager {
                 brightness: brightness,
                 state: channels[display.id] != nil ? .probing : initialState(for: display),
                 usesSoftwareDimming: software,
-                preferredDimming: store.dimmingMethod(for: key) ?? .gamma
+                preferredDimming: store.dimmingMethod(for: key) ?? .gamma,
+                // Abgewählt: Kein Kanal, aber die Fabrik bekäme einen; sonst zählt der Kanal.
+                canUseDDC: display.avServiceID != nil && (channels[display.id] != nil || !ddcEnabled),
+                ddcEnabled: ddcEnabled
             )
         }
         syncSoftwareDimming()
@@ -271,30 +280,40 @@ public final class DisplayManager {
         }
     }
 
-    /// Ohne DDC/CI bekommt kein externer Monitor einen Kanal; der des eingebauten Displays
-    /// ist keiner.
+    /// Hat der Nutzer DDC/CI für einen Monitor abgewählt, bekommt er keinen Kanal; der
+    /// des eingebauten Displays ist keiner.
     private func channelKey(for display: DiscoveredDisplay) -> ChannelKey? {
         switch display.kind {
         case .builtIn: .builtIn(display.id)
-        case .external(let avServiceID): isDDCEnabled ? avServiceID.map(ChannelKey.avService) : nil
+        case .external(let avServiceID):
+            store.isDDCEnabled(for: display.identity.storageKey) ? avServiceID.map(ChannelKey.avService) : nil
         }
     }
 
     /// Zustand eines Displays ohne Kanal.
     private func initialState(for display: DiscoveredDisplay) -> DDCState {
-        !display.isBuiltIn && !isDDCEnabled ? .disabled : .noChannel
+        guard display.avServiceID != nil, !store.isDDCEnabled(for: display.identity.storageKey) else { return .noChannel }
+        return .disabled
     }
 
-    /// Schaltet DDC/CI für externe Monitore ein oder aus und sucht die Monitore neu.
-    /// Aus: Die Kanäle werden verworfen (keine weiteren I2C-Aufrufe), die Monitore dimmen
-    /// ab jetzt per Software vom ungedimmten Stand aus; die Hintergrundbeleuchtung
-    /// bleibt, wie sie steht. An: neue Kanäle, Prüfung, danach gilt wieder der
-    /// gespeicherte DDC-Wert.
-    public func setDDCEnabled(_ enabled: Bool) {
-        guard enabled != isDDCEnabled else { return }
-        log.notice("DDC/CI für externe Monitore \(enabled ? "an" : "aus", privacy: .public)")
-        store.setDDCEnabled(enabled)
-        isDDCEnabled = enabled
+    /// Wählt für einen Monitor DDC/CI, Gamma oder Overlay und merkt sich die Wahl.
+    /// DDC/CI: neuer Kanal und Prüfung, danach gilt wieder der gespeicherte DDC-Wert.
+    /// Gamma oder Overlay bei bisher DDC/CI: Der Kanal wird verworfen (keine weiteren
+    /// I2C-Aufrufe), der Monitor dimmt ab jetzt per Software vom ungedimmten Stand aus;
+    /// die Hintergrundbeleuchtung bleibt, wie sie steht.
+    public func setBrightnessMethod(_ method: BrightnessMethod, for id: CGDirectDisplayID) {
+        guard let index = index(of: id) else { return }
+        let monitor = monitors[index]
+        if let dimming = method.dimming {
+            setDimmingMethod(dimming, for: id)
+            guard monitor.canUseDDC, monitor.ddcEnabled else { return }
+            log.notice("Display \(id): DDC/CI aus, \(dimming.rawValue, privacy: .public)")
+            store.setDDCEnabled(false, for: monitor.storageKey)
+        } else {
+            guard monitor.canUseDDC, !monitor.ddcEnabled else { return }
+            log.notice("Display \(id): DDC/CI an")
+            store.setDDCEnabled(true, for: monitor.storageKey)
+        }
         refresh(force: true)
     }
 

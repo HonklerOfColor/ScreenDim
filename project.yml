@@ -7,7 +7,8 @@ options:
   createIntermediateGroups: true
   developmentLanguage: de
 
-# Logik ohne UI und ohne private API; Tests per `swift test` im Paketordner.
+# Logik ohne UI und ohne private API; Tests per `swift test` im Paketordner. Der
+# I2C-Transport (IOAVService, private API) liegt in der App.
 packages:
   ScreenDimKit:
     path: ScreenDimKit
@@ -18,7 +19,7 @@ settings:
     MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "1"
     MACOSX_DEPLOYMENT_TARGET: "15.0"
-    # Offen: Team-ID und Signatur (Apple Distribution).
+    # Offen: Team-ID und Signatur (Developer ID Application, danach Notarisierung).
     CODE_SIGN_STYLE: Manual
     CODE_SIGN_IDENTITY: "-"
     DEVELOPMENT_TEAM: ""
@@ -39,8 +40,8 @@ settings:
     SWIFT_EMIT_LOC_STRINGS: YES
 
 targets:
-  # Mac App Store: Sandbox, keine private API. Externe Monitore dimmt die App per Software.
-  # Prüfen: scripts/check-mas-binary.sh <ScreenDim.app>
+  # Developer ID, ohne Sandbox: DDC/CI über IOAVService (private API, im App Store nicht
+  # zulässig). Externe Monitore ohne DDC dimmt die App per Software.
   ScreenDim:
     type: application
     platform: macOS
@@ -66,18 +67,11 @@ targets:
         NSLocalNetworkUsageDescription: "ScreenDim sucht im lokalen Netzwerk nach deinem Schreibtisch-Sensor und verbindet sich nur mit ihm."
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
-        ITSAppUsesNonExemptEncryption: false
-    entitlements:
-      path: ScreenDim/ScreenDim.entitlements
-      properties:
-        com.apple.security.app-sandbox: true
-        # Nur für den optionalen Sensor im LAN.
-        com.apple.security.network.client: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.andreastrabi.ScreenDim
         PRODUCT_NAME: ScreenDim
-        ENABLE_APP_SANDBOX: YES
+        ENABLE_APP_SANDBOX: NO
 
 schemes:
   ScreenDim:

@@ -26,14 +26,22 @@ struct ScreenDimApp: App {
         }
         .defaultLaunchBehavior(.suppressed)
         .windowResizability(.contentMinSize)
+
+        Window("ScreenDim Diagnose", id: DiagnosticsView.windowID) {
+            DiagnosticsView(manager: appDelegate.manager)
+        }
+        .defaultLaunchBehavior(.suppressed)
+        .windowResizability(.contentMinSize)
     }
 }
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    /// Keine private API, also weder DDC noch Steuerung des eingebauten Displays.
-    /// Externe Monitore dimmt der Manager per Software.
-    let manager = DisplayManager(discover: { DisplayDiscovery.displays(scanRegistry: false) })
+    /// Externe Monitore per DDC/CI über `IOAVService`; wo das nicht geht, dimmt der
+    /// Manager per Software. Das eingebaute Display regelt macOS (Helligkeitstasten).
+    let manager = DisplayManager(makeExternalControl: { avServiceID, label, timing in
+        IOAVServiceTransport(registryEntryID: avServiceID).map { DDCService(transport: $0, label: label, timing: timing) }
+    })
     /// Optionaler Schreibtisch-Sensor; ohne Einstellung passiert nichts.
     lazy var sensor = SensorController(manager: manager)
     let loginItem = LoginItem()

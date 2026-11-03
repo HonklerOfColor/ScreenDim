@@ -24,8 +24,9 @@ public enum SensorEvent: Equatable, Sendable {
     case heartbeat
 }
 
-/// Quelle für Sensorereignisse: der echte Sensor (SSE), die Simulation oder (nur Direct)
-/// der eingebaute Lichtsensor des Macs, der nur `.connection(.connected)` und `.lux` meldet.
+/// Quelle für Sensorereignisse: der echte Sensor (SSE), die Simulation oder (per Fabrik,
+/// derzeit ungenutzt) der eingebaute Lichtsensor des Macs, der nur `.connection(.connected)`
+/// und `.lux` meldet.
 public protocol SensorSource: AnyObject, Sendable {
     /// Jeder Aufruf startet einen eigenen Strom. Beenden des Konsumenten beendet die Quelle.
     func events() -> AsyncStream<SensorEvent>

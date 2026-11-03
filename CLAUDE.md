@@ -2,41 +2,41 @@
 
 macOS-Menüleisten-App (`LSUIElement`), die die Helligkeit aller Displays regelt.
 Swift 6, SwiftUI, macOS 15+, Apple Silicon. Sprache in Code-Kommentaren, UI-Quelltexten
-und Doku: Deutsch.
+und Doku: Deutsch. Open Source auf GitHub.
 
-## Ein Target
+## Ein Target, Developer ID
 
-`ScreenDim` (Bundle-ID `com.andreastrabi.ScreenDim`), Mac App Store, Sandbox, nur
-öffentliche API. Externe Monitore dimmt die App per Software (Gamma oder Overlay); das
-eingebaute Display lässt sich ebenso per Software dimmen, seine Hintergrundbeleuchtung
-regelt macOS (Helligkeitstasten).
+`ScreenDim` (Bundle-ID `com.andreastrabi.ScreenDim`), ohne Sandbox, Hardened Runtime,
+Verteilung per Developer ID und Notarisierung. Kein App Store: DDC/CI auf Apple Silicon
+geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
 
-- Keine private API im Projekt. `ScreenDimKit` enthält keine Namen wie `IOAVService` oder
-  `DisplayServices` als Zeichenkette. Nach jedem Build: `scripts/check-mas-binary.sh
-  <ScreenDim.app>` muss mit Exit 0 enden. Der Hinweis auf `_dlsym` kommt aus clangs
-  Laufzeit für Verfügbarkeitsprüfungen (SwiftUI) und ist kein Treffer.
-- Die frühere Variante „ScreenDim Direct“ (Developer ID, DDC/CI über `IOAVService`,
-  eingebautes Display über `DisplayServices`, eingebauter Lichtsensor) wurde am
-  2026-11-03 entfernt; ihr Code steht in der Git-Historie (bis Commit `b3ca76a`).
-  Den eingebauten Lichtsensor als Lichtquelle gibt es nicht; `docs/EingebauterLichtsensor.md`
-  bleibt als Messprotokoll.
-- Noch in `ScreenDimKit`, aber von der App nicht mehr genutzt: der DDC-Stack (`DDC/`,
-  Kanal-Fabriken und Probe im `DisplayManager`, `isDDCEnabled`) und die Lichtquelle
-  „eingebaut“ im `SensorController` (`makeBuiltInLightSensor`, `LightSource` mit
-  `builtIn…`, `LuxFilter`-Zweig). Ohne Fabriken bekommt kein Monitor einen Kanal
-  (`DDCState.noChannel`), alles läuft über Software-Dimmung; ohne eingebauten Sensor
-  wirkt jede `LightSource` außer „aus“ wie „nur Schreibtisch“.
+- Externe Monitore regelt die App per DDC/CI (Hintergrundbeleuchtung des Monitors); das
+  ist der Standard, sobald ein DDC-Kanal (`DCPAVServiceProxy`) gefunden wird. Kommt DDC
+  nicht durch (Null-Antwort, Timeout, I/O-Fehler), dimmt automatisch die Software (Gamma
+  oder Overlay). Der Nutzer wählt je Monitor DDC/CI, Gamma oder Overlay
+  (`BrightnessMethod`); Gamma/Overlay statt DDC/CI heißt: kein Kanal, kein I2C-Verkehr.
+- Das eingebaute Display lässt sich per Software dimmen; seine Hintergrundbeleuchtung
+  regelt macOS (Helligkeitstasten). Die frühere Steuerung über `DisplayServices` und der
+  eingebaute Lichtsensor (IOHIDEventSystem) sind entfernt; ihr Code steht in der
+  Git-Historie (bis Commit `b3ca76a`), `docs/EingebauterLichtsensor.md` bleibt als
+  Messprotokoll. Die Fabriken (`makeBuiltInControl`, `makeBuiltInLightSensor`,
+  `isAutoBrightnessEnabled`) gibt es noch; die App reicht nichts herein.
+- Private API nur in der App (`ScreenDim/System/IOAVServiceTransport.swift`, geladen per
+  `dlsym`). `ScreenDimKit` enthält keine private API und keine Namen wie `IOAVService`
+  als Zeichenkette; die Kanäle kommen über die Fabrik `makeExternalControl` herein, damit
+  die Paket-Tests ohne Hardware laufen.
 
 ## Architektur
 
 - `ScreenDimKit/` (lokales Swift-Paket, Logik ohne UI):
   - `DDC/`: Paketaufbau (DDC/CI 1.1), `DDCService` (eine serielle Queue je Monitor,
-    Deadline, Sperre bei Hängern, höchstens 3 offene Aufrufe), `LatestValueThrottle`,
-    `I2CTransport` (nur das Protokoll). Von der App nicht genutzt, siehe oben.
-  - `Display/`: `DisplayManager` (Zustand, Routing der Software-Dimmung; die
-    DDC-Teile sind ohne Fabriken inaktiv), `DisplayDiscovery` (CoreGraphics; die App
-    ruft sie mit `scanRegistry: false`), `BrightnessStore` (DDC- und Software-Wert
-    getrennt, Verfahren je Monitor), `SoftwareDimming` mit `GammaDimmer` und
+    Deadline, Sperre bei Hängern, höchstens 3 offene Aufrufe, Vorlauf-Write nach jedem
+    Read), `LatestValueThrottle`, `I2CTransport` (nur das Protokoll), `DDCDiagnostics`.
+  - `Display/`: `DisplayManager` (Zustand, Kanal-Cache über Refreshes, Probe in bis zu
+    drei Runden, Routing der Software-Dimmung, `setBrightnessMethod`), `DisplayDiscovery`
+    (CoreGraphics und IORegistry: Framebuffer ↔ `DCPAVServiceProxy`, DisplayPort-Links),
+    `BrightnessStore` (DDC- und Software-Wert getrennt, Verfahren und DDC-Wahl je
+    Monitor), `BrightnessMethod`, `SoftwareDimming` mit `GammaDimmer` und
     `OverlayDimmer`, `ScreenBlanker`, `DisplayDiagnostics`.
   - `Sensor/`: optionaler Schreibtisch-Sensor. `SensorController` (Einstellungen, Kopplung,
     Quelle, Abwesenheit → `DisplayManager.setScreensBlanked`, Lux → Helligkeit),
@@ -45,16 +45,19 @@ regelt macOS (Helligkeitstasten).
     `PairingCode`, `SSEParser`/`ESPHomeEvents`, `PresenceGate`, `SensorDebug`
     (Protokoll für das Fenster „Sensor-Diagnose“, läuft nur, solange es offen ist).
     Jeder Monitor folgt seinem Lichtprofil (`LightCurve`: Lux-Stützpunkte, je Monitor
-    abschaltbar); Licht und Anwesenheit kommen vom ESP32 (oder der Demo).
+    abschaltbar); Licht und Anwesenheit kommen vom ESP32 (oder der Demo). Ohne
+    eingebauten Sensor wirkt jede `LightSource` außer „aus“ wie „nur Schreibtisch“.
 - Lichtregelung:
   - Alle automatischen Wege laufen über `DisplayManager.fadeBrightness` (Licht 2 s,
-    Rückfall/Aufwachen 0,5 s), Start beim echten Wert. Nur `setBrightness`
-    (Regler, Tasten) setzt sofort und pausiert die Lichtregelung des Monitors.
+    Prüfung/Rückfall/Aufwachen 0,5 s), Start beim echten Wert (DDC: zuletzt bestätigter
+    Write, kein Read). Nur `setBrightness` (Regler, Tasten) setzt sofort und pausiert die
+    Lichtregelung des Monitors.
   - Lux des ESP32 durchgereicht, Hysterese 3 Punkte gegen das laufende Ziel.
     Schreibtisch-Sensor frisch durch jedes Ereignis (45 s).
   - Je Auftrag ein `BrightnessJob` mit Grund: Protokoll der Sensor-Diagnose und
     `log.info`, Kategorie `light`.
-- `ScreenDim/` (App): `App/` (Einstieg), `UI/`, `System/` (Tastenkürzel, Login-Item),
+- `ScreenDim/` (App): `App/` (Einstieg, Fabrik für DDC), `UI/` (Menü, Einstellungen,
+  Sensor-Diagnose, DDC-Diagnose), `System/` (Tastenkürzel, Login-Item, `IOAVService`),
   `Resources/` (Asset-Katalog, String-Katalog, Privacy-Manifest).
 
 Software-Dimmung: Gamma ist Standard. Lässt sich die Gamma-Tabelle eines Displays nicht
@@ -77,11 +80,12 @@ geschrieben.
   ```
   Muss ohne Warnungen bauen (Warnungen sind Fehler). Die Logzeile von
   `appintentsmetadataprocessor` („Metadata extraction skipped“) ist keine Diagnose.
+- `xcodebuild` gleicht den String-Katalog nicht ab; das macht nur ein Build in Xcode.
+  Neue Texte bis dahin von Hand in `Localizable.xcstrings` eintragen (mit Englisch).
 - Tests nur im Paket: `cd ScreenDimKit && swift test --scratch-path /tmp/screendim-kit-build`.
   Kein `xcodebuild test`, kein Simulator. Tests benutzen keine UserDefaults-Suites, sondern
   `MemoryPreferences` aus `TestDoubles.swift`: `cfprefsd` legt Suite-Plists in
   ~/Library/Preferences asynchron an, auch nach `removePersistentDomain`.
-- Danach `scripts/check-mas-binary.sh` auf das gebaute `ScreenDim.app`.
 - App nicht ungefragt starten. Kein Netzwerk, kein `git push`. Commits nur nach Freigabe.
 - Keine Timer oder Polling, wo Notifications reichen. Version nur auf Anweisung ändern.
 
@@ -90,11 +94,10 @@ geschrieben.
 `ScreenDim/Resources/Localizable.xcstrings`, Quelle Deutsch, dazu Englisch. SwiftUI-Literale
 extrahiert Xcode. Texte aus `ScreenDimKit` laufen über `String(localized:)` mit dem
 Haupt-Bundle; ihre Schlüssel stehen von Hand im Katalog (`extractionState: manual`).
-Schlüsselbildung: `Int` → `%lld`, `String` → `%@`, ein `%` neben einer Interpolation → `%%`.
+Schlüsselbildung: `Int` → `%lld`, `String` → `%@`, ein `%` neben einer Interpolation → `%%`,
+zwei Interpolationen → `%1$@`, `%2$@`.
 
-## Hardware-Erfahrungen (DDC/CI, aus der Direct-Zeit)
-
-Die App spricht kein DDC/CI mehr; die Befunde bleiben für den DDC-Stack im Paket.
+## Hardware-Erfahrungen (DDC/CI)
 
 - Monitore hinter dem StarTech-TB4-Dock (Realtek-MST-Hub, OUI 00 E0 4C) sind für DDC
   unzuverlässig. Der S34CG50 blieb nach einem doppelten Set-VCP-Write (10 ms Abstand)

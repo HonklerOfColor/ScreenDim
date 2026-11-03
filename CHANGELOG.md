@@ -3,13 +3,18 @@
 ## Unveröffentlicht (1.0, Build 1)
 
 ### Geändert
-- Nur noch ein Target: „ScreenDim“ für den Mac App Store (Sandbox, nur öffentliche API,
-  Software-Dimmung). Die Variante „ScreenDim Direct“ (Developer ID, DDC/CI über
-  `IOAVService`, eingebautes Display über `DisplayServices`, eingebauter Lichtsensor,
-  Diagnose-Fenster, Schalter „Hintergrundbeleuchtung per DDC/CI regeln“) ist entfernt;
-  ihr Code steht in der Git-Historie. Einstellungen und Sensor-Diagnose nennen den
-  eingebauten Lichtsensor nicht mehr. Der DDC-Stack in `ScreenDimKit` bleibt vorerst,
-  die App nutzt ihn nicht.
+- Nur noch ein Target „ScreenDim“, verteilt per Developer ID und Notarisierung statt
+  über den Mac App Store, ohne Sandbox, Open Source. DDC/CI über `IOAVService` ist wieder
+  drin: Externe Monitore regelt die App an ihrer Hintergrundbeleuchtung, sobald ein
+  DDC-Kanal gefunden wird; Gamma und Overlay dimmen nur als Rückfall oder auf Wunsch.
+  Der Picker je Monitor (Einstellungen → Allgemein) bietet „DDC/CI“, „Gamma“ und
+  „Overlay“; Gamma oder Overlay statt DDC/CI heißt kein I2C-Verkehr zu diesem Monitor
+  (ersetzt den früheren globalen Schalter). Kommt DDC nicht durch, steht der Grund unter
+  dem Monitor, mit „Erneut prüfen“. Das Fenster „Diagnose …“ (Kanal, Link, letzte
+  I2C-Ergebnisse, Test-Read und -Write) ist zurück.
+- Entfernt bleiben die Steuerung des eingebauten Displays über `DisplayServices` und
+  der eingebaute Lichtsensor; ihr Code steht in der Git-Historie. `check-mas-binary.sh`
+  und die App-Review-Notizen sind weg.
 
 ### Neu
 - Optionaler Schreibtisch-Sensor (ESP32/ESPHome, DIY): Suche per Bonjour
@@ -21,8 +26,8 @@
 - Demo-Modus mit simuliertem Sensor für Nutzer ohne Hardware und für App Review; Banner,
   Menüeintrag und eigenes Menüleisten-Symbol, nach dem Start immer aus (außer
   `-ScreenDimDemo YES`).
-- Einstellungsfenster (Abschnitt „Sensor“), App-Review-Notizen in `docs/AppReviewNotes.md`.
-- App-Store-Variante: Das eingebaute Display lässt sich per Software dimmen (Gamma oder
+- Einstellungsfenster (Abschnitt „Sensor“).
+- Das eingebaute Display lässt sich per Software dimmen (Gamma oder
   Overlay, gemerkt pro Display). Allgemein: Displays ohne Steuerkanal dimmt die Software.
 - Lichtquelle: Schreibtisch-Sensor oder aus (Wahl in den Einstellungen, sobald der Sensor
   verbunden ist). Fällt der Sensor aus (getrennt, 45 s ohne Ereignis), stoppt die
@@ -46,13 +51,12 @@
 - Overlay-Dimmung als zweiter Weg neben Gamma: randloses Fenster über Menüleiste, allen
   Spaces und Vollbild-Apps. Greift automatisch, wenn die Gamma-Tabelle eines Displays
   nicht nutzbar ist; Umschalter „Gamma/Overlay“ pro Monitor, gemerkt pro Monitor.
-- `scripts/check-mas-binary.sh` prüft das gebaute Binary auf private API.
 - Privacy-Manifest (UserDefaults CA92.1, kein Tracking, keine erhobenen Daten),
   Asset-Katalog mit leerem AppIcon-Slot, String-Katalog Deutsch/Englisch.
 - Logik als lokales Swift-Paket `ScreenDimKit`; Tests per `swift test`.
 
 ### Behoben
-- DDC/CI (nur noch im Paket): Auf Apple Silicon kommt der erste I2C-Write nach einem
+- DDC/CI: Auf Apple Silicon kommt der erste I2C-Write nach einem
   Read beim Monitor nicht an (gemessen: W-R-W-R bleibt Null-Message, W-W-R antwortet;
   ein einzelner Set-VCP nach einem Read ging verloren). Jetzt geht nach jedem Read ein
   Vorlauf-Write voraus (`DDCTiming.primeAfterRead`, Abstand 10 ms).

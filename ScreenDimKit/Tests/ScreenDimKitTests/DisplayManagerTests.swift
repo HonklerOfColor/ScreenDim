@@ -370,22 +370,24 @@ struct DisplayManagerTests {
         #expect(manager.monitors.map(\.id) == [2, 3])
     }
 
-    // MARK: - DDC/CI ausschalten
+    // MARK: - DDC/CI je Monitor abwählen
 
-    @Test("DDC/CI aus: Kanal weg, Software-Dimmung ohne DDC-Writes; an: neuer Kanal, DDC übernimmt")
+    @Test("Gamma statt DDC/CI: Kanal weg, Software-Dimmung ohne DDC-Writes; DDC/CI: neuer Kanal, DDC übernimmt")
     func ddcToggle() async {
         let control = StubControl()
         setup.displays = [Self.external(2, avService: 0x100)]
         setup.makeControl = { _ in control }
         let manager = makeManager()
-        #expect(manager.isDDCEnabled)
         manager.refresh(force: true)
+        #expect(monitor(manager, 2)?.canUseDDC == true)
+        #expect(monitor(manager, 2)?.preferredMethod == .ddc)
         #expect(await eventually { state(manager, 2) == .ready })
         manager.setBrightness(30, for: 2)
         #expect(await eventually { control.writes == [30] })
 
-        manager.setDDCEnabled(false)
-        #expect(!manager.isDDCEnabled)
+        manager.setBrightnessMethod(.gamma, for: 2)
+        #expect(monitor(manager, 2)?.preferredMethod == .gamma)
+        #expect(monitor(manager, 2)?.canUseDDC == true)
         #expect(state(manager, 2) == .disabled)
         #expect(monitor(manager, 2)?.usesSoftwareDimming == true)
         #expect(monitor(manager, 2)?.isAdjustable == true)
@@ -399,43 +401,67 @@ struct DisplayManagerTests {
         try? await Task.sleep(for: .milliseconds(100))
         #expect(control.writes == [30])
 
+        // Overlay statt Gamma ist nur ein Wechsel des Software-Verfahrens, kein Refresh.
+        manager.setBrightnessMethod(.overlay, for: 2)
+        #expect(monitor(manager, 2)?.preferredMethod == .overlay)
+        #expect(setup.gamma.levels.isEmpty)
+        #expect(setup.overlay.levels == [2: 60])
+        #expect(setup.created == [0x100])
+
         // „Monitore neu suchen“ und „Erneut prüfen“ legen keinen Kanal an.
         manager.refresh(force: true)
         manager.retry(2)
         #expect(setup.created == [0x100])
         #expect(state(manager, 2) == .disabled)
 
-        // Wieder an: neuer Kanal, Software-Dimmung bleibt bis zur Prüfung, dann DDC-Wert.
+        // Wieder DDC/CI: neuer Kanal, Software-Dimmung bleibt bis zur Prüfung, dann DDC-Wert.
         control.setRead(.success(VCPReading(current: 50, maximum: 100)))
-        manager.setDDCEnabled(true)
+        manager.setBrightnessMethod(.ddc, for: 2)
         #expect(setup.created == [0x100, 0x100])
         #expect(state(manager, 2) == .probing)
-        #expect(setup.gamma.levels == [2: 60])
+        #expect(monitor(manager, 2)?.preferredMethod == .ddc)
+        #expect(setup.overlay.levels == [2: 60])
         #expect(await eventually { state(manager, 2) == .ready })
         #expect(monitor(manager, 2)?.usesSoftwareDimming == false)
-        #expect(setup.gamma.levels.isEmpty)
+        #expect(setup.overlay.levels.isEmpty)
         #expect(await eventually { control.writes == [30, 30] })
     }
 
-    @Test("DDC/CI aus bleibt über den Neustart; der Software-Wert gilt sofort")
+    @Test("Ohne AV-Service gibt es kein DDC/CI; die Wahl bleibt beim Software-Verfahren")
+    func noAVServiceMeansNoDDC() {
+        setup.displays = [Self.external(2, avService: nil)]
+        let manager = makeManager()
+        manager.refresh(force: true)
+        #expect(monitor(manager, 2)?.canUseDDC == false)
+        #expect(monitor(manager, 2)?.preferredMethod == .gamma)
+        #expect(state(manager, 2) == .noChannel)
+        manager.setBrightnessMethod(.ddc, for: 2)
+        #expect(monitor(manager, 2)?.preferredMethod == .gamma)
+        #expect(setup.created.isEmpty)
+    }
+
+    @Test("Gamma statt DDC/CI bleibt über den Neustart; der Software-Wert gilt sofort")
     func ddcDisabledPersists() async {
         setup.displays = [Self.external(2, avService: 0x100)]
         let manager = makeManager()
-        manager.setDDCEnabled(false)
+        manager.refresh(force: true)
+        #expect(await eventually { state(manager, 2) == .ready })
+        manager.setBrightnessMethod(.gamma, for: 2)
         manager.setBrightness(40, for: 2)
 
         let second = makeManager()
-        #expect(!second.isDDCEnabled)
         second.refresh(force: true)
-        #expect(setup.created.isEmpty)
+        #expect(setup.created == [0x100])
         #expect(state(second, 2) == .disabled)
+        #expect(monitor(second, 2)?.preferredMethod == .gamma)
         #expect(await eventually { setup.gamma.levels == [2: 40] })
     }
 
-    @Test("DDC/CI aus betrifft das eingebaute Display nicht")
+    @Test("DDC/CI abwählen betrifft nur diesen Monitor, nicht das eingebaute Display")
     func ddcDisabledKeepsBuiltInControl() async {
         let control = StubControl()
         setup.displays = [Self.builtIn, Self.external(2, avService: 0x100)]
+        BrightnessStore(storage: setup.preferences).setDDCEnabled(false, for: "19501-3148-2")
         let manager = DisplayManager(
             store: BrightnessStore(storage: setup.preferences),
             timing: .immediate,
@@ -448,11 +474,11 @@ struct DisplayManagerTests {
             },
             makeBuiltInControl: { _ in control }
         )
-        manager.setDDCEnabled(false)
         manager.refresh(force: true)
 
         #expect(setup.created.isEmpty)
         #expect(state(manager, 2) == .disabled)
+        #expect(monitor(manager, 2)?.canUseDDC == true)
         #expect(await eventually { state(manager, 1) == .ready })
         #expect(monitor(manager, 1)?.usesSoftwareDimming == false)
         manager.setBrightness(70, for: 1)

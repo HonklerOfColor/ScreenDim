@@ -8,7 +8,7 @@ import Observation
 /// die Helligkeit. Ohne Sensor passiert nichts; Standard ist „aus“.
 ///
 /// Das Licht kann außer vom Schreibtisch-Sensor auch vom eingebauten Lichtsensor des Macs
-/// kommen (MacBook, iMac; nur „ScreenDim Direct“, Quelle per Fabrik). Welche Quelle gilt,
+/// kommen (MacBook, iMac; Quelle per Fabrik, derzeit reicht die App keine herein). Welche Quelle gilt,
 /// entscheidet `LightSourceSelector` nach Wahl
 /// (`LightSource`) und Verfügbarkeit; die andere springt bei Ausfall ein.
 ///
@@ -225,9 +225,9 @@ public final class SensorController {
 
     /// - Parameters:
     ///   - makeBuiltInLightSensor: eingebauter Lichtsensor; `nil` ohne Sensor (Mac mini,
-    ///     Mac Studio) und in der App-Store-Variante.
+    ///     Mac Studio) oder ohne Fabrik (die App reicht derzeit keine herein).
     ///   - isAutoBrightnessEnabled: ob macOS das eingebaute Display selbst regelt
-    ///     („Helligkeit automatisch anpassen“); `nil`, wenn unbekannt (App Store).
+    ///     („Helligkeit automatisch anpassen“); `nil`, wenn unbekannt (keine Fabrik).
     public convenience init(
         manager: DisplayManager,
         makeBuiltInLightSensor: @MainActor () -> (any SensorSource)? = { nil },
@@ -537,8 +537,7 @@ public final class SensorController {
     }
 
     /// macOS regelt das eingebaute Display selbst („Helligkeit automatisch anpassen“).
-    /// Software-Dimmung (App Store) wirkt zusätzlich zur Hintergrundbeleuchtung und stört
-    /// nicht.
+    /// Software-Dimmung wirkt zusätzlich zur Hintergrundbeleuchtung und stört nicht.
     private func macOSRegulates(_ monitor: DisplayManager.Monitor) -> Bool {
         guard monitor.isBuiltIn, !monitor.usesSoftwareDimming else { return false }
         refreshAutoBrightness(force: false)

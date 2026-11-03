@@ -3,12 +3,17 @@
 Helligkeit aller Displays aus der Menüleiste regeln: ein Slider pro Monitor, einer für
 alle, dazu ⌃⌥↑ / ⌃⌥↓ für alle Monitore in 10-%-Schritten.
 
-ScreenDim läuft in der Sandbox und nutzt nur öffentliche API (Mac App Store). Monitore
-werden per Software abgedunkelt: Gamma-Kurve oder halbtransparentes Overlay, pro Monitor
-wählbar. Die Hintergrundbeleuchtung bleibt, wie sie ist; die des eingebauten Displays
-regelst du wie gewohnt mit den Helligkeitstasten. Optional regelt ein Schreibtisch-Sensor
-(ESP32) die Helligkeit nach dem Umgebungslicht und schaltet die Bildschirme bei
-Abwesenheit ab.
+Externe Monitore regelt ScreenDim per DDC/CI, also an der Hintergrundbeleuchtung des
+Monitors selbst. Wo DDC/CI nicht durchkommt (manche Docks und Adapter, DDC/CI im
+Monitor-Menü aus), dimmt die Software: Gamma-Kurve oder halbtransparentes Overlay. Das
+Verfahren ist pro Monitor wählbar. Das eingebaute Display lässt sich per Software dimmen;
+seine Hintergrundbeleuchtung regelst du wie gewohnt mit den Helligkeitstasten. Optional
+regelt ein Schreibtisch-Sensor (ESP32) die Helligkeit nach dem Umgebungslicht und
+schaltet die Bildschirme bei Abwesenheit ab.
+
+ScreenDim ist Open Source und wird außerhalb des Mac App Store verteilt (Developer ID,
+notarisiert): DDC/CI auf Apple Silicon braucht `IOAVService`, eine private API, die Apple
+im App Store nicht zulässt. Die App läuft deshalb ohne Sandbox.
 
 ## Voraussetzungen
 
@@ -24,12 +29,6 @@ xcodegen generate
 xcodebuild -project ScreenDim.xcodeproj -scheme "ScreenDim" -destination 'generic/platform=macOS' -derivedDataPath /tmp/screendim-dd CODE_SIGNING_ALLOWED=NO build
 ```
 
-Das Binary auf private API prüfen:
-
-```bash
-scripts/check-mas-binary.sh /tmp/screendim-dd/Build/Products/Debug/ScreenDim.app
-```
-
 ## Tests
 
 ```bash
@@ -40,9 +39,10 @@ Die Tests brauchen weder die App noch Hardware.
 
 ## Aufbau
 
-- `ScreenDimKit/`: Swift-Paket mit der Logik (Display-Verwaltung, Software-Dimmung,
-  Sensor, Speicher).
-- `ScreenDim/`: die App (SwiftUI-Menü, Einstellungen, Tastenkürzel, Login-Item).
+- `ScreenDimKit/`: Swift-Paket mit der Logik (DDC/CI-Protokoll, Display-Verwaltung,
+  Software-Dimmung, Sensor, Speicher), ohne private API.
+- `ScreenDim/`: die App (SwiftUI-Menü, Einstellungen, Diagnose, Tastenkürzel, Login-Item,
+  I2C-Transport über `IOAVService`).
 - `project.yml`: Projektbeschreibung für XcodeGen.
 
 Weitere Details stehen in `CLAUDE.md`. Offene Punkte stehen in `STATUS.md`, Änderungen in `CHANGELOG.md`.
