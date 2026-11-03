@@ -1,0 +1,241 @@
+# ScreenDim-Schreibtisch-Sensor: ESP32-S3 mit Waveshare HMMD mmWave (24 GHz, S3KM1110).
+#
+# Schnittstelle zur App (ScreenDimKit, `SensorProtocol`):
+# - mDNS `_screendim._tcp`, TXT `proto=esphome-sse`, `fw=<Version>`; Instanzname gleich
+#   Hostname (`screendim-desk-xxxxxx`).
+# - Webserver mit Digest-Login, Nutzer `screendim`, Passwort = Kopplungscode.
+#   `GET /events` (SSE, Ping alle 10 s), `GET /binary_sensor/Presence`,
+#   `GET /text_sensor/Pairing Code`.
+# - BOOT kurz drücken: Kopplungsfenster (2 min ohne Login, LED pulsiert blau).
+#   BOOT 10 s halten: neuer Code, alte Kopplung ungültig, danach Kopplungsfenster.
+#
+# Bauen und flashen: siehe Firmware/README.md.
+
+substitutions:
+  name: screendim-desk
+  fw_version: "0.1.0"
+  # Verdrahtung HMMD → ESP32-S3
+  presence_pin: GPIO4 # OT2: HIGH = anwesend
+  radar_rx_pin: GPIO18 # ← TX des Radars
+  radar_tx_pin: GPIO17 # → RX des Radars
+  # RGB-LED (WS2812) der DevKitC-1-Nachbauten; DevKitC-1 v1.1: GPIO38
+  led_pin: GPIO48
+  # Zusätzlich zur Abfallverzögerung im Radar
+  presence_off_delay: 5s
+  pairing_window: 2min
+
+esphome:
+  name: ${name}
+  friendly_name: ScreenDim Sensor
+  name_add_mac_suffix: true
+  min_version: 2026.10.0
+  project:
+    name: andreastrabi.screendim-desk
+    version: ${fw_version}
+  includes:
+    - screendim_pairing.h
+  on_boot:
+    # Nach dem Laden der globals (800), vor WLAN und Webserver (250): Der Platzhalter aus
+    # `web_server.auth` gilt nie.
+    priority: 600
+    then:
+      - lambda: |-
+          bool fresh = id(code_bits) == 0;
+          if (fresh)
+            id(code_bits) = screendim::new_code_bits(true);
+          id(pairing_code).publish_state(screendim::encode(id(code_bits)));
+          screendim::set_pairing_open(false);
+          ESP_LOGI("screendim", "Firmware %s, Kopplungscode %s", "${fw_version}",
+                   fresh ? "neu erzeugt" : "geladen");
+      # globals schreibt erst `loop()` in den Flash-Puffer; danach sofort sichern.
+      - delay: 2s
+      - lambda: global_preferences->sync();
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+
+logger:
+  level: DEBUG
+
+globals:
+  # 40 Bit Kopplungscode; 0 = noch keiner
+  - id: code_bits
+    type: uint64_t
+    restore_value: true
+    initial_value: "0"
+
+wifi:
+  # Ohne gespeichertes WLAN: Zugangspunkt `screendim-desk-xxxxxx` mit Captive Portal,
+  # alternativ Improv über USB (web.esphome.io).
+  ap: {}
+
+captive_portal:
+
+improv_serial:
+
+mdns:
+  services:
+    - service: _screendim
+      protocol: _tcp
+      port: 80
+      txt:
+        proto: esphome-sse
+        fw: ${fw_version}
+
+web_server:
+  port: 80
+  version: 3
+  local: true
+  # Kein Log per SSE: Die App liest nur `state` und `ping`.
+  log: false
+  auth:
+    type: digest
+    username: screendim
+    # Platzhalter, gilt nie: on_boot setzt den Kopplungscode, bevor der Webserver startet.
+    password: platzhalter
+
+ota:
+  # Update über die Weboberfläche, mit Kopplungscode
+  - platform: web_server
+
+uart:
+  id: radar_uart
+  tx_pin: ${radar_tx_pin}
+  rx_pin:
+    number: ${radar_rx_pin}
+    mode:
+      input: true
+      pullup: true
+  baud_rate: 115200
+  # Vorerst nur mitlesen: Das Ausgabeformat des HMMD ist nicht dokumentiert
+  # (laut Waveshare „ON/OFF und Entfernungstor“, Takt 100 ms).
+  debug:
+    direction: RX
+    dummy_receiver: true
+    after:
+      delimiter: "\n"
+      timeout: 20ms
+    sequence:
+      - lambda: UARTDebug::log_string(direction, bytes);
+
+binary_sensor:
+  - platform: gpio
+    id: presence
+    name: Presence
+    device_class: occupancy
+    pin:
+      number: ${presence_pin}
+      # Ohne Radar bleibt der Eingang HIGH: „anwesend“, die Bildschirme bleiben an.
+      mode:
+        input: true
+        pullup: true
+    filters:
+      - delayed_on: 100ms
+      - delayed_off: ${presence_off_delay}
+    # ESPHome loggt Zustandswechsel nur auf VERBOSE; den Anfangszustand auch melden
+    trigger_on_initial_state: true
+    on_state:
+      - logger.log:
+          level: INFO
+          tag: screendim
+          format: "Anwesenheit: %s"
+          args: ['x ? "ja" : "nein"']
+
+  - platform: gpio
+    id: boot_button
+    internal: true
+    pin:
+      number: GPIO0
+      inverted: true
+      ignore_strapping_warning: true
+      mode:
+        input: true
+        pullup: true
+    on_click:
+      min_length: 50ms
+      max_length: 2s
+      then:
+        - script.execute: open_pairing
+    on_multi_click:
+      - timing:
+          - ON for at least 10s
+        then:
+          - script.execute: renew_code
+
+text_sensor:
+  - platform: template
+    id: pairing_code
+    name: Pairing Code
+    icon: mdi:key-variant
+    entity_category: diagnostic
+    update_interval: never
+
+script:
+  - id: open_pairing
+    mode: restart
+    then:
+      - lambda: |-
+          screendim::set_pairing_open(true);
+          ESP_LOGI("screendim", "Kopplungsfenster offen");
+      - light.turn_on:
+          id: status_led
+          red: 0%
+          green: 20%
+          blue: 100%
+          brightness: 40%
+          effect: Kopplung
+      - delay: ${pairing_window}
+      - lambda: |-
+          screendim::set_pairing_open(false);
+          ESP_LOGI("screendim", "Kopplungsfenster zu");
+      - light.turn_off: status_led
+
+  - id: renew_code
+    mode: single
+    then:
+      - lambda: |-
+          id(code_bits) = screendim::new_code_bits(false);
+          id(pairing_code).publish_state(screendim::encode(id(code_bits)));
+          screendim::set_pairing_open(false);
+          ESP_LOGW("screendim", "Neuer Kopplungscode, alte Kopplung ungültig");
+      - light.turn_on:
+          id: status_led
+          red: 100%
+          green: 0%
+          blue: 0%
+          brightness: 40%
+          effect: Neuer Code
+      - delay: 2s
+      - lambda: global_preferences->sync();
+      - script.execute: open_pairing
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: status_led
+    internal: true
+    pin: ${led_pin}
+    num_leds: 1
+    chipset: WS2812
+    channel_colors: GRB
+    restore_mode: ALWAYS_OFF
+    default_transition_length: 0s
+    effects:
+      - pulse:
+          name: Kopplung
+          transition_length: 500ms
+          update_interval: 500ms
+      - strobe:
+          name: Neuer Code
+          colors:
+            - state: true
+              brightness: 40%
+              red: 100%
+              green: 0%
+              blue: 0%
+              duration: 150ms
+            - state: false
+              duration: 150ms

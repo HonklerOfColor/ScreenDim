@@ -34,6 +34,13 @@ Auf echter Hardware noch nicht geprüft. Die Tests decken nur die Logik ab.
       seine Größe an.
 
 ### Schreibtisch-Sensor (ESP32)
+- [x] Firmware 0.1.0 auf ESP32-S3 (8 MB Flash, 8 MB PSRAM) geflasht: startet, Kopplungscode
+      bleibt über Neustarts, ohne Radar „Anwesenheit: ja“, UART still (2026-11-03).
+- [ ] WLAN einrichten (Captive Portal oder web.esphome.io), danach `dns-sd -B _screendim._tcp`.
+- [ ] RGB-LED: pulsiert sie blau nach kurzem BOOT? Sonst `led_pin` (GPIO38 statt 48).
+- [ ] HMMD anschließen (OT2 → GPIO4, TX → GPIO18, RX → GPIO17, 3,3 V): Anwesenheit im
+      Log, UART-Rohdaten ansehen und daraus Entfernung und Abfallverzögerung machen.
+- [ ] Lichtsensor (`sensor/Ambient Light`) fehlt in der Firmware noch.
 - [ ] Bonjour-Suche zeigt den Sensor (Hostname, Firmware); macOS fragt einmal nach dem
       lokalen Netzwerk.
 - [ ] Kopplung im Kopplungsfenster automatisch; danach 401 → BOOT kurz drücken → Code kommt;

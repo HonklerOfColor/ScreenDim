@@ -17,6 +17,11 @@
   und die App-Review-Notizen sind weg.
 
 ### Neu
+- Sensor-Firmware `Firmware/screendim-desk.yaml` (ESPHome 2026.10, ESP32-S3, Waveshare
+  HMMD mmWave): Anwesenheit über OT2 an GPIO4 (ohne Radar „anwesend“), Kopplungscode
+  im NVS, BOOT kurz = Kopplungsfenster 2 min, BOOT 10 s = neuer Code, Digest-Login,
+  mDNS `_screendim._tcp`, WLAN per Captive Portal oder Improv. UART des Radars wird
+  vorerst nur mitgeloggt.
 - Optionaler Schreibtisch-Sensor (ESP32/ESPHome, DIY): Suche per Bonjour
   (`_screendim._tcp`), Kopplung mit Code (automatisch im Kopplungsfenster, sonst BOOT-Taste
   oder Eingabe), Digest-Login, SSE-Strom mit Neuverbindung (1 s → 30 s). Abwesenheit
