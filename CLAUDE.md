@@ -70,8 +70,9 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
   Sensor-Diagnose, DDC-Diagnose), `System/` (Tastenkürzel, Login-Item, `IOAVService`),
   `Resources/` (Asset-Katalog, String-Katalog, Privacy-Manifest).
 - `Firmware/` (ESPHome, ESP32-S3 + Waveshare HMMD mmWave): `screendim-desk.yaml`,
-  Kopplungscode und Auth-Umschaltung in `screendim_pairing.h`. Muss zu `SensorProtocol`
-  passen (Entitätsnamen, mDNS-TXT, Nutzer `screendim`). ESPHome im venv
+  Kopplungscode und Auth-Umschaltung in `screendim_pairing.h`, Stückliste und
+  Schaltplan (`schaltplan.svg`, von Hand geschriebenes SVG) in `README.md`. Muss zu
+  `SensorProtocol` passen (Entitätsnamen, mDNS-TXT, Nutzer `screendim`). ESPHome im venv
   `~/.venvs/esphome`, Build immer mit `ESPHOME_DATA_DIR=/tmp/screendim-esphome` (nicht in
   iCloud). Zwischen USB-Resets mindestens 60 s laufen lassen, sonst zählt Safe Mode mit
   (10 schnelle Neustarts). Zustandswechsel loggt ESPHome 2026.10 nur auf VERBOSE.

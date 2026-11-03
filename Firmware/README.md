@@ -4,27 +4,41 @@ ESPHome-Firmware für den optionalen Sensor von ScreenDim. Er meldet Anwesenheit
 Schreibtisch; die App schaltet bei Abwesenheit die Bildschirme schwarz. Ein Lichtsensor
 (`sensor/Ambient Light`) kommt später dazu.
 
-## Teile
+## Stückliste
 
-- ESP32-S3-Board (getestet: ESP32-S3 mit 8 MB Flash, 8 MB PSRAM, natives USB)
-- Waveshare HMMD mmWave Sensor (24 GHz, S3KM1110), 3,3 V
+| Teil | Genau | Hinweis |
+|------|-------|---------|
+| Mikrocontroller | [ESP32-S3-DevKitC-1](https://www.espressif.com/en/products/devkits/esp32-s3-devkitc-1), Variante N8R8 (8 MB Flash, 8 MB PSRAM) | Nachbauten mit demselben Pinout gehen auch (getestet mit 8 MB Flash, 8 MB PSRAM, natives USB). Die Firmware setzt `flash_size: 8MB`; bei 16 MB den Wert in `screendim-desk.yaml` anpassen. |
+| Radar (Anwesenheit) | [Waveshare HMMD mmWave Sensor](https://www.waveshare.com/hmmd-mmwave-sensor.htm) (24 GHz, 20 × 20 mm) | Erkennt Mikrobewegungen (Atmen, Tippen), nicht nur Gehen. Pinbelegung im [Wiki](https://www.waveshare.com/wiki/HMMD_mmWave_Sensor). |
+| Verbindung | 5 Dupont-Kabel Buchse–Buchse, 10 cm | Oder direkt löten; der HMMD kommt mit Stiftleiste. |
+| Strom | USB-C-Kabel an den Port „USB“ des Boards | Zum Flashen am Mac, danach an jedem USB-Netzteil. |
 
-## Verdrahtung
+Ein Lichtsensor ist noch nicht dabei: Die App erwartet ihn als `sensor/Ambient Light`,
+die Firmware liefert ihn noch nicht (siehe „Offen“). Bis dahin regelt der Sensor nur die
+Anwesenheit.
 
-| HMMD | ESP32-S3 | Zweck |
-|------|----------|-------|
-| 3V3  | 3V3      | Versorgung (3,0–3,6 V, **nicht 5 V**) |
-| GND  | GND      | |
-| OT2 (GPIO OUT) | GPIO4 | Anwesenheit: HIGH = anwesend |
-| TX   | GPIO18 (RX) | UART 115200, vorerst nur mitgelesen |
-| RX   | GPIO17 (TX) | UART, für spätere Einstellungen |
+## Schaltplan
+
+![Verdrahtung: ESP32-S3-DevKitC-1 mit Waveshare HMMD mmWave Sensor, fünf Leitungen](schaltplan.svg)
+
+| HMMD (J2) | ESP32-S3 | Zweck |
+|-----------|----------|-------|
+| 1 · 3V3 | 3V3 | Versorgung (3,0–3,6 V, **nicht 5 V**) |
+| 2 · GND | GND | Masse |
+| 3 · TX | GPIO18 (RX) | UART 115200, vorerst nur mitgelesen |
+| 4 · RX | GPIO17 (TX) | UART, für spätere Einstellungen |
+| 5 · OT2 | GPIO4 | Anwesenheit: HIGH = anwesend |
 
 Die Pins stehen oben in `screendim-desk.yaml` unter `substitutions`. Ohne angeschlossenes
 Radar zieht ein Pull-up GPIO4 auf HIGH: Der Sensor meldet „anwesend“, die Bildschirme
 bleiben an.
 
 Die RGB-LED sitzt bei den meisten DevKitC-1-Nachbauten an GPIO48, beim DevKitC-1 v1.1 an
-GPIO38 (`led_pin`).
+GPIO38 (`led_pin`). Der BOOT-Taster (GPIO0) dient der Kopplung, siehe unten.
+
+Aufstellung: Das Radar mit der Antennenseite (ohne Bauteile) zum Sitzplatz, nicht hinter
+Metall. Auf dem Schreibtisch neben dem Monitor reicht; ein Gehäuse aus Kunststoff stört
+nicht.
 
 ## Bauen und flashen
 

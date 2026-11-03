@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ScreenDim-Schreibtisch-Sensor: Verdrahtung ESP32-S3-DevKitC-1 ↔ Waveshare HMMD mmWave Sensor.
+     Pins wie in screendim-desk.yaml (substitutions). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="530" viewBox="0 0 820 530"
+     font-family="-apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14">
+  <title>ScreenDim-Sensor: ESP32-S3-DevKitC-1 und Waveshare HMMD mmWave Sensor</title>
+  <desc>Fünf Leitungen: 3V3 an 3V3, GND an GND, GPIO18 (RX) an TX des Radars, GPIO17 (TX) an RX des Radars, GPIO4 an OT2 (HIGH = anwesend).</desc>
+
+  <rect width="820" height="530" fill="#ffffff"/>
+
+  <text x="410" y="36" text-anchor="middle" font-size="18" font-weight="600" fill="#1f2328">ScreenDim-Schreibtisch-Sensor: Verdrahtung</text>
+
+  <!-- ESP32-S3-DevKitC-1 -->
+  <rect x="60" y="70" width="270" height="390" rx="10" fill="#f6f8fa" stroke="#1f2328" stroke-width="2"/>
+  <text x="195" y="98" text-anchor="middle" font-weight="600" fill="#1f2328">ESP32-S3-DevKitC-1</text>
+  <text x="195" y="118" text-anchor="middle" font-size="12" fill="#57606a">N8R8: 8 MB Flash, 8 MB PSRAM (oder Nachbau)</text>
+
+  <!-- USB-C -->
+  <rect x="60" y="150" width="34" height="18" rx="6" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/>
+  <text x="102" y="164" font-size="12" fill="#1f2328">USB-C „USB“: Strom, Flashen, Logs</text>
+
+  <!-- BOOT -->
+  <rect x="78" y="185" width="22" height="22" rx="3" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/>
+  <circle cx="89" cy="196" r="5" fill="#1f2328"/>
+  <text x="110" y="196" font-size="12" fill="#1f2328">BOOT (GPIO0): kurz = Kopplung,</text>
+  <text x="110" y="211" font-size="12" fill="#1f2328">10 s halten = neuer Kopplungscode</text>
+
+  <!-- RGB-LED -->
+  <rect x="78" y="225" width="22" height="22" rx="3" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/>
+  <circle cx="89" cy="236" r="6" fill="#3b82f6"/>
+  <text x="110" y="236" font-size="12" fill="#1f2328">RGB-LED (WS2812) an GPIO48,</text>
+  <text x="110" y="251" font-size="12" fill="#1f2328">DevKitC-1 v1.1: GPIO38</text>
+
+  <!-- ESP-Pins rechts -->
+  <g font-size="13" fill="#1f2328" font-weight="600" text-anchor="end">
+    <text x="318" y="294">3V3</text>
+    <text x="318" y="334">GND</text>
+    <text x="318" y="374">GPIO18</text>
+    <text x="318" y="414">GPIO17</text>
+    <text x="318" y="454">GPIO4</text>
+  </g>
+  <g fill="#1f2328">
+    <circle cx="330" cy="290" r="4"/>
+    <circle cx="330" cy="330" r="4"/>
+    <circle cx="330" cy="370" r="4"/>
+    <circle cx="330" cy="410" r="4"/>
+    <circle cx="330" cy="450" r="4"/>
+  </g>
+
+  <!-- Leitungen -->
+  <g stroke-width="3" fill="none" stroke-linecap="round">
+    <line x1="330" y1="290" x2="530" y2="290" stroke="#d1242f"/>
+    <line x1="330" y1="330" x2="530" y2="330" stroke="#1f2328"/>
+    <line x1="330" y1="370" x2="530" y2="370" stroke="#0969da"/>
+    <line x1="330" y1="410" x2="530" y2="410" stroke="#1a7f37"/>
+    <line x1="330" y1="450" x2="530" y2="450" stroke="#bf8700"/>
+  </g>
+
+  <!-- Beschriftung der Leitungen -->
+  <g font-size="12" text-anchor="middle">
+    <text x="430" y="282" fill="#d1242f">3,3 V (3,0–3,6 V, nicht 5 V)</text>
+    <text x="430" y="322" fill="#1f2328">Masse</text>
+    <text x="430" y="362" fill="#0969da">UART 115200: Radar TX → ESP RX</text>
+    <text x="430" y="402" fill="#1a7f37">UART 115200: ESP TX → Radar RX</text>
+    <text x="430" y="442" fill="#bf8700">Anwesenheit: HIGH = anwesend</text>
+  </g>
+
+  <!-- HMMD-Pins links -->
+  <g fill="#1f2328">
+    <circle cx="530" cy="290" r="4"/>
+    <circle cx="530" cy="330" r="4"/>
+    <circle cx="530" cy="370" r="4"/>
+    <circle cx="530" cy="410" r="4"/>
+    <circle cx="530" cy="450" r="4"/>
+  </g>
+  <g font-size="13" fill="#1f2328" font-weight="600">
+    <text x="542" y="294">3V3</text>
+    <text x="542" y="334">GND</text>
+    <text x="542" y="374">TX</text>
+    <text x="542" y="414">RX</text>
+    <text x="542" y="454">OT2</text>
+  </g>
+
+  <!-- Waveshare HMMD -->
+  <rect x="530" y="70" width="230" height="390" rx="10" fill="#f6f8fa" stroke="#1f2328" stroke-width="2"/>
+  <text x="645" y="98" text-anchor="middle" font-weight="600" fill="#1f2328">Waveshare HMMD</text>
+  <text x="645" y="118" text-anchor="middle" font-weight="600" fill="#1f2328">mmWave Sensor</text>
+  <text x="645" y="138" text-anchor="middle" font-size="12" fill="#57606a">24-GHz-Radar, 20 × 20 mm, Header J2</text>
+  <text x="645" y="156" text-anchor="middle" font-size="12" fill="#57606a">Pins 1–5: 3V3, GND, TX, RX, OT2</text>
+
+  <!-- Antenne, Symbol -->
+  <g stroke="#57606a" stroke-width="1.5" fill="none">
+    <path d="M 690 230 q 20 -20 0 -40"/>
+    <path d="M 702 240 q 36 -30 0 -60"/>
+    <path d="M 714 250 q 52 -40 0 -80"/>
+  </g>
+  <text x="645" y="262" text-anchor="middle" font-size="12" fill="#57606a">Antenne mit freiem Blick zum Sitzplatz</text>
+
+  <!-- Fußnoten -->
+  <g font-size="12" fill="#57606a">
+    <text x="60" y="490">Alle Pegel 3,3 V. Ohne Radar zieht ein Pull-up GPIO4 auf HIGH: Die App sieht „anwesend“, die Bildschirme bleiben an.</text>
+    <text x="60" y="510">Pins stehen unter „substitutions“ in Firmware/screendim-desk.yaml und lassen sich dort ändern.</text>
+  </g>
+</svg>
