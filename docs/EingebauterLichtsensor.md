@@ -1,5 +1,10 @@
 # Eingebauter Lichtsensor als Lichtquelle
 
+**Eingestellt (2026-11-03).** ScreenDim hat nur noch das App-Store-Target; der Zugriff auf
+den Lichtsensor braucht private API und kommt nicht in die App. `BuiltInLightSensor.swift`
+und die Direct-Variante stehen in der Git-Historie (bis Commit `b3ca76a`). Dieses Dokument
+bleibt als Messprotokoll und Entwurf.
+
 Stand: 2026-10-29, Prototyp, nur „ScreenDim Direct“. Vorrang und Rückfall zwischen beiden
 Lichtquellen: ebenfalls 2026-10-29. Glättung, ein Schreiber fürs eingebaute Display und
 Überblendung auf allen automatischen Wegen: 2026-10-30.

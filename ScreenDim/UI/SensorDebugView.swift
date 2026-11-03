@@ -4,8 +4,7 @@ import SwiftUI
 
 /// Fenster „Sensor-Diagnose“: aktuelle Messung jeder Quelle, welche gerade Anwesenheit
 /// und Licht liefert (und ob als Rückfall), und ein Protokoll der Ereignisse und
-/// Quellwechsel mit ihrer Wirkung. Solange das Fenster offen ist, liest der eingebaute
-/// Lichtsensor mit, auch wenn er nicht die Lichtquelle ist.
+/// Quellwechsel mit ihrer Wirkung.
 struct SensorDebugView: View {
     static let windowID = "sensor-debug"
 
@@ -18,7 +17,6 @@ struct SensorDebugView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     ActiveSummary(sensor: sensor)
                     DeskSourceBox(sensor: sensor)
-                    BuiltInSourceBox(sensor: sensor)
                     EventLog(sensor: sensor)
                 }
                 .padding(16)
@@ -50,8 +48,6 @@ struct SensorDebugView: View {
             "Anwesenheit aktiv: \(sensor.activePresenceOrigin?.rawValue ?? "-")",
             "Schreibtisch-Sensor: \(sensor.status), Host \(sensor.pairedHostname ?? "-"), "
                 + "Anwesenheit \(sensor.presence.map(String.init) ?? "-"), Lux \(sensor.lux.map { String($0) } ?? "-")",
-            "Eingebaut: vorhanden \(sensor.hasBuiltInLightSensor), Deckel zu \(sensor.isBuiltInLightSensorCovered), "
-                + "Lux \(sensor.builtInLux.map { String($0) } ?? "-")",
             "Zuletzt gesetzt: \(sensor.lightLevels.isEmpty ? "-" : levelsText(sensor.lightLevels)) "
                 + "(\(sensor.lightBrightnessOrigin?.rawValue ?? "-")), Bildschirme aus: \(sensor.screensBlanked)",
             "",
@@ -106,9 +102,6 @@ private struct ActiveSummary: View {
                     Text("Verfügbar").foregroundStyle(.secondary)
                     HStack(spacing: 10) {
                         AvailabilityLabel(title: "Schreibtisch-Sensor", available: sensor.isDeskSensorLightAvailable)
-                        if sensor.hasBuiltInLightSensor {
-                            AvailabilityLabel(title: "Eingebauter Lichtsensor", available: sensor.isBuiltInLightAvailable)
-                        }
                     }
                 }
                 GridRow {
@@ -192,49 +185,6 @@ private struct DeskSourceBox: View {
                 presence: sensor.activePresenceOrigin == origin,
                 light: sensor.activeLightOrigin == origin
             )
-        }
-    }
-}
-
-private struct BuiltInSourceBox: View {
-    let sensor: SensorController
-
-    var body: some View {
-        GroupBox {
-            Group {
-                if !sensor.hasBuiltInLightSensor {
-                    #if SCREENDIM_DIRECT
-                    Text("Dieser Mac hat keinen eingebauten Lichtsensor.")
-                        .foregroundStyle(.secondary)
-                    #else
-                    Text("Nur in ScreenDim Direct verfügbar – der App Store erlaubt keinen Zugriff auf den Lichtsensor.")
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    #endif
-                } else if sensor.isBuiltInLightSensorCovered {
-                    Label("Deckel zu: Der Lichtsensor ist pausiert.", systemImage: "laptopcomputer")
-                        .foregroundStyle(.orange)
-                } else {
-                    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
-                        GridRow {
-                            Text("Umgebungslicht").foregroundStyle(.secondary)
-                            LuxText(lux: sensor.builtInLux)
-                        }
-                        GridRow {
-                            Text("Geglättet").foregroundStyle(.secondary)
-                            LuxText(lux: sensor.builtInFilteredLux)
-                        }
-                        GridRow {
-                            Text("Letztes Ereignis").foregroundStyle(.secondary)
-                            EventAge(date: sensor.builtInLastEventDate)
-                        }
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(4)
-        } label: {
-            SourceHeader(title: "Eingebauter Lichtsensor", presence: false, light: sensor.activeLightOrigin == .builtIn)
         }
     }
 }

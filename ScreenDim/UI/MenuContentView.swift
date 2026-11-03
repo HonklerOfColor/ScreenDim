@@ -8,9 +8,6 @@ struct MenuContentView: View {
     let sensor: SensorController
     let loginItem: LoginItem
     @Environment(\.openSettings) private var openSettings
-    #if SCREENDIM_DIRECT
-    @Environment(\.openWindow) private var openWindow
-    #endif
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -38,14 +35,6 @@ struct MenuContentView: View {
                 Button { manager.refresh(force: true) } label: {
                     MenuRowLabel("Monitore neu suchen", systemImage: "arrow.clockwise")
                 }
-                #if SCREENDIM_DIRECT
-                Button {
-                    openWindow(id: DiagnosticsView.windowID)
-                    NSApplication.shared.activate()
-                } label: {
-                    MenuRowLabel("Diagnose …", systemImage: "stethoscope")
-                }
-                #endif
             }
             .buttonStyle(MenuRowStyle())
 
@@ -101,10 +90,9 @@ struct MenuContentView: View {
 
     @ViewBuilder
     private var footnotes: some View {
-        #if !SCREENDIM_DIRECT
         if manager.monitors.contains(where: \.usesSoftwareDimming) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Diese Version dimmt per Software. Die Hintergrundbeleuchtung bleibt, wie sie ist.")
+                Text("ScreenDim dimmt per Software. Die Hintergrundbeleuchtung bleibt, wie sie ist.")
                 if manager.monitors.contains(where: { $0.isBuiltIn && $0.usesSoftwareDimming }) {
                     Text("Die des eingebauten Displays regelst du weiter mit den Helligkeitstasten.")
                 }
@@ -113,7 +101,6 @@ struct MenuContentView: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
-        #endif
         Group {
             if manager.hotKeysAvailable {
                 Text("⌃⌥↑ / ⌃⌥↓  alle Monitore ±\(Int(DisplayManager.hotKeyStep).formatted()) %")
@@ -206,18 +193,10 @@ private struct MonitorRow: View {
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            case _ where monitor.usesSoftwareDimming:
-                #if SCREENDIM_DIRECT
-                // Ausgeschaltet ist kein Fehler; „Erneut prüfen“ brächte nichts.
-                hint(softwareReason, systemImage: "circle.lefthalf.filled", color: .secondary, retry: monitor.state != .disabled)
-                #else
-                // Ohne DDC ist Software-Dimmung der Normalfall; der Hinweis steht einmal unten.
-                EmptyView()
-                #endif
             case _ where monitor.isBuiltIn && monitor.state.isFailure:
                 hint("Helligkeit lässt sich gerade nicht lesen oder setzen.", retry: true)
             default:
-                // Displays ohne Kanal und externe mit DDC-Fehler laufen per Software-Dimmung (oben).
+                // Software-Dimmung ist der Normalfall; der Hinweis steht einmal unten.
                 EmptyView()
             }
         }
@@ -254,24 +233,6 @@ private struct MonitorRow: View {
         case (.adapter, nil): "Über Adapter"
         }
     }
-
-    #if SCREENDIM_DIRECT
-    private var softwareReason: LocalizedStringKey {
-        if monitor.isBuiltIn {
-            return "macOS erlaubt für dieses Display keine Helligkeitssteuerung. Software-Dimmung aktiv."
-        }
-        return switch (monitor.intermediary, monitor.state) {
-        case (_, .disabled): "DDC/CI ist in den Einstellungen ausgeschaltet. Software-Dimmung aktiv."
-        case (.dock, _): "DDC kommt über das Dock nicht durch. Software-Dimmung aktiv."
-        case (.adapter, _): "DDC kommt über den Adapter nicht durch. Software-Dimmung aktiv."
-        case (nil, .nullReply): "Monitor antwortet leer – DDC/CI im Monitor-Menü aus? Software-Dimmung aktiv."
-        case (nil, .i2cTimeout): "DDC-Verbindung blockiert. Software-Dimmung aktiv."
-        case (nil, .ioError(let status)): "I2C-Fehler \(IOReturnDescription.name(status)). Software-Dimmung aktiv."
-        case (nil, .noChannel): "Kein DDC-Kanal gefunden. Software-Dimmung aktiv."
-        case (nil, _): "Monitor reagiert nicht auf DDC/CI. Software-Dimmung aktiv."
-        }
-    }
-    #endif
 
     private func hint(
         _ text: LocalizedStringKey,

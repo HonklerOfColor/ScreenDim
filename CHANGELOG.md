@@ -2,6 +2,15 @@
 
 ## Unveröffentlicht (1.0, Build 1)
 
+### Geändert
+- Nur noch ein Target: „ScreenDim“ für den Mac App Store (Sandbox, nur öffentliche API,
+  Software-Dimmung). Die Variante „ScreenDim Direct“ (Developer ID, DDC/CI über
+  `IOAVService`, eingebautes Display über `DisplayServices`, eingebauter Lichtsensor,
+  Diagnose-Fenster, Schalter „Hintergrundbeleuchtung per DDC/CI regeln“) ist entfernt;
+  ihr Code steht in der Git-Historie. Einstellungen und Sensor-Diagnose nennen den
+  eingebauten Lichtsensor nicht mehr. Der DDC-Stack in `ScreenDimKit` bleibt vorerst,
+  die App nutzt ihn nicht.
+
 ### Neu
 - Optionaler Schreibtisch-Sensor (ESP32/ESPHome, DIY): Suche per Bonjour
   (`_screendim._tcp`), Kopplung mit Code (automatisch im Kopplungsfenster, sonst BOOT-Taste
@@ -15,18 +24,13 @@
 - Einstellungsfenster (Abschnitt „Sensor“), App-Review-Notizen in `docs/AppReviewNotes.md`.
 - App-Store-Variante: Das eingebaute Display lässt sich per Software dimmen (Gamma oder
   Overlay, gemerkt pro Display). Allgemein: Displays ohne Steuerkanal dimmt die Software.
-- Lichtquelle mit Vorrang: Schreibtisch-Sensor zuerst (Standard), eingebauter Lichtsensor
-  zuerst, nur einer von beiden oder aus. Fällt die bevorzugte Quelle aus (getrennt, 45 s
-  ohne Ereignis, Deckel zu), springt die andere ein; zurück frühestens nach 5 s. Der
-  eingebaute Sensor ist nur in Direct verfügbar (Prototyp). Einstellungen
-  zeigen die aktive Quelle mit Grund; die App-Store-Variante nennt, dass der Lichtsensor
-  nur in ScreenDim Direct geht. Ersetzt den Schalter „Helligkeit ans Umgebungslicht
-  anpassen“. Details: `docs/EingebauterLichtsensor.md`.
+- Lichtquelle: Schreibtisch-Sensor oder aus (Wahl in den Einstellungen, sobald der Sensor
+  verbunden ist). Fällt der Sensor aus (getrennt, 45 s ohne Ereignis), stoppt die
+  Lichtregelung. Ersetzt den Schalter „Helligkeit ans Umgebungslicht anpassen“.
 - Fenster „Sensor-Diagnose“ (Einstellungen → „Sensor-Diagnose …“): aktuelle Messung von
-  Schreibtisch-Sensor bzw. Demo und eingebautem Lichtsensor, welche Quelle gerade
-  Anwesenheit und Licht liefert (und ob als Rückfall), zuletzt gesetzte Helligkeit und ein
-  Protokoll der Ereignisse und Quellwechsel mit ihrer Wirkung. Solange es offen ist, liest
-  der eingebaute Sensor mit.
+  Schreibtisch-Sensor bzw. Demo, welche Quelle gerade Anwesenheit und Licht liefert,
+  zuletzt gesetzte Helligkeit und ein Protokoll der Ereignisse und Quellwechsel mit ihrer
+  Wirkung.
 - Helligkeit je Monitor nach Licht: eigene Kurve aus bis zu acht Lux-Stützpunkten,
   dazwischen logarithmisch, je Monitor abschaltbar; Diagramm mit aktuellem Licht.
   Das eingebaute Display folgt standardmäßig nicht. Einstellungen in zwei Tabs („Sensor“,
@@ -39,35 +43,19 @@
   halbiert).
 - Sensor-Diagnose: je Helligkeitsauftrag ein Eintrag mit Grund, Start (gemerkt/echt), Ziel
   und Dauer; dazu `log.info` in der Kategorie `light`.
-- Direct: Dritte, späte Probe-Runde (5 s) nach verstümmelter DDC-Antwort: Manche
-  Monitore liefern nach dem Einstecken einige Sekunden Zufallsbytes (JapanNext 6K),
-  landeten bisher in der Software-Dimmung und kamen erst mit der nächsten
-  Neu-Enumeration zurück. Nach Null-Antwort, Timeout oder I/O-Fehler bleibt es bei zwei
-  Runden.
-- Direct: Schalter „Hintergrundbeleuchtung per DDC/CI regeln“ (Einstellungen →
-  „Helligkeit“ → „Externe Monitore“, Standard: an). Aus: keine DDC-Kanäle und kein
-  I2C-Verkehr, externe Monitore dimmen per Software (Gamma oder Overlay) wie in der
-  App-Store-Variante; das eingebaute Display bleibt bei seiner Steuerung. Für Monitore
-  und Docks, die auf DDC/CI hängen bleiben. Im Menü: „DDC/CI ist in den Einstellungen
-  ausgeschaltet“, in der Diagnose Zustand „DDC/CI ausgeschaltet“.
-- Zwei Varianten aus einer Codebasis: „ScreenDim“ für den Mac App Store (Sandbox, ohne
-  private API, Software-Dimmung) und „ScreenDim Direct“ (Developer ID, DDC/CI).
 - Overlay-Dimmung als zweiter Weg neben Gamma: randloses Fenster über Menüleiste, allen
   Spaces und Vollbild-Apps. Greift automatisch, wenn die Gamma-Tabelle eines Displays
   nicht nutzbar ist; Umschalter „Gamma/Overlay“ pro Monitor, gemerkt pro Monitor.
-- `scripts/check-mas-binary.sh` prüft ein gebautes App-Store-Binary auf private API.
+- `scripts/check-mas-binary.sh` prüft das gebaute Binary auf private API.
 - Privacy-Manifest (UserDefaults CA92.1, kein Tracking, keine erhobenen Daten),
   Asset-Katalog mit leerem AppIcon-Slot, String-Katalog Deutsch/Englisch.
 - Logik als lokales Swift-Paket `ScreenDimKit`; Tests per `swift test`.
 
 ### Behoben
-- DDC/CI: Auf Apple Silicon kommt der erste I2C-Write nach einem Read beim Monitor nicht
-  an (gemessen: W-R-W-R bleibt Null-Message, W-W-R antwortet; ein einzelner Set-VCP nach
-  einem Read ging verloren). Monitore antworteten deshalb nur direkt nach dem
-  Einstecken und verstummten nach dem ersten Refresh oder App-Neustart; Tastenkürzel
-  nach einer Prüfung bewirkten nichts. Jetzt geht nach jedem Read ein Vorlauf-Write
-  voraus (`DDCTiming.primeAfterRead`, Abstand 10 ms); abschaltbar per
-  `defaults write com.andreastrabi.ScreenDim.direct ddc.primeAfterRead -bool NO`.
+- DDC/CI (nur noch im Paket): Auf Apple Silicon kommt der erste I2C-Write nach einem
+  Read beim Monitor nicht an (gemessen: W-R-W-R bleibt Null-Message, W-W-R antwortet;
+  ein einzelner Set-VCP nach einem Read ging verloren). Jetzt geht nach jedem Read ein
+  Vorlauf-Write voraus (`DDCTiming.primeAfterRead`, Abstand 10 ms).
 - DDCService: Zulassung und Eintrag eines Aufrufs liefen in zwei getrennten Locks;
   gleichzeitige Aufrufe konnten `maxPendingCalls` überschreiten.
 - DDCService: Feuerte der Deadline-Timer eines wartenden Aufrufs vor dem des hängenden,
@@ -91,9 +79,8 @@
   eingebaute Display gleichzeitig; Überblendungen begannen beim gemerkten statt beim
   echten Wert; Prüfung, Software-Rückfall und Refresh setzten Werte hart; der
   Schreibtisch-Sensor galt bei ruhigem Licht als ausgefallen, die Quelle wechselte samt
-  Reset der Hysterese. Jetzt ein Schreiber (Direct erkennt die Auto-Helligkeit; eine
-  fremde Änderung wird übernommen und pausiert die Regelung 60 s), echte Startwerte,
-  Überblendung auf allen automatischen Wegen und Quellwahl nach Ereignissen.
+  Reset der Hysterese. Jetzt echte Startwerte, Überblendung auf allen automatischen
+  Wegen und Quellwahl nach Ereignissen.
 
 ## 1.0 (Entwicklung)
 - DDC/CI-Helligkeit für externe Monitore, eingebautes Display, Master-Slider,

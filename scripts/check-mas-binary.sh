@@ -1,5 +1,5 @@
 #!/bin/bash
-# Prüft ein gebautes ScreenDim.app (Mac-App-Store-Variante) auf private API.
+# Prüft ein gebautes ScreenDim.app auf private API (Mac App Store).
 # Baut nichts. Exit 0: sauber, 1: Treffer, 2: Aufruffehler.
 #
 #   scripts/check-mas-binary.sh /pfad/zu/ScreenDim.app

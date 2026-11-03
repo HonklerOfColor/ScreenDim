@@ -4,69 +4,58 @@ macOS-Menüleisten-App (`LSUIElement`), die die Helligkeit aller Displays regelt
 Swift 6, SwiftUI, macOS 15+, Apple Silicon. Sprache in Code-Kommentaren, UI-Quelltexten
 und Doku: Deutsch.
 
-## Varianten
+## Ein Target
 
-Eine Codebasis, zwei App-Targets aus `project.yml`:
+`ScreenDim` (Bundle-ID `com.andreastrabi.ScreenDim`), Mac App Store, Sandbox, nur
+öffentliche API. Externe Monitore dimmt die App per Software (Gamma oder Overlay); das
+eingebaute Display lässt sich ebenso per Software dimmen, seine Hintergrundbeleuchtung
+regelt macOS (Helligkeitstasten).
 
-| Target | Bundle-ID | Verteilung | Helligkeit |
-|---|---|---|---|
-| `ScreenDim` | `com.andreastrabi.ScreenDim` | Mac App Store, Sandbox | Externe Monitore per Software (Gamma oder Overlay). Eingebautes Display regelt macOS. |
-| `ScreenDim Direct` | `com.andreastrabi.ScreenDim.direct` | Developer ID, keine Sandbox | DDC/CI über `IOAVService`, eingebautes Display über `DisplayServices`, Software-Dimmung als Rückfall. |
-
-- Private API steht **nur** in `ScreenDim/Direct/` und `ScreenDim/UI/DiagnosticsView.swift`.
-  Das MAS-Target schließt diese Dateien in `project.yml` aus; zusätzlich sind sie in
-  `#if SCREENDIM_DIRECT` gekapselt. Das Flag setzt nur das Direct-Target.
-- `ScreenDimKit` enthält keine private API und keine Namen wie `IOAVService` oder
-  `DisplayServices` als Zeichenkette. Die DDC-Kanäle kommen über Fabriken in den
-  `DisplayManager` (`makeExternalControl`, `makeBuiltInControl`).
-- Nach jedem MAS-Build: `scripts/check-mas-binary.sh <ScreenDim.app>` muss mit Exit 0 enden.
-  Der Hinweis auf `_dlsym` kommt aus clangs Laufzeit für Verfügbarkeitsprüfungen
-  (SwiftUI) und ist kein Treffer.
+- Keine private API im Projekt. `ScreenDimKit` enthält keine Namen wie `IOAVService` oder
+  `DisplayServices` als Zeichenkette. Nach jedem Build: `scripts/check-mas-binary.sh
+  <ScreenDim.app>` muss mit Exit 0 enden. Der Hinweis auf `_dlsym` kommt aus clangs
+  Laufzeit für Verfügbarkeitsprüfungen (SwiftUI) und ist kein Treffer.
+- Die frühere Variante „ScreenDim Direct“ (Developer ID, DDC/CI über `IOAVService`,
+  eingebautes Display über `DisplayServices`, eingebauter Lichtsensor) wurde am
+  2026-11-03 entfernt; ihr Code steht in der Git-Historie (bis Commit `b3ca76a`).
+  Den eingebauten Lichtsensor als Lichtquelle gibt es nicht; `docs/EingebauterLichtsensor.md`
+  bleibt als Messprotokoll.
+- Noch in `ScreenDimKit`, aber von der App nicht mehr genutzt: der DDC-Stack (`DDC/`,
+  Kanal-Fabriken und Probe im `DisplayManager`, `isDDCEnabled`) und die Lichtquelle
+  „eingebaut“ im `SensorController` (`makeBuiltInLightSensor`, `LightSource` mit
+  `builtIn…`, `LuxFilter`-Zweig). Ohne Fabriken bekommt kein Monitor einen Kanal
+  (`DDCState.noChannel`), alles läuft über Software-Dimmung; ohne eingebauten Sensor
+  wirkt jede `LightSource` außer „aus“ wie „nur Schreibtisch“.
 
 ## Architektur
 
 - `ScreenDimKit/` (lokales Swift-Paket, Logik ohne UI):
   - `DDC/`: Paketaufbau (DDC/CI 1.1), `DDCService` (eine serielle Queue je Monitor,
     Deadline, Sperre bei Hängern, höchstens 3 offene Aufrufe), `LatestValueThrottle`,
-    `I2CTransport` (nur das Protokoll).
-  - `Display/`: `DisplayManager` (Zustand, Kanal-Cache über Refreshes, Probe, Routing
-    der Software-Dimmung; `isDDCEnabled`/`setDDCEnabled`: ohne DDC bekommt kein
-    externer Monitor einen Kanal, Zustand `DDCState.disabled`, Software-Dimmung),
-    `DisplayDiscovery` (CoreGraphics, optional IORegistry),
-    `BrightnessStore` (DDC- und Software-Wert getrennt, Verfahren je Monitor,
-    Schalter `ddcEnabled`),
-    `SoftwareDimming` mit `GammaDimmer` und `OverlayDimmer`, `ScreenBlanker`, `DisplayDiagnostics`.
+    `I2CTransport` (nur das Protokoll). Von der App nicht genutzt, siehe oben.
+  - `Display/`: `DisplayManager` (Zustand, Routing der Software-Dimmung; die
+    DDC-Teile sind ohne Fabriken inaktiv), `DisplayDiscovery` (CoreGraphics; die App
+    ruft sie mit `scanRegistry: false`), `BrightnessStore` (DDC- und Software-Wert
+    getrennt, Verfahren je Monitor), `SoftwareDimming` mit `GammaDimmer` und
+    `OverlayDimmer`, `ScreenBlanker`, `DisplayDiagnostics`.
   - `Sensor/`: optionaler Schreibtisch-Sensor. `SensorController` (Einstellungen, Kopplung,
     Quelle, Abwesenheit → `DisplayManager.setScreensBlanked`, Lux → Helligkeit),
     `SensorSource` mit `SSESensorSource` (Digest, SSE, Backoff) und
     `SimulatedSensorSource` (Demo), `SensorBrowser` (NWBrowser), `SensorKeychain`,
     `PairingCode`, `SSEParser`/`ESPHomeEvents`, `PresenceGate`, `SensorDebug`
     (Protokoll für das Fenster „Sensor-Diagnose“, läuft nur, solange es offen ist).
-    Lichtquelle mit Vorrang (`LightSource`: Schreibtisch zuerst (Standard), eingebaut
-    zuerst, nur Schreibtisch, nur eingebaut, aus); `LightSourceSelector` (rein) wählt nach
-    Verfügbarkeit (ESP32: verbunden, letztes Ereignis ≤ 45 s; eingebaut: Deckel offen,
-    Wert ≤ 5 s) mit 5 s Wechselsperre. Jeder Monitor folgt seinem Lichtprofil (`LightCurve`:
-    Lux-Stützpunkte, je Monitor abschaltbar), gleich aus welcher Quelle; Anwesenheit
-    kommt nur vom ESP32. Ohne eingebauten Sensor wirkt jede Wahl außer „aus“ wie „nur
-    Schreibtisch“, gespeichert bleibt sie. Den eingebauten Lichtsensor reicht Direct per
-    Fabrik (`makeBuiltInLightSensor`, Quelle `Direct/BuiltInLightSensor.swift`).
-- Lichtregelung (Details `docs/EingebauterLichtsensor.md`, „Lichtregelung“):
-  - Ein Schreiber: Das eingebaute Display regelt ScreenDim nur, wenn sein Profil es will
-    (Standard: nein) und macOS-Auto-Helligkeit aus ist (Direct liest sie per
-    CoreBrightness, Fabrik `isAutoBrightnessEnabled`). Weicht der echte Wert um > 3 Punkte
-    vom eigenen ab: übernehmen, 60 s Pause.
+    Jeder Monitor folgt seinem Lichtprofil (`LightCurve`: Lux-Stützpunkte, je Monitor
+    abschaltbar); Licht und Anwesenheit kommen vom ESP32 (oder der Demo).
+- Lichtregelung:
   - Alle automatischen Wege laufen über `DisplayManager.fadeBrightness` (Licht 2 s,
-    Prüfung/Rückfall/Aufwachen 0,5 s), Start beim echten Wert (eingebaut: lesen bei
-    freier Drossel; DDC: zuletzt bestätigter Write, kein Read). Nur `setBrightness`
+    Rückfall/Aufwachen 0,5 s), Start beim echten Wert. Nur `setBrightness`
     (Regler, Tasten) setzt sofort und pausiert die Lichtregelung des Monitors.
-  - Lux über `LuxFilter` (eingebaut: Median 5 + EMA 4 s im Log-Raum; ESP32 durchgereicht),
-    Hysterese 3 Punkte gegen das laufende Ziel. Schreibtisch-Sensor frisch durch jedes
-    Ereignis (45 s), kein Reset beim Quellwechsel.
+  - Lux des ESP32 durchgereicht, Hysterese 3 Punkte gegen das laufende Ziel.
+    Schreibtisch-Sensor frisch durch jedes Ereignis (45 s).
   - Je Auftrag ein `BrightnessJob` mit Grund: Protokoll der Sensor-Diagnose und
     `log.info`, Kategorie `light`.
-- `ScreenDim/` (App): `App/` (Einstieg, Varianten-Auswahl), `UI/`, `System/` (Tastenkürzel,
-  Login-Item), `Direct/` (private API), `Resources/` (Asset-Katalog, String-Katalog,
-  Privacy-Manifest).
+- `ScreenDim/` (App): `App/` (Einstieg), `UI/`, `System/` (Tastenkürzel, Login-Item),
+  `Resources/` (Asset-Katalog, String-Katalog, Privacy-Manifest).
 
 Software-Dimmung: Gamma ist Standard. Lässt sich die Gamma-Tabelle eines Displays nicht
 lesen oder setzen, dimmt automatisch das Overlay; der Nutzer kann pro Monitor umschalten.
@@ -85,9 +74,8 @@ geschrieben.
 - Builds nur generisch, DerivedData außerhalb von iCloud:
   ```
   xcodebuild -project ScreenDim.xcodeproj -scheme "ScreenDim" -destination 'generic/platform=macOS' -derivedDataPath /tmp/screendim-dd CODE_SIGNING_ALLOWED=NO build
-  xcodebuild -project ScreenDim.xcodeproj -scheme "ScreenDim Direct" -destination 'generic/platform=macOS' -derivedDataPath /tmp/screendim-dd CODE_SIGNING_ALLOWED=NO build
   ```
-  Beide müssen ohne Warnungen bauen (Warnungen sind Fehler). Die Logzeile von
+  Muss ohne Warnungen bauen (Warnungen sind Fehler). Die Logzeile von
   `appintentsmetadataprocessor` („Metadata extraction skipped“) ist keine Diagnose.
 - Tests nur im Paket: `cd ScreenDimKit && swift test --scratch-path /tmp/screendim-kit-build`.
   Kein `xcodebuild test`, kein Simulator. Tests benutzen keine UserDefaults-Suites, sondern
@@ -104,7 +92,9 @@ extrahiert Xcode. Texte aus `ScreenDimKit` laufen über `String(localized:)` mit
 Haupt-Bundle; ihre Schlüssel stehen von Hand im Katalog (`extractionState: manual`).
 Schlüsselbildung: `Int` → `%lld`, `String` → `%@`, ein `%` neben einer Interpolation → `%%`.
 
-## Hardware-Erfahrungen
+## Hardware-Erfahrungen (DDC/CI, aus der Direct-Zeit)
+
+Die App spricht kein DDC/CI mehr; die Befunde bleiben für den DDC-Stack im Paket.
 
 - Monitore hinter dem StarTech-TB4-Dock (Realtek-MST-Hub, OUI 00 E0 4C) sind für DDC
   unzuverlässig. Der S34CG50 blieb nach einem doppelten Set-VCP-Write (10 ms Abstand)
@@ -114,8 +104,7 @@ Schlüsselbildung: `Int` → `%lld`, `String` → `%@`, ein `%` neben einer Inte
   I2C-Write nach einem Read kommt nicht an. W-R-W-R bleibt Null-Message (mit dem Rest
   der vorigen Antwort im Puffer), W-W-R antwortet immer, auch mit 160 ms Abstand; ein
   einzelner Set-VCP nach einem Read geht verloren. Deshalb der Vorlauf-Write
-  (`DDCTiming.primeAfterRead`). Am Dock noch nicht geprüft; dort notfalls
-  `ddc.primeAfterRead -bool NO`. Mess-Werkzeug: eigenes Swift-CLI mit `IOAVService`.
+  (`DDCTiming.primeAfterRead`). Mess-Werkzeug: eigenes Swift-CLI mit `IOAVService`.
 - JapanNext 6K (6720×3780): über USB-C→DP (Sabrent-Adapter) nur Null-Messages, außer
   einmal beim Einstecken vor dem EDID; über HDMI und über Thunderbolt-4-Kabel an seinem
   USB-C-Eingang geht DDC/CI (TB4: Antwort sofort in Runde 1). Nach dem Einstecken per

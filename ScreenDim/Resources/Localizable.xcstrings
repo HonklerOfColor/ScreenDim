@@ -346,16 +346,6 @@
         }
       }
     },
-    "AV-Service" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AV service"
-          }
-        }
-      }
-    },
     "AV-Service: %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -418,16 +408,6 @@
         }
       }
     },
-    "Branch" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Branch"
-          }
-        }
-      }
-    },
     "Branch: %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -435,16 +415,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Branch: %@"
-          }
-        }
-      }
-    },
-    "CGDirectDisplayID" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CGDirectDisplayID"
           }
         }
       }
@@ -499,62 +469,12 @@
         }
       }
     },
-    "DDC kommt über das Dock nicht durch. Software-Dimmung aktiv." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DDC doesn't get through the dock. Software dimming active."
-          }
-        }
-      }
-    },
-    "DDC kommt über den Adapter nicht durch. Software-Dimmung aktiv." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DDC doesn't get through the adapter. Software dimming active."
-          }
-        }
-      }
-    },
-    "DDC-Timing: %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DDC timing: %@"
-          }
-        }
-      }
-    },
-    "DDC-Verbindung blockiert. Software-Dimmung aktiv." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DDC connection blocked. Software dimming active."
-          }
-        }
-      }
-    },
     "Deckel zu" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lid closed"
-          }
-        }
-      }
-    },
-    "Deckel zu: Der Lichtsensor ist pausiert." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lid closed: the light sensor is paused."
           }
         }
       }
@@ -629,26 +549,6 @@
         }
       }
     },
-    "Diagnose …" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Diagnostics…"
-          }
-        }
-      }
-    },
-    "Diagnose kopieren" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copy Diagnostics"
-          }
-        }
-      }
-    },
     "Die Bildschirme gehen nach 3 s aus. Maus oder Tastatur weckt sie sofort." : {
       "localizations" : {
         "en" : {
@@ -679,26 +579,6 @@
         }
       }
     },
-    "Diese Version dimmt per Software. Die Hintergrundbeleuchtung bleibt, wie sie ist." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This version dims in software. The backlight stays as it is."
-          }
-        }
-      }
-    },
-    "Dieser Mac hat keinen eingebauten Lichtsensor." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This Mac has no built-in light sensor."
-          }
-        }
-      }
-    },
     "Displays …" : {
       "localizations" : {
         "en" : {
@@ -715,16 +595,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Briefly press the BOOT button on the sensor (LED blinks)."
-          }
-        }
-      }
-    },
-    "EDID" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "EDID"
           }
         }
       }
@@ -901,16 +771,6 @@
         }
       }
     },
-    "Geglättet" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Smoothed"
-          }
-        }
-      }
-    },
     "Gekoppelt mit" : {
       "localizations" : {
         "en" : {
@@ -1055,26 +915,6 @@
         }
       }
     },
-    "I2C-Fehler %@. Software-Dimmung aktiv." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I2C error %@. Software dimming active."
-          }
-        }
-      }
-    },
-    "I2C-Read" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I2C read"
-          }
-        }
-      }
-    },
     "I2C-Timeout, Kanal blockiert" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1086,32 +926,12 @@
         }
       }
     },
-    "I2C-Write" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I2C write"
-          }
-        }
-      }
-    },
     "In den Systemeinstellungen erlauben …" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Allow in System Settings…"
-          }
-        }
-      }
-    },
-    "Kanal" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Channel"
           }
         }
       }
@@ -1133,16 +953,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "No code received. Briefly press BOOT and try again, or enter the code."
-          }
-        }
-      }
-    },
-    "Kein DDC-Kanal gefunden. Software-Dimmung aktiv." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No DDC channel found. Software dimming active."
           }
         }
       }
@@ -1332,16 +1142,6 @@
         }
       }
     },
-    "Letzter Read" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Last read"
-          }
-        }
-      }
-    },
     "Letzter Read: %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1349,16 +1149,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Last read: %@"
-          }
-        }
-      }
-    },
-    "Letzter Write" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Last write"
           }
         }
       }
@@ -1476,16 +1266,6 @@
         }
       }
     },
-    "macOS erlaubt für dieses Display keine Helligkeitssteuerung. Software-Dimmung aktiv." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "macOS doesn’t allow brightness control for this display. Software dimming active."
-          }
-        }
-      }
-    },
     "macOS regelt dieses Display selbst. Schalte „Helligkeit automatisch anpassen“ aus, wenn ScreenDim es regeln soll." : {
       "localizations" : {
         "en" : {
@@ -1523,26 +1303,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Display %lld"
-          }
-        }
-      }
-    },
-    "Monitor antwortet leer – DDC/CI im Monitor-Menü aus? Software-Dimmung aktiv." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Display sends empty replies – is DDC/CI off in its menu? Software dimming active."
-          }
-        }
-      }
-    },
-    "Monitor reagiert nicht auf DDC/CI. Software-Dimmung aktiv." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Display doesn't respond to DDC/CI. Software dimming active."
           }
         }
       }
@@ -1625,16 +1385,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Built-in light sensor only"
-          }
-        }
-      }
-    },
-    "Nur in ScreenDim Direct verfügbar – der App Store erlaubt keinen Zugriff auf den Lichtsensor." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Only available in ScreenDim Direct – the App Store version can't access the light sensor."
           }
         }
       }
@@ -1791,16 +1541,6 @@
         }
       }
     },
-    "Schreibt einmal den Wert, den der Slider zeigt: %@ von 100." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Writes the slider value once: %@ of 100."
-          }
-        }
-      }
-    },
     "Schreibtisch-Sensor" : {
       "localizations" : {
         "en" : {
@@ -1877,16 +1617,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ScreenDim"
-          }
-        }
-      }
-    },
-    "ScreenDim Diagnose" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ScreenDim Diagnostics"
           }
         }
       }
@@ -2061,26 +1791,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Shortcuts ⌃⌥↑/↓ are taken by another app"
-          }
-        }
-      }
-    },
-    "Test: Read 0x10" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Test: Read 0x10"
-          }
-        }
-      }
-    },
-    "Test: Write 0x10 = aktueller Wert" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Test: Write 0x10 = current value"
           }
         }
       }
@@ -2330,16 +2040,6 @@
         }
       }
     },
-    "DDC/CI ist in den Einstellungen ausgeschaltet. Software-Dimmung aktiv." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DDC/CI is turned off in Settings. Software dimming active."
-          }
-        }
-      }
-    },
     "Externe Monitore" : {
       "localizations" : {
         "en" : {
@@ -2350,32 +2050,12 @@
         }
       }
     },
-    "Hintergrundbeleuchtung per DDC/CI regeln" : {
+    "ScreenDim dimmt per Software. Die Hintergrundbeleuchtung bleibt, wie sie ist." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Control backlight via DDC/CI"
-          }
-        }
-      }
-    },
-    "ScreenDim stellt die Hintergrundbeleuchtung externer Monitore direkt ein. Wo DDC/CI nicht durchkommt, dimmt die Software." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ScreenDim sets the backlight of external displays directly. Where DDC/CI doesn’t get through, software dimming takes over."
-          }
-        }
-      }
-    },
-    "Externe Monitore werden nur per Software gedimmt (Gamma oder Overlay); die Hintergrundbeleuchtung bleibt, wie sie steht. Kein DDC/CI-Verkehr – hilft bei Monitoren oder Docks, die daran hängen bleiben." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "External displays are dimmed by software only (gamma or overlay); the backlight stays as it is. No DDC/CI traffic – helps with displays or docks that hang on it."
+            "value" : "ScreenDim dims in software. The backlight stays as it is."
           }
         }
       }

@@ -21,9 +21,6 @@ struct SettingsView: View {
             }
             Tab("Helligkeit", systemImage: "sun.max") {
                 SettingsPage(sensor: sensor) {
-                    #if SCREENDIM_DIRECT
-                    DDCSection(manager: manager)
-                    #endif
                     LightSection(sensor: sensor)
                     if showsLightCurves {
                         LightCurveSection(sensor: sensor, manager: manager)
@@ -43,8 +40,7 @@ struct SettingsView: View {
 
     /// Kurven nur, wenn überhaupt Licht kommen kann.
     private var showsLightCurves: Bool {
-        sensor.effectiveLightSource != .off
-            && (sensor.isEnabled || sensor.isDemoActive || sensor.hasBuiltInLightSensor)
+        sensor.effectiveLightSource != .off && (sensor.isEnabled || sensor.isDemoActive)
     }
 }
 
@@ -162,38 +158,8 @@ private struct SensorSection: View {
     }
 }
 
-#if SCREENDIM_DIRECT
-/// DDC/CI für externe Monitore ein- oder ausschalten. Aus: Software-Dimmung wie in der
-/// App-Store-Variante, kein I2C-Verkehr; für Monitore und Docks, die auf DDC/CI hängen
-/// bleiben oder flackern.
-private struct DDCSection: View {
-    let manager: DisplayManager
-
-    var body: some View {
-        Section("Externe Monitore") {
-            Toggle("Hintergrundbeleuchtung per DDC/CI regeln", isOn: Binding(
-                get: { manager.isDDCEnabled }, set: { manager.setDDCEnabled($0) }
-            ))
-            if manager.isDDCEnabled {
-                caption("ScreenDim stellt die Hintergrundbeleuchtung externer Monitore direkt ein. Wo DDC/CI nicht durchkommt, dimmt die Software.")
-            } else {
-                caption("Externe Monitore werden nur per Software gedimmt (Gamma oder Overlay); die Hintergrundbeleuchtung bleibt, wie sie steht. Kein DDC/CI-Verkehr – hilft bei Monitoren oder Docks, die daran hängen bleiben.")
-            }
-        }
-    }
-
-    private func caption(_ text: LocalizedStringKey) -> some View {
-        Text(text)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-}
-#endif
-
-/// Woher das Licht für die Helligkeit kommt, mit Vorrang und Rückfall. Ohne Lichtsensor im
-/// Mac bleibt nur Schreibtisch-Sensor oder aus; die Wahl erscheint dann erst mit
-/// verbundenem Sensor.
+/// Ob das Umgebungslicht die Helligkeit regelt. Die Wahl erscheint erst mit verbundenem
+/// Schreibtisch-Sensor; eine andere Lichtquelle gibt es nicht.
 private struct LightSection: View {
     let sensor: SensorController
 
@@ -201,22 +167,9 @@ private struct LightSection: View {
         sensor.isEnabled && !sensor.isDemoActive && sensor.status == .connected
     }
 
-    private var showsChoice: Bool {
-        sensor.hasBuiltInLightSensor || deskSensorConnected
-    }
-
     var body: some View {
-        #if SCREENDIM_DIRECT
-        if showsChoice { section }
-        #else
-        // App Store: Der Hinweis auf den eingebauten Sensor steht auch ohne Schreibtisch-Sensor.
-        section
-        #endif
-    }
-
-    private var section: some View {
-        Section("Umgebungslicht") {
-            if showsChoice {
+        if deskSensorConnected {
+            Section("Umgebungslicht") {
                 Picker("Helligkeit anpassen nach", selection: Binding(
                     get: { sensor.effectiveLightSource }, set: { sensor.setLightSource($0) }
                 )) {
@@ -228,9 +181,6 @@ private struct LightSection: View {
                     activeStatus
                 }
             }
-            #if !SCREENDIM_DIRECT
-            caption("Nur in ScreenDim Direct verfügbar – der App Store erlaubt keinen Zugriff auf den Lichtsensor.")
-            #endif
         }
     }
 

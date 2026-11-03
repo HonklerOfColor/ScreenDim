@@ -26,39 +26,16 @@ struct ScreenDimApp: App {
         }
         .defaultLaunchBehavior(.suppressed)
         .windowResizability(.contentMinSize)
-
-        #if SCREENDIM_DIRECT
-        Window("ScreenDim Diagnose", id: DiagnosticsView.windowID) {
-            DiagnosticsView(manager: appDelegate.manager)
-        }
-        .defaultLaunchBehavior(.suppressed)
-        .windowResizability(.contentMinSize)
-        #endif
     }
 }
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    #if SCREENDIM_DIRECT
-    let manager = DisplayManager(
-        makeExternalControl: DirectControls.external,
-        makeBuiltInControl: DirectControls.builtIn
-    )
-    #else
-    /// App Store: keine private API, also weder DDC noch Steuerung des eingebauten
-    /// Displays. Externe Monitore dimmt der Manager per Software.
+    /// Keine private API, also weder DDC noch Steuerung des eingebauten Displays.
+    /// Externe Monitore dimmt der Manager per Software.
     let manager = DisplayManager(discover: { DisplayDiscovery.displays(scanRegistry: false) })
-    #endif
     /// Optionaler Schreibtisch-Sensor; ohne Einstellung passiert nichts.
-    #if SCREENDIM_DIRECT
-    lazy var sensor = SensorController(
-        manager: manager,
-        makeBuiltInLightSensor: DirectControls.lightSensor,
-        isAutoBrightnessEnabled: DirectControls.autoBrightness
-    )
-    #else
     lazy var sensor = SensorController(manager: manager)
-    #endif
     let loginItem = LoginItem()
     private let hotKeys = HotKeyCenter()
 
