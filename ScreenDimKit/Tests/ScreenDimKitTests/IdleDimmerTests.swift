@@ -13,7 +13,6 @@ struct IdleDimmerTests {
         let input = StubInput()
         /// Schlaf des `IdleDimmer`; Überblendungen des Managers haben ihren eigenen.
         let sleeper = ManualSleeper()
-        var keptAwake = false
         var displays: [DiscoveredDisplay] = [IdleDimmerTests.display(2), IdleDimmerTests.display(3)]
         var makeControl: (UInt64) -> any DDCControlling = { _ in StubControl() }
         /// Hält den Dimmer am Leben; seine Tasks halten ihn nur schwach.
@@ -67,7 +66,6 @@ struct IdleDimmerTests {
             manager: manager,
             preferences: setup.preferences,
             input: setup.input,
-            isDisplayKeptAwake: { setup.keptAwake },
             sleep: { await sleeper.sleep($0) }
         )
         dimmer.setTimeout(timeout)
@@ -96,9 +94,7 @@ struct IdleDimmerTests {
     func disabledByDefault() async {
         let manager = makeManager()
         setup.input.timeSinceLastInput = .seconds(7200)
-        let dimmer = IdleDimmer(
-            manager: manager, preferences: setup.preferences, input: setup.input, isDisplayKeptAwake: { false }
-        )
+        let dimmer = IdleDimmer(manager: manager, preferences: setup.preferences, input: setup.input)
         #expect(!dimmer.isEnabled)
         #expect(dimmer.timeout == IdleDimmer.defaultTimeout)
         #expect(dimmer.level == IdleDimmer.defaultLevel)
@@ -191,33 +187,25 @@ struct IdleDimmerTests {
         #expect(setup.gamma.levels[2] == 70)
     }
 
-    @Test("App hält den Bildschirm wach: nicht abdunkeln, in 60 s erneut prüfen; abschaltbar")
-    func keptAwakePauses() async {
+    @Test("Nur Eingaben zählen: nach dem Zurückholen beim nächsten Ablauf wieder abdunkeln")
+    func dimsAgainAfterNextTimeout() async {
         let manager = makeManager()
-        setup.keptAwake = true
-        setup.input.timeSinceLastInput = .seconds(1000)
         let sleeper = setup.sleeper
         var started = sleeper.started.makeAsyncIterator()
-        let dimmer = makeDimmer(manager)
-        dimmer.start()
-        #expect(await started.next() == IdleDimmer.keptAwakeRecheck)
-        #expect(!manager.isIdleDimmed)
-
-        // Video zu Ende: beim nächsten Prüfen abdunkeln.
-        setup.keptAwake = false
-        sleeper.wake()
+        _ = startDimmed(manager)
         #expect(await started.next() == IdleDimmer.inputCheckInterval)
-        #expect(manager.isIdleDimmed)
 
-        // Ohne Rücksicht auf wach haltende Apps dunkelt er sofort ab.
         setup.input.timeSinceLastInput = .zero
         setup.input.fire()
         #expect(await started.next() == timeout)
-        setup.keptAwake = true
+        #expect(!manager.isIdleDimmed)
+
+        // Wieder die volle Zeit ohne Eingabe, etwa während ein Video läuft.
         setup.input.timeSinceLastInput = timeout
-        dimmer.setPausesWhileKeptAwake(false)
+        sleeper.wake()
         #expect(await started.next() == IdleDimmer.inputCheckInterval)
         #expect(manager.isIdleDimmed)
+        #expect(setup.gamma.levels[2] == 5)
     }
 
     @Test("Bildschirme schlafen: nichts beobachten; beim Aufwachen kurz danach Helligkeit zurück")
@@ -361,17 +349,13 @@ struct IdleDimmerTests {
         let dimmer = makeDimmer(manager)
         dimmer.setTimeout(.seconds(300))
         dimmer.setLevel(80)
-        dimmer.setPausesWhileKeptAwake(false)
         #expect(dimmer.level == 50)
         #expect(dimmer.timeoutMinutes == 5)
 
-        let reloaded = IdleDimmer(
-            manager: manager, preferences: setup.preferences, input: setup.input, isDisplayKeptAwake: { false }
-        )
+        let reloaded = IdleDimmer(manager: manager, preferences: setup.preferences, input: setup.input)
         #expect(reloaded.isEnabled)
         #expect(reloaded.timeout == .seconds(300))
         #expect(reloaded.level == 50)
-        #expect(!reloaded.pausesWhileKeptAwake)
     }
 
     @Test("Ausschalten während abgedunkelt: Helligkeit zurück, kein Warten mehr")

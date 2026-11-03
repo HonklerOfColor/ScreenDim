@@ -31,22 +31,12 @@
         }
       }
     },
-    "Etwa bei Videos, Präsentationen oder Videokonferenzen. Genauso schiebt macOS das Ausschalten des Displays auf." : {
+    "Es zählen nur Maus und Tastatur, auch während ein Video läuft. Jede Mausbewegung oder Taste bringt die Helligkeit sofort zurück. Dunklere Monitore bleiben, wie sie sind. Wann macOS die Displays ausschaltet, stellst du weiter in den Systemeinstellungen ein." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "For example during videos, presentations or video calls. macOS postpones turning off the display the same way."
-          }
-        }
-      }
-    },
-    "Jede Mausbewegung oder Taste bringt die Helligkeit sofort zurück. Dunklere Monitore bleiben, wie sie sind. Wann macOS die Displays ausschaltet, stellst du weiter in den Systemeinstellungen ein." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Any mouse movement or key press brings the brightness back right away. Darker displays stay as they are. When macOS turns the displays off is still set in System Settings."
+            "value" : "Only mouse and keyboard count, even while a video is playing. Any mouse movement or key press brings the brightness back right away. Darker displays stay as they are. When macOS turns the displays off is still set in System Settings."
           }
         }
       }
@@ -77,16 +67,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "After"
-          }
-        }
-      }
-    },
-    "Nicht, während eine App den Bildschirm wach hält" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not while an app keeps the display awake"
           }
         }
       }

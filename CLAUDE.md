@@ -64,7 +64,8 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
   (Event-Monitor), Tasten über eine Prüfung je Sekunde, nur solange abgedunkelt ist (ohne
   Bedienungshilfen-Freigabe sieht kein Event-Monitor fremde Tasten). Schlafen die
   Bildschirme, ruht alles; nach ihrem Aufwachen kommt die Helligkeit 2 s später zurück.
-  Hält eine App den Bildschirm wach (`PreventUserIdleDisplaySleep`), wird nicht abgedunkelt.
+  Es zählen nur Eingaben: Auch bei laufendem Video (Zusicherungen gegen den Display-Ruhezustand)
+  wird abgedunkelt.
 - `ScreenDim/` (App): `App/` (Einstieg, Fabrik für DDC), `UI/` (Menü, Einstellungen,
   Sensor-Diagnose, DDC-Diagnose), `System/` (Tastenkürzel, Login-Item, `IOAVService`),
   `Resources/` (Asset-Katalog, String-Katalog, Privacy-Manifest).

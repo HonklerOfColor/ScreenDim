@@ -128,12 +128,8 @@ private struct IdleSection: View {
                             .frame(width: 44, alignment: .trailing)
                     }
                 }
-                Toggle("Nicht, während eine App den Bildschirm wach hält", isOn: Binding(
-                    get: { idle.pausesWhileKeptAwake }, set: { idle.setPausesWhileKeptAwake($0) }
-                ))
-                .help("Etwa bei Videos, Präsentationen oder Videokonferenzen. Genauso schiebt macOS das Ausschalten des Displays auf.")
             }
-            Text("Jede Mausbewegung oder Taste bringt die Helligkeit sofort zurück. Dunklere Monitore bleiben, wie sie sind. Wann macOS die Displays ausschaltet, stellst du weiter in den Systemeinstellungen ein.")
+            Text("Es zählen nur Maus und Tastatur, auch während ein Video läuft. Jede Mausbewegung oder Taste bringt die Helligkeit sofort zurück. Dunklere Monitore bleiben, wie sie sind. Wann macOS die Displays ausschaltet, stellst du weiter in den Systemeinstellungen ein.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
