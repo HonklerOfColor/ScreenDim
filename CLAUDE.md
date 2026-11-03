@@ -111,7 +111,8 @@ Schlüsselbildung: `Int` → `%lld`, `String` → `%@`, ein `%` neben einer Inte
   (Aufrufe blockierten etwa 8 s). Deshalb: nie schnell hintereinander abfragen, nicht
   doppelt schreiben.
 - JapanNext 6K (6720×3780): über USB-C→DP (Sabrent-Adapter) nur Null-Messages, außer
-  einmal beim Einstecken vor dem EDID; über HDMI geht DDC/CI. Nach dem Einstecken etwa
-  5 s Zufallsbytes (`checksumMismatch`), daher die dritte Probe-Runde.
+  einmal beim Einstecken vor dem EDID; über HDMI und über Thunderbolt-4-Kabel an seinem
+  USB-C-Eingang geht DDC/CI (TB4: Antwort sofort in Runde 1). Nach dem Einstecken per
+  HDMI etwa 5 s Zufallsbytes (`checksumMismatch`), daher die dritte Probe-Runde.
 - In zsh ist `log` ein Builtin; immer `/usr/bin/log show|stream` verwenden.
 - Codesign im iCloud-Ordner scheitert an FinderInfo-xattrs; DerivedData daher unter `/tmp`.
