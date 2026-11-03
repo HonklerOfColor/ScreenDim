@@ -133,18 +133,18 @@ struct SensorKeychainTests {
     @Test("Speichern, lesen, überschreiben, löschen")
     func roundTrip() throws {
         defer { keychain.delete(host) }
-        #expect(keychain.code(for: host) == nil)
+        #expect(try keychain.code(for: host) == nil)
 
         let first = try #require(PairingCode(normalizing: "ABCD-EFGH"))
         try keychain.save(first, for: host)
-        #expect(keychain.code(for: host) == first)
+        #expect(try keychain.code(for: host) == first)
 
         let second = try #require(PairingCode(normalizing: "K7M2-P9QR"))
         try keychain.save(second, for: host)
-        #expect(keychain.code(for: host) == second)
-        #expect(keychain.code(for: "anderer-host.local") == nil)
+        #expect(try keychain.code(for: host) == second)
+        #expect(try keychain.code(for: "anderer-host.local") == nil)
 
         keychain.delete(host)
-        #expect(keychain.code(for: host) == nil)
+        #expect(try keychain.code(for: host) == nil)
     }
 }

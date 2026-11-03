@@ -11,8 +11,10 @@ public struct LightCurve: Codable, Equatable, Sendable {
         public var percent: Double
 
         public init(lux: Double, percent: Double) {
-            self.lux = min(max(lux.rounded(), 0), LightCurve.maxLux)
-            self.percent = min(max(percent.rounded(), 0), 100)
+            // NaN käme durch min/max unverändert durch; `percent(forLux:)` fände dann keinen
+            // Abschnitt. Das Lux-Feld der Einstellungen nimmt „NaN“ als Zahl an.
+            self.lux = lux.isNaN ? 0 : min(max(lux.rounded(), 0), LightCurve.maxLux)
+            self.percent = percent.isNaN ? 100 : min(max(percent.rounded(), 0), 100)
         }
     }
 
@@ -37,10 +39,10 @@ public struct LightCurve: Codable, Equatable, Sendable {
     }
 
     public func percent(forLux lux: Double) -> Double {
-        guard let first = points.first, let last = points.last else { return 100 }
+        guard let first = points.first, let last = points.last, !lux.isNaN else { return 100 }
         if lux <= first.lux { return first.percent }
         if lux >= last.lux { return last.percent }
-        let upper = points.firstIndex { $0.lux > lux }!
+        let upper = points.firstIndex { $0.lux > lux } ?? points.count - 1
         let low = points[upper - 1], high = points[upper]
         // Logarithmisch ab 1 lx; darunter gibt es keinen sinnvollen Logarithmus.
         let span = log10(max(high.lux, 1)) - log10(max(low.lux, 1))

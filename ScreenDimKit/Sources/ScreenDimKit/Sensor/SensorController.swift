@@ -26,6 +26,9 @@ public final class SensorController {
         case connected
         /// Der Sensor lehnt den gespeicherten Code ab.
         case pairingRequired
+        /// Der Schlüsselbund gibt den Code nicht her (gesperrt, Zugriff verweigert). Der Code
+        /// ist womöglich da; eine Neukopplung würde ihn nur überschreiben.
+        case keychainUnavailable(OSStatus)
     }
 
     /// Woher das Umgebungslicht für die Helligkeit kommt, mit Vorrang. Die Fälle mit dem
@@ -404,8 +407,16 @@ public final class SensorController {
             source = simulation
             status = .demo
         } else if isEnabled, let host = pairedHostname {
-            guard let code = credentials.code(for: host) else {
-                status = .pairingRequired
+            let code: PairingCode
+            do throws(SensorKeychain.Failure) {
+                guard let stored = try credentials.code(for: host) else {
+                    status = .pairingRequired
+                    return
+                }
+                code = stored
+            } catch {
+                sensorLog.error("Schlüsselbund nicht lesbar (Status \(error.status)); keine Neukopplung")
+                status = .keychainUnavailable(error.status)
                 return
             }
             source = makeLiveSource(SensorEndpoint(hostname: host), code)
@@ -460,7 +471,6 @@ public final class SensorController {
             } else if changed, PresenceGate.shouldBlank(
                 presence: present,
                 connected: connection == .connected,
-                lastEventAge: lastEventAge,
                 sinceLastInput: input.timeSinceLastInput
             ) {
                 blankScreens()
@@ -906,13 +916,31 @@ public final class SensorController {
     /// Prüft den Code mit `GET /binary_sensor/Presence` per Digest.
     private func verify(_ code: PairingCode, with sensor: DiscoveredSensor, typed: Bool) async {
         pairing = .verifying(sensor)
-        // Im offenen Kopplungsfenster nimmt der Sensor jedes Passwort an; dann muss ein
-        // eingetippter Code dem angezeigten gleichen.
-        if typed, case .ok(let data) = await http.get(sensor.endpoint.url(SensorProtocol.pairingPath), password: nil),
-           let shown = PairingCode.fromPairingResponse(data), shown != code {
+        if typed {
+            // Im offenen Kopplungsfenster nimmt der Sensor jedes Passwort an; dann muss ein
+            // eingetippter Code dem angezeigten gleichen. Ist der gerade nicht zu holen, wird
+            // nichts gespeichert: Der Digest-Login bewiese im Fenster nichts.
+            let shownResponse = await http.get(sensor.endpoint.url(SensorProtocol.pairingPath), password: nil)
             guard !Task.isCancelled else { return }
-            pairing = .failed(sensor, .wrongCode)
-            return
+            switch shownResponse {
+            case .ok(let data):
+                guard let shown = PairingCode.fromPairingResponse(data) else {
+                    pairing = .failed(sensor, .unreachable)
+                    return
+                }
+                if shown != code {
+                    pairing = .failed(sensor, .wrongCode)
+                    return
+                }
+            case .unauthorized:
+                break // Fenster zu: Der Digest-Login prüft den Code wirklich.
+            case .timeout:
+                pairing = .failed(sensor, .timeout)
+                return
+            case .unreachable, .status:
+                pairing = .failed(sensor, .unreachable)
+                return
+            }
         }
         let response = await http.get(sensor.endpoint.url(SensorProtocol.presencePath), password: code.raw)
         guard !Task.isCancelled else { return }

@@ -3,7 +3,9 @@ import Security
 
 /// Ablage des Kopplungscodes. In Tests ersetzbar.
 public protocol SensorCredentialStore: Sendable {
-    func code(for hostname: String) -> PairingCode?
+    /// `nil`: kein Code gespeichert. Lässt sich der Speicher nicht lesen (Schlüsselbund
+    /// gesperrt, Zugriff verweigert), wirft er; das heißt nicht „nicht gekoppelt“.
+    func code(for hostname: String) throws(SensorKeychain.Failure) -> PairingCode?
     func save(_ code: PairingCode, for hostname: String) throws(SensorKeychain.Failure)
     func delete(_ hostname: String)
 }
@@ -21,15 +23,21 @@ public struct SensorKeychain: SensorCredentialStore {
         self.service = service
     }
 
-    public func code(for hostname: String) -> PairingCode? {
+    public func code(for hostname: String) throws(Failure) -> PairingCode? {
         var query = baseQuery(hostname)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data
-        else { return nil }
-        return PairingCode(normalizing: String(decoding: data, as: UTF8.self))
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        switch status {
+        case errSecSuccess:
+            guard let data = result as? Data else { return nil }
+            return PairingCode(normalizing: String(decoding: data, as: UTF8.self))
+        case errSecItemNotFound:
+            return nil
+        default:
+            throw Failure(status: status)
+        }
     }
 
     public func save(_ code: PairingCode, for hostname: String) throws(Failure) {

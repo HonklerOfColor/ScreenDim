@@ -86,7 +86,8 @@ Chrome auf <https://web.esphome.io> („Connect“ → „Configure Wi-Fi“, Im
 - Beim ersten Start erzeugt der Sensor einen Kopplungscode (8 Zeichen, `ABCD-EFGH`) und
   speichert ihn.
 - **BOOT kurz drücken:** Kopplungsfenster für 2 Minuten, die LED pulsiert blau. In dieser
-  Zeit holt die App den Code ohne Login (`GET /text_sensor/Pairing Code`).
+  Zeit holt die App den Code ohne Login (`GET /text_sensor/Pairing Code`); alles andere
+  (Weboberfläche, OTA, Zustände) bleibt hinter dem Login.
 - **BOOT 10 s halten:** neuer Code, die LED blinkt rot. Die App meldet „Kopplung verloren“;
   danach öffnet sich das Kopplungsfenster von selbst.
 - Außerhalb des Fensters verlangt der Webserver Digest-Login: Nutzer `screendim`, Passwort

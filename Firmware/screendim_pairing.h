@@ -11,6 +11,7 @@
 #include "bootloader_random.h"
 #include "esp_random.h"
 #include "esphome/components/web_server_base/web_server_base.h"
+#include "esphome/components/web_server_idf/web_server_idf.h"
 
 namespace screendim {
 
@@ -43,12 +44,39 @@ inline std::string encode(uint64_t bits) {
   return std::string(code_raw, 4) + "-" + std::string(code_raw + 4, 4);
 }
 
-// Kopplungsfenster: ohne Passwort lässt der Webserver jede Anfrage durch. Sonst Digest mit
-// dem Code.
-inline void set_pairing_open(bool open) {
+// Kopplungsfenster offen: Nur der Code ist ohne Login abrufbar.
+inline bool pairing_open = false;
+
+inline void set_pairing_open(bool open) { pairing_open = open; }
+
+// Beantwortet im Kopplungsfenster `GET /text_sensor/Pairing Code` ohne Login, wie es der
+// ESPHome-Webserver mit Login täte. Alles andere (Weboberfläche, OTA, Zustände, Ereignisse)
+// bleibt immer hinter dem Digest-Login; früher fiel im Fenster das Passwort ganz weg.
+class PairingCodeHandler : public esphome::web_server_idf::AsyncWebHandler {
+ public:
+  bool canHandle(esphome::web_server_idf::AsyncWebServerRequest *request) const override {
+    if (!pairing_open || request->method() != HTTP_GET)
+      return false;
+    char url[esphome::web_server_idf::AsyncWebServerRequest::URL_BUF_SIZE];
+    return request->url_to(url) == "/text_sensor/Pairing Code";
+  }
+
+  void handleRequest(esphome::web_server_idf::AsyncWebServerRequest *request) override {
+    std::string code = std::string(code_raw, 4) + "-" + std::string(code_raw + 4, 4);
+    std::string json = "{\"id\":\"text_sensor-pairing_code\",\"value\":\"" + code + "\",\"state\":\"" + code + "\"}";
+    request->send(200, "application/json", json.c_str());
+  }
+};
+
+// Einmal beim Start, vor dem Webserver (on_boot 600, Webserver 249): Passwort = Code (der
+// Webserver hält nur den Zeiger, ein neuer Code gilt sofort), Handler fürs Kopplungsfenster
+// vor den Handlern des Webservers.
+inline void setup_web_auth() {
   auto *base = esphome::web_server_base::global_web_server_base;
-  if (base != nullptr)
-    base->set_auth_password(open ? nullptr : code_raw);
+  if (base == nullptr)
+    return;
+  base->set_auth_password(code_raw);
+  base->add_handler_without_auth(new PairingCodeHandler());
 }
 
 }  // namespace screendim

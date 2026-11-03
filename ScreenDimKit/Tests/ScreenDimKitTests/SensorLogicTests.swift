@@ -73,20 +73,16 @@ struct SimulatedSensorTests {
 
 @Suite("Freigabe der Abwesenheit")
 struct PresenceGateTests {
-    @Test("Aus nur bei frischer Abwesenheit, verbunden und ohne Eingabe")
+    @Test("Aus nur bei Abwesenheit, verbunden und ohne Eingabe")
     func shouldBlank() {
-        let fresh = Duration.seconds(1)
         let idle = Duration.seconds(30)
-        #expect(PresenceGate.shouldBlank(presence: false, connected: true, lastEventAge: fresh, sinceLastInput: idle))
-        #expect(!PresenceGate.shouldBlank(presence: true, connected: true, lastEventAge: fresh, sinceLastInput: idle))
-        #expect(!PresenceGate.shouldBlank(presence: nil, connected: true, lastEventAge: fresh, sinceLastInput: idle))
-        #expect(!PresenceGate.shouldBlank(presence: false, connected: false, lastEventAge: fresh, sinceLastInput: idle))
-        #expect(!PresenceGate.shouldBlank(presence: false, connected: true, lastEventAge: nil, sinceLastInput: idle))
-        // Veraltet: 10 s und älter.
-        #expect(PresenceGate.shouldBlank(presence: false, connected: true, lastEventAge: .milliseconds(9_999), sinceLastInput: idle))
-        #expect(!PresenceGate.shouldBlank(presence: false, connected: true, lastEventAge: .seconds(10), sinceLastInput: idle))
+        #expect(PresenceGate.shouldBlank(presence: false, connected: true, sinceLastInput: idle))
+        #expect(!PresenceGate.shouldBlank(presence: true, connected: true, sinceLastInput: idle))
+        #expect(!PresenceGate.shouldBlank(presence: nil, connected: true, sinceLastInput: idle))
+        #expect(!PresenceGate.shouldBlank(presence: false, connected: false, sinceLastInput: idle))
         // Gerade getippt oder die Maus bewegt.
-        #expect(!PresenceGate.shouldBlank(presence: false, connected: true, lastEventAge: fresh, sinceLastInput: .seconds(1)))
+        #expect(!PresenceGate.shouldBlank(presence: false, connected: true, sinceLastInput: .seconds(1)))
+        #expect(PresenceGate.shouldBlank(presence: false, connected: true, sinceLastInput: PresenceGate.inputGrace))
     }
 
     @Test("Veraltet nach 30 s Stille oder ohne Verbindung")
@@ -95,6 +91,17 @@ struct PresenceGateTests {
         #expect(PresenceGate.isStale(connected: true, lastEventAge: .seconds(30)))
         #expect(PresenceGate.isStale(connected: false, lastEventAge: .seconds(1)))
         #expect(PresenceGate.isStale(connected: true, lastEventAge: nil))
+    }
+
+    @Test("NaN als Stützpunkt oder Abfrage: kein Absturz, Unendlich wird begrenzt")
+    func nanIsHarmless() {
+        let curve = LightCurve(points: [.init(lux: .nan, percent: .nan), .init(lux: 100, percent: 60)])
+        #expect(curve.points.map(\.lux) == [0, 100])
+        #expect(curve.points[0].percent == 100)
+        #expect(curve.percent(forLux: 50) == 66) // 0 lx zählt wie 1 lx: 100 − 40 · log10(50)/2
+        #expect(curve.percent(forLux: .nan) == 100)
+        #expect(LightCurve.Point(lux: .infinity, percent: 50).lux == LightCurve.maxLux)
+        #expect(LightCurve.Point(lux: -.infinity, percent: 50).lux == 0)
     }
 
     @Test("Standardkurve: Licht → Helligkeit logarithmisch zwischen 20 und 100 %")

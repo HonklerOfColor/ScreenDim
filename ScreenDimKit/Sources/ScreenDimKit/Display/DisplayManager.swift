@@ -120,6 +120,8 @@ public final class DisplayManager {
     /// Wie weit der Deckel greift: 0 gar nicht, 1 ganz; dazwischen beim Überblenden.
     @ObservationIgnored private var idleFraction: Double = 0
     @ObservationIgnored private var idleFade: Task<Void, Never>?
+    /// Wert vor dem Ziehen am Regler je Display (`setBrightness(…, interactive: true)`).
+    @ObservationIgnored private var interactiveStart: [CGDirectDisplayID: Double] = [:]
 
     /// Jeder Helligkeitsauftrag (Licht, Regler, Prüfung, Rückfall, …), für Protokoll und
     /// Pausen der Lichtregelung.
@@ -220,6 +222,7 @@ public final class DisplayManager {
         fades.values.forEach { $0.cancel() }
         fades = [:]
         fadeTargets = [:]
+        interactiveStart = [:]
         let visible = Dictionary(
             monitors.filter(\.usesSoftwareDimming).map { ($0.storageKey, $0.brightness) },
             uniquingKeysWith: { $1 }
@@ -379,22 +382,50 @@ public final class DisplayManager {
     /// Setzt die Helligkeit sofort und bricht eine laufende Überblendung ab: Was der Nutzer
     /// einstellt (Regler, Tastenkürzel), gewinnt, auch gegen die Leerlauf-Dimmung. Meldet
     /// einen Auftrag „manual“.
+    /// - Parameter interactive: Beim Ziehen am Regler. Der Wert gilt sofort; gespeichert und
+    ///   gemeldet wird erst beim Loslassen (`endInteractiveBrightness`), sonst flutet jedes
+    ///   Mausereignis Protokoll, Log und UserDefaults.
     /// - Returns: `false`, wenn der Monitor noch geprüft wird und den Wert deshalb nicht
     ///   übernommen hat. Nach der Prüfung steht er auf seinem gespeicherten Wert.
     @discardableResult
-    public func setBrightness(_ percent: Double, for id: CGDirectDisplayID) -> Bool {
+    public func setBrightness(_ percent: Double, for id: CGDirectDisplayID, interactive: Bool = false) -> Bool {
         endIdleDim()
         fades.removeValue(forKey: id)?.cancel()
         fadeTargets[id] = nil
         guard let before = monitors.first(where: { $0.id == id }) else { return true }
+        if interactive {
+            if interactiveStart[id] == nil { interactiveStart[id] = before.brightness }
+            return apply(percent, to: id, persist: false)
+        }
         let accepted = apply(percent, to: id, persist: true)
-        if let after = monitors.first(where: { $0.id == id }), after.brightness != before.brightness {
+        let remembered = interactiveStart.removeValue(forKey: id) ?? before.brightness
+        if let after = monitors.first(where: { $0.id == id }), after.brightness != remembered {
             report(BrightnessJob(
                 storageKey: after.storageKey, name: after.name, reason: .manual,
-                remembered: before.brightness, actual: nil, target: after.brightness, duration: .zero
+                remembered: remembered, actual: nil, target: after.brightness, duration: .zero
             ))
         }
         return accepted
+    }
+
+    /// Loslassen des Reglers: speichert den Wert und meldet einen Auftrag „manual“ vom Stand
+    /// vor dem Ziehen aus. Ohne Änderung passiert nichts.
+    public func endInteractiveBrightness(for id: CGDirectDisplayID) {
+        guard let start = interactiveStart.removeValue(forKey: id), let index = index(of: id) else { return }
+        let monitor = monitors[index]
+        guard monitor.brightness != start else { return }
+        persist(monitor.brightness, at: index)
+        report(BrightnessJob(
+            storageKey: monitor.storageKey, name: monitor.name, reason: .manual,
+            remembered: start, actual: nil, target: monitor.brightness, duration: .zero
+        ))
+    }
+
+    /// Loslassen des Reglers „Alle Monitore“.
+    public func endInteractiveBrightness() {
+        for id in Array(interactiveStart.keys) {
+            endInteractiveBrightness(for: id)
+        }
     }
 
     /// Gleitet in Schritten von höchstens einem Prozentpunkt zum Wert, statt zu springen.
@@ -557,10 +588,10 @@ public final class DisplayManager {
     /// - Returns: `false`, wenn ein betroffener Monitor noch geprüft wird und den Wert
     ///   deshalb nicht übernommen hat. Nach der Prüfung steht er auf seinem gespeicherten Wert.
     @discardableResult
-    public func setAllBrightness(_ percent: Double, includingBuiltIn: Bool = true) -> Bool {
+    public func setAllBrightness(_ percent: Double, includingBuiltIn: Bool = true, interactive: Bool = false) -> Bool {
         var complete = true
         for monitor in monitors where includingBuiltIn || !monitor.isBuiltIn {
-            if !setBrightness(percent, for: monitor.id) { complete = false }
+            if !setBrightness(percent, for: monitor.id, interactive: interactive) { complete = false }
         }
         return complete
     }
@@ -739,7 +770,6 @@ public final class DisplayManager {
     /// spätere nur nach verstümmelter Antwort (siehe `probeDelay`).
     private func probe(_ id: CGDirectDisplayID, generation: Int) async {
         guard let channel = channels[id], let monitor = monitors.first(where: { $0.id == id }) else { return }
-        let saved = monitor.isBuiltIn ? nil : store.brightness(for: monitor.storageKey, mode: .ddc)
 
         var reading: VCPReading?
         var lastError: DDCError?
@@ -759,22 +789,7 @@ public final class DisplayManager {
         guard generation == self.generation, let index = index(of: id) else { return }
 
         if let reading {
-            channel.maximum = max(reading.maximum, 1)
-            let current = Self.percent(fromRaw: reading.current, maximum: channel.maximum)
-            log.notice("Display \(id): Helligkeit \(reading.current)/\(reading.maximum), gespeichert: \(saved ?? -1)")
-            channel.confirmed = reading.current
-            channel.submitted = reading.current
-            monitors[index].state = .ready
-            monitors[index].usesSoftwareDimming = false
-            monitors[index].brightness = current
-            syncSoftwareDimming()
-            // Während der Leerlauf-Dimmung geprüft (etwa neu angesteckt): gleich deckeln.
-            if idleFraction > 0 {
-                submit(output(current), to: channel)
-            }
-            if let saved, saved != current {
-                fadeBrightness(to: saved, for: id, reason: .probeRestore, duration: systemFadeDuration)
-            }
+            adopt(reading, for: id, channel: channel)
         } else {
             monitors[index].state = lastError.map(DDCState.init(failure:)) ?? .noResponse
             if !monitor.isBuiltIn {
@@ -782,6 +797,30 @@ public final class DisplayManager {
             }
         }
         onMonitorReady?(id)
+    }
+
+    /// Übernimmt eine gelesene Helligkeit: Kanal bereit, Software-Dimmung aus (ein Read ist
+    /// genau die Prüfung), bei externen Monitoren danach der gespeicherte Wert.
+    private func adopt(_ reading: VCPReading, for id: CGDirectDisplayID, channel: Channel) {
+        guard let index = index(of: id) else { return }
+        let monitor = monitors[index]
+        let saved = monitor.isBuiltIn ? nil : store.brightness(for: monitor.storageKey, mode: .ddc)
+        channel.maximum = max(reading.maximum, 1)
+        let current = Self.percent(fromRaw: reading.current, maximum: channel.maximum)
+        log.notice("Display \(id): Helligkeit \(reading.current)/\(reading.maximum), gespeichert: \(saved ?? -1)")
+        channel.confirmed = reading.current
+        channel.submitted = reading.current
+        monitors[index].state = .ready
+        monitors[index].usesSoftwareDimming = false
+        monitors[index].brightness = current
+        syncSoftwareDimming()
+        // Während der Leerlauf-Dimmung geprüft (etwa neu angesteckt): gleich deckeln.
+        if idleFraction > 0 {
+            submit(output(current), to: channel)
+        }
+        if let saved, saved != current {
+            fadeBrightness(to: saved, for: id, reason: .probeRestore, duration: systemFadeDuration)
+        }
     }
 
     /// Pause vor der nächsten Probe-Runde; `nil` beendet die Prüfung.
@@ -807,6 +846,14 @@ public final class DisplayManager {
             guard let index = index(of: id), monitors[index].state != .probing, monitors[index].state != .noChannel else { continue }
             fail(index, error)
         }
+    }
+
+    /// macOS hat ein Display entfernt. Bis der Refresh die neue Menge übernimmt (1,5 s), darf
+    /// sein Overlay oder Schwarzfenster nicht auf einen anderen Bildschirm wandern; AppKit
+    /// schiebt Fenster entfernter Bildschirme dorthin. Fenster ohne Bildschirm verschwinden.
+    func displayRemoved(_ id: CGDirectDisplayID) {
+        overlay.refresh([id])
+        blanker.refresh([id])
     }
 
     // MARK: - Software-Dimmung
@@ -890,8 +937,9 @@ public final class DisplayManager {
             let elapsed = (ContinuousClock.now - started).milliseconds
             log.notice("Test-Read Display \(id): \(reading.current)/\(reading.maximum), \(elapsed) ms")
             if let index = index(of: id), monitors[index].state != .probing {
-                channel.maximum = max(reading.maximum, 1)
-                monitors[index].state = .ready
+                // Wie nach der Prüfung: DDC gilt wieder, auch wenn der Monitor inzwischen
+                // per Software gedimmt wurde; sonst stünde „Bereit“ neben „reagiert nicht“.
+                adopt(reading, for: id, channel: channel)
             }
             return String(localized: "Read OK: \(Int(reading.current))/\(Int(reading.maximum)), \(elapsed) ms")
         } catch {
@@ -912,9 +960,12 @@ public final class DisplayManager {
         }
         let raw = Self.raw(fromPercent: monitor.brightness, maximum: channel.maximum)
         let started = ContinuousClock.now
-        channel.submitted = raw
         do throws(DDCError) {
             try await channel.control.write(.brightness, value: raw)
+            // Erst der bestätigte Write zählt; sonst unterdrückte `submit` den nächsten
+            // gleichen Wert, obwohl der Monitor ihn nie bekam.
+            channel.submitted = raw
+            channel.confirmed = raw
             let elapsed = (ContinuousClock.now - started).milliseconds
             log.notice("Test-Write Display \(id): \(raw), \(elapsed) ms")
             return String(localized: "Write \(Int(raw)) OK, \(elapsed) ms")
@@ -956,6 +1007,9 @@ private func displayReconfigured(
 ) {
     guard !flags.contains(.beginConfigurationFlag) else { return }
     Task { @MainActor in
+        if flags.contains(.removeFlag) {
+            ReconfigurationRelay.manager?.displayRemoved(display)
+        }
         // Hotplug: kurz warten, bis der DDC-Kanal des neuen Monitors bereit ist.
         ReconfigurationRelay.manager?.scheduleRefresh(force: false, reconfigured: [display], after: .milliseconds(1500))
     }

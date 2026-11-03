@@ -667,6 +667,9 @@ struct SensorStatusLabel: View {
         case .connected: Label("Verbunden", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
         case .pairingRequired:
             Label("Kopplung verloren – neu koppeln", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+        case .keychainUnavailable(let status):
+            Label("Schlüsselbund nicht lesbar (Fehler \(Int(status)))", systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
         }
     }
 }

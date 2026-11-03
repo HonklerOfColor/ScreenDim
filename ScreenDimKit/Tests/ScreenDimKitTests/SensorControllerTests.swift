@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import Security
 import Testing
 @testable import ScreenDimKit
 
@@ -773,7 +774,7 @@ struct SensorControllerTests {
         controller.beginPairing(with: Self.sensor)
         #expect(await eventually { controller.pairedHostname == Self.host })
         #expect(controller.pairing == .idle)
-        #expect(credentials.code(for: Self.host)?.raw == "K7M2P9QR")
+        #expect(credentials.stored[Self.host]?.raw == "K7M2P9QR")
         #expect(preferences.string(forKey: SensorController.Keys.hostname) == Self.host)
         #expect(controller.status == .searching)
         #expect(http.requests.map(\.path) == [SensorProtocol.pairingPath, SensorProtocol.presencePath])
@@ -795,8 +796,38 @@ struct SensorControllerTests {
         #expect(controller.submitCode("abcd efgh"))
         #expect(await eventually { controller.pairing == .failed(Self.sensor, .wrongCode) })
         #expect(controller.pairedHostname == nil)
-        #expect(credentials.code(for: Self.host) == nil)
+        #expect(credentials.stored[Self.host] == nil)
         controller.cancelPairing()
+    }
+
+    @Test("Code von Hand: Ist der angezeigte Code nicht zu holen, wird nichts gespeichert")
+    func manualCodeNeedsShownCode() async {
+        let controller = makeController(paired: false)
+        controller.setEnabled(true)
+        http.enqueue(.unauthorized, for: SensorProtocol.pairingPath)
+        controller.beginPairing(with: Self.sensor)
+        #expect(await eventually { controller.pairing == .waitingForButton(Self.sensor) })
+
+        // Fenster inzwischen offen (jedes Passwort ginge durch), aber der Code-Abruf scheitert.
+        http.enqueue(.timeout, for: SensorProtocol.pairingPath)
+        http.enqueue(.ok(Data()), for: SensorProtocol.presencePath)
+        #expect(controller.submitCode("abcd efgh"))
+        #expect(await eventually { controller.pairing == .failed(Self.sensor, .timeout) })
+        #expect(controller.pairedHostname == nil)
+        #expect(credentials.stored[Self.host] == nil)
+        #expect(!http.requests.contains { $0.path == SensorProtocol.presencePath })
+        controller.cancelPairing()
+    }
+
+    @Test("Schlüsselbund nicht lesbar: kein „neu koppeln“, Code und Hostname bleiben")
+    func keychainUnavailable() {
+        let controller = makeController()
+        credentials.readFailure.withLock { $0 = errSecInteractionNotAllowed }
+        controller.start()
+        #expect(controller.status == .keychainUnavailable(errSecInteractionNotAllowed))
+        #expect(controller.pairedHostname == Self.host)
+        #expect(credentials.stored[Self.host] == Self.code)
+        controller.stop()
     }
 
     @Test("Entkoppeln löscht Code und Hostnamen")
@@ -805,7 +836,7 @@ struct SensorControllerTests {
         controller.start()
         #expect(controller.status == .searching)
         controller.unpair()
-        #expect(credentials.code(for: Self.host) == nil)
+        #expect(credentials.stored[Self.host] == nil)
         #expect(preferences.string(forKey: SensorController.Keys.hostname) == nil)
         #expect(controller.pairedHostname == nil)
         #expect(controller.status == .notPaired)

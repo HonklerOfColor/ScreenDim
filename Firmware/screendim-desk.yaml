@@ -7,7 +7,8 @@
 # - Webserver mit Digest-Login, Nutzer `screendim`, Passwort = Kopplungscode.
 #   `GET /events` (SSE, Ping alle 10 s), `GET /binary_sensor/Presence`,
 #   `GET /sensor/Ambient Light`, `GET /text_sensor/Pairing Code`.
-# - BOOT kurz drücken: Kopplungsfenster (2 min ohne Login, LED pulsiert blau).
+# - BOOT kurz drücken: Kopplungsfenster (2 min, LED pulsiert blau): Der Code ist ohne
+#   Login abrufbar; alles andere bleibt hinter dem Login.
 #   BOOT 10 s halten: neuer Code, alte Kopplung ungültig, danach Kopplungsfenster.
 #
 # Bauen und flashen: siehe Firmware/README.md.
@@ -48,7 +49,7 @@ esphome:
           if (fresh)
             id(code_bits) = screendim::new_code_bits(true);
           id(pairing_code).publish_state(screendim::encode(id(code_bits)));
-          screendim::set_pairing_open(false);
+          screendim::setup_web_auth();
           ESP_LOGI("screendim", "Firmware %s, Kopplungscode %s", "${fw_version}",
                    fresh ? "neu erzeugt" : "geladen");
       # globals schreibt erst `loop()` in den Flash-Puffer; danach sofort sichern.

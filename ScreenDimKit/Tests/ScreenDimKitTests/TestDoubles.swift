@@ -402,9 +402,14 @@ final class StubSensorHTTP: SensorHTTP {
 /// Schlüsselbund im RAM.
 final class MemoryCredentials: SensorCredentialStore {
     private let codes = Mutex<[String: PairingCode]>([:])
+    /// Gesetzt: Jedes Lesen wirft diesen Status (Schlüsselbund gesperrt).
+    let readFailure = Mutex<OSStatus?>(nil)
 
-    func code(for hostname: String) -> PairingCode? {
-        codes.withLock { $0[hostname] }
+    var stored: [String: PairingCode] { codes.withLock { $0 } }
+
+    func code(for hostname: String) throws(SensorKeychain.Failure) -> PairingCode? {
+        if let status = readFailure.withLock({ $0 }) { throw SensorKeychain.Failure(status: status) }
+        return codes.withLock { $0[hostname] }
     }
 
     func save(_ code: PairingCode, for hostname: String) throws(SensorKeychain.Failure) {
@@ -444,10 +449,15 @@ final class StubInput: InputActivityMonitoring {
 @MainActor
 final class StubBlanker: ScreenBlanking {
     private(set) var blanked: Set<CGDirectDisplayID> = []
+    private(set) var refreshed: [Set<CGDirectDisplayID>] = []
 
     nonisolated init() {}
 
     func blank(_ displays: Set<CGDirectDisplayID>) {
         blanked = displays
+    }
+
+    func refresh(_ displays: Set<CGDirectDisplayID>) {
+        refreshed.append(displays)
     }
 }

@@ -66,7 +66,8 @@ struct MenuContentView: View {
                     BrightnessControl(
                         title: String(localized: "Alle Monitore"),
                         systemImage: "sun.max.fill",
-                        value: Binding(get: { manager.masterBrightness }, set: { manager.setAllBrightness($0) }),
+                        value: Binding(get: { manager.masterBrightness }, set: { manager.setAllBrightness($0, interactive: true) }),
+                        onEnded: { manager.endInteractiveBrightness() },
                         isEnabled: manager.monitors.contains(where: \.isAdjustable)
                     )
                 }
@@ -74,7 +75,8 @@ struct MenuContentView: View {
                     BrightnessControl(
                         title: monitor.name,
                         systemImage: monitor.isBuiltIn ? "laptopcomputer" : "display",
-                        value: Binding(get: { monitor.brightness }, set: { manager.setBrightness($0, for: monitor.id) }),
+                        value: Binding(get: { monitor.brightness }, set: { manager.setBrightness($0, for: monitor.id, interactive: true) }),
+                        onEnded: { manager.endInteractiveBrightness(for: monitor.id) },
                         isEnabled: monitor.isAdjustable
                     )
                 }
@@ -115,12 +117,14 @@ struct MenuContentView: View {
 
 // MARK: - Helligkeitsregler
 
-/// Name und Wert in einer Zeile, darunter der Regler.
+/// Name und Wert in einer Zeile, darunter der Regler. `value` setzt beim Ziehen jeden
+/// Zwischenwert; `onEnded` meldet das Loslassen (speichern, Auftrag).
 private struct BrightnessControl: View {
     /// Schon lokalisiert bzw. Monitorname.
     let title: String
     let systemImage: String
     @Binding var value: Double
+    let onEnded: () -> Void
     let isEnabled: Bool
 
     var body: some View {
@@ -134,7 +138,7 @@ private struct BrightnessControl: View {
                     .font(.subheadline.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
-            BrightnessBar(value: $value, systemImage: systemImage)
+            BrightnessBar(value: $value, onEnded: onEnded, systemImage: systemImage)
                 .accessibilityLabel(Text("Helligkeit \(title)"))
         }
         .disabled(!isEnabled)
@@ -147,6 +151,7 @@ private struct BrightnessControl: View {
 /// Bedienungshilfen.
 private struct BrightnessBar: View {
     @Binding var value: Double
+    let onEnded: () -> Void
     let systemImage: String
     @Environment(\.isEnabled) private var isEnabled
 
@@ -174,6 +179,10 @@ private struct BrightnessBar: View {
                         guard isEnabled, width > 0 else { return }
                         value = (gesture.location.x / width * 100).rounded().clamped(to: 0...100)
                     }
+                    .onEnded { _ in
+                        guard isEnabled else { return }
+                        onEnded()
+                    }
             )
         }
         .frame(height: Self.height)
@@ -184,8 +193,9 @@ private struct BrightnessBar: View {
             switch direction {
             case .increment: value = (value + step).clamped(to: 0...100)
             case .decrement: value = (value - step).clamped(to: 0...100)
-            @unknown default: break
+            @unknown default: return
             }
+            onEnded()
         }
     }
 }

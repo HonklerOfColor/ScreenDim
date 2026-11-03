@@ -104,8 +104,15 @@ final class DimmingPanel: OverlayWindow {
     }
 
     func updateFrame() {
-        guard let screen = NSScreen.screen(for: displayID) else { return }
+        guard let screen = NSScreen.screen(for: displayID) else {
+            // Bildschirm weg: Sonst schöbe AppKit das Fenster auf einen anderen.
+            panel.orderOut(nil)
+            return
+        }
         panel.setFrame(screen.frame, display: true)
+        if !panel.isVisible {
+            panel.orderFrontRegardless()
+        }
     }
 
     func close() {
@@ -119,6 +126,8 @@ final class DimmingPanel: OverlayWindow {
 public protocol ScreenBlanking: AnyObject {
     /// Genau diese Displays schwarz, alle anderen wieder sichtbar.
     func blank(_ displays: Set<CGDirectDisplayID>)
+    /// Lage der Fenster dieser Displays neu bestimmen; ohne Bildschirm verschwindet das Fenster.
+    func refresh(_ displays: Set<CGDirectDisplayID>)
 }
 
 /// Schwarze Fenster über der Software-Dimmung, gleiche Art wie deren Overlay. Mausklicks
@@ -144,6 +153,12 @@ public final class ScreenBlanker: ScreenBlanking {
             guard let window = windows[id] ?? makeWindow(id) else { continue }
             windows[id] = window
             window.show(alpha: 1)
+        }
+    }
+
+    public func refresh(_ displays: Set<CGDirectDisplayID>) {
+        for id in displays {
+            windows[id]?.updateFrame()
         }
     }
 }

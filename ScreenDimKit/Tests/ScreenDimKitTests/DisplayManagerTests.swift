@@ -13,6 +13,7 @@ struct DisplayManagerTests {
         var makeControl: (UInt64) -> any DDCControlling = { _ in StubControl() }
         let gamma = StubDimmer()
         let overlay = StubDimmer()
+        let blanker = StubBlanker()
         /// Überlebt mehrere Manager in einem Test („Neustart“).
         let preferences = MemoryPreferences()
     }
@@ -32,6 +33,7 @@ struct DisplayManagerTests {
             },
             gamma: setup.gamma,
             overlay: setup.overlay,
+            blanker: setup.blanker,
             discover: { setup.displays },
             makeExternalControl: { avServiceID, _, _ in
                 setup.created.append(avServiceID)
@@ -643,6 +645,69 @@ struct DisplayManagerTests {
         #expect(seen.first == 98)
         #expect(zip(seen, seen.dropFirst()).allSatisfy { $0 > $1 })
         #expect(setup.gamma.levels[2] == 20)
+    }
+
+    @Test("Ziehen am Regler: Wert sofort, gespeichert und gemeldet erst beim Loslassen")
+    func interactiveBrightness() {
+        setup.displays = [Self.external(2, avService: nil)]
+        let manager = makeManager()
+        manager.refresh(force: true)
+        let store = BrightnessStore(storage: setup.preferences)
+        let key = Self.external(2, avService: nil).storageKey
+        manager.setBrightness(80, for: 2)
+        var jobs: [BrightnessJob] = []
+        manager.onBrightnessJob = { jobs.append($0) }
+
+        manager.setBrightness(70, for: 2, interactive: true)
+        manager.setBrightness(60, for: 2, interactive: true)
+        #expect(monitor(manager, 2)?.brightness == 60)
+        #expect(setup.gamma.levels[2] == 60)
+        #expect(store.brightness(for: key, mode: .software) == 80)
+        #expect(jobs.isEmpty)
+
+        manager.endInteractiveBrightness(for: 2)
+        #expect(store.brightness(for: key, mode: .software) == 60)
+        #expect(jobs.map(\.reason) == [.manual])
+        #expect(jobs.first?.remembered == 80)
+        #expect(jobs.first?.target == 60)
+
+        // Loslassen ohne Änderung: kein Auftrag, kein Write.
+        manager.setBrightness(60, for: 2, interactive: true)
+        manager.endInteractiveBrightness()
+        #expect(jobs.count == 1)
+    }
+
+    @Test("Test-Read nach Software-Rückfall: DDC übernimmt wieder; Test-Write merkt den Wert nur bei Erfolg")
+    func testReadRestoresDDC() async {
+        setup.displays = [Self.external(2, avService: 0x100)]
+        let control = StubControl(read: .failure(.nullReply))
+        setup.makeControl = { _ in control }
+        let manager = makeManager()
+        manager.refresh(force: true)
+        #expect(await eventually { monitor(manager, 2)?.usesSoftwareDimming == true })
+        #expect(monitor(manager, 2)?.state == .nullReply)
+
+        control.setRead(.success(VCPReading(current: 40, maximum: 100)))
+        _ = await manager.testRead(2)
+        #expect(monitor(manager, 2)?.state == .ready)
+        #expect(monitor(manager, 2)?.usesSoftwareDimming == false)
+        #expect(monitor(manager, 2)?.brightness == 40)
+        #expect(setup.gamma.levels[2] == nil)
+
+        // Test-Write: der Wert geht genau einmal raus und gilt danach als bestätigt.
+        _ = await manager.testWrite(2)
+        #expect(control.writes == [40])
+    }
+
+    @Test("Entferntes Display: Overlay und Schwarzfenster sofort anpassen, nicht erst beim Refresh")
+    func displayRemovedRefreshesWindows() {
+        setup.displays = [Self.external(2, avService: nil), Self.external(3, avService: nil)]
+        let manager = makeManager()
+        manager.refresh(force: true)
+
+        manager.displayRemoved(3)
+        #expect(setup.overlay.refreshed == [[3]])
+        #expect(setup.blanker.refreshed == [[3]])
     }
 
     @Test("Kleine Änderung ohne Überblenden; setBrightness bricht eine Überblendung ab")

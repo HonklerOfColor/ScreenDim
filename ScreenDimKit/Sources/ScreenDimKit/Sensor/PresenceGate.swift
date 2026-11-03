@@ -4,8 +4,6 @@ import CoreGraphics
 /// Wann die Anwesenheit des Sensors die Bildschirme ausschalten darf. Im Zweifel bleiben
 /// sie an: Ein veralteter oder getrennter Sensor schaltet nichts aus.
 public enum PresenceGate {
-    /// Älter darf das letzte Ereignis beim Ausschalten nicht sein.
-    public static let maxEventAge: Duration = .seconds(10)
     /// Sind die Bildschirme schon aus, gilt der Sensor erst nach dieser Stille als
     /// veraltet. Ohne Zustandsänderung schickt ESPHome nur Pings (etwa alle 10 s); mit
     /// 10 s würden die Bildschirme flackern.
@@ -13,16 +11,11 @@ public enum PresenceGate {
     /// Eingaben innerhalb dieser Zeit verhindern das Ausschalten.
     public static let inputGrace: Duration = .seconds(2)
 
-    /// Bildschirme aus? Nur bei gemeldeter Abwesenheit eines verbundenen Sensors mit
-    /// frischem Ereignis und ohne gerade erfolgte Eingabe.
-    public static func shouldBlank(
-        presence: Bool?,
-        connected: Bool,
-        lastEventAge: Duration?,
-        sinceLastInput: Duration
-    ) -> Bool {
-        guard presence == false, connected, let lastEventAge else { return false }
-        return lastEventAge < maxEventAge && sinceLastInput >= inputGrace
+    /// Bildschirme aus? Nur bei gemeldeter Abwesenheit eines verbundenen Sensors und ohne
+    /// gerade erfolgte Eingabe. Wie frisch die Meldung ist, prüft niemand: Sie löst die
+    /// Entscheidung gerade erst aus.
+    public static func shouldBlank(presence: Bool?, connected: Bool, sinceLastInput: Duration) -> Bool {
+        presence == false && connected && sinceLastInput >= inputGrace
     }
 
     /// Bildschirme wieder an, weil der Sensor nichts mehr meldet?

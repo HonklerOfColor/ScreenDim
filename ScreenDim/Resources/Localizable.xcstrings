@@ -1859,6 +1859,16 @@
         }
       }
     },
+    "Schlüsselbund nicht lesbar (Fehler %lld)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keychain not readable (error %lld)"
+          }
+        }
+      }
+    },
     "Schreibt einmal den Wert, den der Slider zeigt: %@ von 100." : {
       "localizations" : {
         "en" : {

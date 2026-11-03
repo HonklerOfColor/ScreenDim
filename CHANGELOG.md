@@ -73,6 +73,26 @@
 - Logik als lokales Swift-Paket `ScreenDimKit`; Tests per `swift test`.
 
 ### Behoben
+- Schreibtisch-Sensor: Ein nicht lesbarer Schlüsselbund (gesperrt, Zugriff verweigert)
+  galt als „nicht gekoppelt“ und verlangte eine Neukopplung, die den Code überschrieb.
+  Jetzt eigener Status „Schlüsselbund nicht lesbar“; Code und Hostname bleiben.
+- Kopplung von Hand: Ließ sich der angezeigte Code gerade nicht abrufen, wurde der
+  getippte Code ungeprüft gespeichert (im offenen Kopplungsfenster nimmt der Sensor jedes
+  Passwort an). Jetzt bricht die Kopplung dann ab.
+- Lichtkurve: Ein Stützpunkt „NaN“ (im Lux-Feld tippbar) brachte die App zum Absturz.
+- Regler: Jedes Mausereignis beim Ziehen erzeugte einen Auftrag „manual“ (Log, Protokoll
+  der Sensor-Diagnose, Pause der Lichtregelung, UserDefaults-Write). Jetzt gilt der Wert
+  beim Ziehen sofort, gespeichert und gemeldet wird einmal beim Loslassen.
+- DDC-Diagnose: Nach einem erfolgreichen Test-Read stand „Bereit“ neben „reagiert nicht“,
+  weil der Monitor in der Software-Dimmung blieb. Jetzt übernimmt DDC wieder wie nach der
+  Prüfung. Ein gescheiterter Test-Write gilt nicht mehr als zuletzt gesendeter Wert.
+- Wird ein Monitor abgezogen, wanderten sein Overlay und sein Schwarzfenster bis zum
+  Refresh (1,5 s) auf einen anderen Bildschirm. Jetzt verschwinden sie sofort.
+- Die 10-s-Grenze für das Alter einer Abwesenheitsmeldung war wirkungslos (das Alter
+  wurde direkt vor der Prüfung auf 0 gesetzt); entfernt.
+- Firmware: Im Kopplungsfenster fiel das Passwort ganz weg, auch für Weboberfläche und
+  OTA-Update. Jetzt ist dort nur der Code ohne Login abrufbar (eigener Handler), alles
+  andere bleibt hinter dem Digest-Login.
 - Gamma-Dimmung: Scheiterte ein Write, nachdem ein Display schon gedimmt war, blieb seine
   Kurve skaliert stehen, und das Overlay dimmte obendrauf (doppelt dunkel, bis zum
   nächsten ColorSync-Reset). Jetzt kommt die gemerkte Originalkurve zurück, sobald sich
