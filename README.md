@@ -10,8 +10,9 @@ Verfahren ist pro Monitor wählbar. Das eingebaute Display lässt sich per Softw
 seine Hintergrundbeleuchtung regelst du wie gewohnt mit den Helligkeitstasten. Optional
 regelt ein Schreibtisch-Sensor (ESP32) die Helligkeit nach dem Umgebungslicht und
 schaltet die Bildschirme bei Abwesenheit ab. Den Sensor baust du selbst aus einem
-ESP32-S3-DevKitC-1 und einem Waveshare HMMD mmWave Sensor (fünf Leitungen); Stückliste,
-Schaltplan und Firmware stehen in [`Firmware/`](Firmware/README.md).
+ESP32-S3-DevKitC-1, einem Waveshare HMMD mmWave Sensor (Anwesenheit) und einem
+VEML7700-Modul (Licht), neun Leitungen; Stückliste, Schaltplan und Firmware stehen in
+[`Firmware/`](Firmware/README.md).
 
 Auf Wunsch dunkelt ScreenDim alle Monitore ab, wenn du eine Weile weder Maus noch Tastatur
 benutzt (Zeit und Helligkeit wählbar, z. B. nach 15 min auf 5 %). Jede Eingabe bringt die

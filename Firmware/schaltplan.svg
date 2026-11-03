@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- ScreenDim-Schreibtisch-Sensor: Verdrahtung ESP32-S3-DevKitC-1 ↔ Waveshare HMMD mmWave Sensor.
-     Pins wie in screendim-desk.yaml (substitutions). -->
-<svg xmlns="http://www.w3.org/2000/svg" width="820" height="530" viewBox="0 0 820 530"
+<!-- ScreenDim-Schreibtisch-Sensor: Verdrahtung ESP32-S3-DevKitC-1 ↔ Waveshare HMMD mmWave Sensor
+     und VEML7700. Pins wie in screendim-desk.yaml (substitutions). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="740" viewBox="0 0 820 740"
      font-family="-apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14">
-  <title>ScreenDim-Sensor: ESP32-S3-DevKitC-1 und Waveshare HMMD mmWave Sensor</title>
-  <desc>Fünf Leitungen: 3V3 an 3V3, GND an GND, GPIO18 (RX) an TX des Radars, GPIO17 (TX) an RX des Radars, GPIO4 an OT2 (HIGH = anwesend).</desc>
+  <title>ScreenDim-Sensor: ESP32-S3-DevKitC-1, Waveshare HMMD mmWave Sensor und VEML7700</title>
+  <desc>Radar: 3V3 an 3V3, GND an GND, GPIO18 (RX) an TX, GPIO17 (TX) an RX, GPIO4 an OT2 (HIGH = anwesend). Lichtsensor VEML7700: VIN an 3V3, GND an GND, GPIO9 an SCL, GPIO8 an SDA.</desc>
 
-  <rect width="820" height="530" fill="#ffffff"/>
+  <rect width="820" height="740" fill="#ffffff"/>
 
   <text x="410" y="36" text-anchor="middle" font-size="18" font-weight="600" fill="#1f2328">ScreenDim-Schreibtisch-Sensor: Verdrahtung</text>
 
   <!-- ESP32-S3-DevKitC-1 -->
-  <rect x="60" y="70" width="270" height="390" rx="10" fill="#f6f8fa" stroke="#1f2328" stroke-width="2"/>
+  <rect x="60" y="70" width="270" height="580" rx="10" fill="#f6f8fa" stroke="#1f2328" stroke-width="2"/>
   <text x="195" y="98" text-anchor="middle" font-weight="600" fill="#1f2328">ESP32-S3-DevKitC-1</text>
   <text x="195" y="118" text-anchor="middle" font-size="12" fill="#57606a">N8R8: 8 MB Flash, 8 MB PSRAM (oder Nachbau)</text>
 
@@ -31,74 +31,130 @@
   <text x="110" y="236" font-size="12" fill="#1f2328">RGB-LED (WS2812) an GPIO48,</text>
   <text x="110" y="251" font-size="12" fill="#1f2328">DevKitC-1 v1.1: GPIO38</text>
 
-  <!-- ESP-Pins rechts -->
+  <!-- ESP-Pins rechts, obere Gruppe (Radar) -->
   <g font-size="13" fill="#1f2328" font-weight="600" text-anchor="end">
     <text x="318" y="294">3V3</text>
-    <text x="318" y="334">GND</text>
-    <text x="318" y="374">GPIO18</text>
-    <text x="318" y="414">GPIO17</text>
-    <text x="318" y="454">GPIO4</text>
+    <text x="318" y="324">GND</text>
+    <text x="318" y="354">GPIO18</text>
+    <text x="318" y="384">GPIO17</text>
+    <text x="318" y="414">GPIO4</text>
+  </g>
+  <!-- ESP-Pins rechts, untere Gruppe (Lichtsensor) -->
+  <g font-size="13" fill="#1f2328" font-weight="600" text-anchor="end">
+    <text x="318" y="514">3V3</text>
+    <text x="318" y="544">GND</text>
+    <text x="318" y="574">GPIO9</text>
+    <text x="318" y="604">GPIO8</text>
   </g>
   <g fill="#1f2328">
     <circle cx="330" cy="290" r="4"/>
-    <circle cx="330" cy="330" r="4"/>
-    <circle cx="330" cy="370" r="4"/>
+    <circle cx="330" cy="320" r="4"/>
+    <circle cx="330" cy="350" r="4"/>
+    <circle cx="330" cy="380" r="4"/>
     <circle cx="330" cy="410" r="4"/>
-    <circle cx="330" cy="450" r="4"/>
+    <circle cx="330" cy="510" r="4"/>
+    <circle cx="330" cy="540" r="4"/>
+    <circle cx="330" cy="570" r="4"/>
+    <circle cx="330" cy="600" r="4"/>
   </g>
 
-  <!-- Leitungen -->
+  <!-- Leitungen zum Radar -->
   <g stroke-width="3" fill="none" stroke-linecap="round">
-    <line x1="330" y1="290" x2="530" y2="290" stroke="#d1242f"/>
-    <line x1="330" y1="330" x2="530" y2="330" stroke="#1f2328"/>
-    <line x1="330" y1="370" x2="530" y2="370" stroke="#0969da"/>
-    <line x1="330" y1="410" x2="530" y2="410" stroke="#1a7f37"/>
-    <line x1="330" y1="450" x2="530" y2="450" stroke="#bf8700"/>
+    <line x1="330" y1="290" x2="540" y2="290" stroke="#d1242f"/>
+    <line x1="330" y1="320" x2="540" y2="320" stroke="#1f2328"/>
+    <line x1="330" y1="350" x2="540" y2="350" stroke="#0969da"/>
+    <line x1="330" y1="380" x2="540" y2="380" stroke="#1a7f37"/>
+    <line x1="330" y1="410" x2="540" y2="410" stroke="#bf8700"/>
+  </g>
+  <g font-size="11" text-anchor="middle">
+    <text x="435" y="283" fill="#d1242f">3,3 V (3,0–3,6 V, nicht 5 V)</text>
+    <text x="435" y="313" fill="#1f2328">Masse</text>
+    <text x="435" y="343" fill="#0969da">UART 115200: Radar TX → ESP RX</text>
+    <text x="435" y="373" fill="#1a7f37">UART 115200: ESP TX → Radar RX</text>
+    <text x="435" y="403" fill="#bf8700">Anwesenheit: HIGH = anwesend</text>
   </g>
 
-  <!-- Beschriftung der Leitungen -->
-  <g font-size="12" text-anchor="middle">
-    <text x="430" y="282" fill="#d1242f">3,3 V (3,0–3,6 V, nicht 5 V)</text>
-    <text x="430" y="322" fill="#1f2328">Masse</text>
-    <text x="430" y="362" fill="#0969da">UART 115200: Radar TX → ESP RX</text>
-    <text x="430" y="402" fill="#1a7f37">UART 115200: ESP TX → Radar RX</text>
-    <text x="430" y="442" fill="#bf8700">Anwesenheit: HIGH = anwesend</text>
+  <!-- Leitungen zum Lichtsensor -->
+  <g stroke-width="3" fill="none" stroke-linecap="round">
+    <line x1="330" y1="510" x2="540" y2="510" stroke="#d1242f"/>
+    <line x1="330" y1="540" x2="540" y2="540" stroke="#1f2328"/>
+    <line x1="330" y1="570" x2="540" y2="570" stroke="#8250df"/>
+    <line x1="330" y1="600" x2="540" y2="600" stroke="#0e7490"/>
+  </g>
+  <g font-size="11" text-anchor="middle">
+    <text x="435" y="503" fill="#d1242f">3,3 V an VIN (Modul hat Regler)</text>
+    <text x="435" y="533" fill="#1f2328">Masse</text>
+    <text x="435" y="563" fill="#8250df">I2C SCL</text>
+    <text x="435" y="593" fill="#0e7490">I2C SDA (Adresse 0x10)</text>
   </g>
 
-  <!-- HMMD-Pins links -->
+  <!-- Waveshare HMMD, Rahmen -->
+  <rect x="540" y="70" width="240" height="360" rx="10" fill="#f6f8fa" stroke="#1f2328" stroke-width="2"/>
+  <!-- HMMD-Pins -->
   <g fill="#1f2328">
-    <circle cx="530" cy="290" r="4"/>
-    <circle cx="530" cy="330" r="4"/>
-    <circle cx="530" cy="370" r="4"/>
-    <circle cx="530" cy="410" r="4"/>
-    <circle cx="530" cy="450" r="4"/>
+    <circle cx="540" cy="290" r="4"/>
+    <circle cx="540" cy="320" r="4"/>
+    <circle cx="540" cy="350" r="4"/>
+    <circle cx="540" cy="380" r="4"/>
+    <circle cx="540" cy="410" r="4"/>
   </g>
   <g font-size="13" fill="#1f2328" font-weight="600">
-    <text x="542" y="294">3V3</text>
-    <text x="542" y="334">GND</text>
-    <text x="542" y="374">TX</text>
-    <text x="542" y="414">RX</text>
-    <text x="542" y="454">OT2</text>
+    <text x="552" y="294">3V3</text>
+    <text x="552" y="324">GND</text>
+    <text x="552" y="354">TX</text>
+    <text x="552" y="384">RX</text>
+    <text x="552" y="414">OT2</text>
   </g>
 
   <!-- Waveshare HMMD -->
-  <rect x="530" y="70" width="230" height="390" rx="10" fill="#f6f8fa" stroke="#1f2328" stroke-width="2"/>
-  <text x="645" y="98" text-anchor="middle" font-weight="600" fill="#1f2328">Waveshare HMMD</text>
-  <text x="645" y="118" text-anchor="middle" font-weight="600" fill="#1f2328">mmWave Sensor</text>
-  <text x="645" y="138" text-anchor="middle" font-size="12" fill="#57606a">24-GHz-Radar, 20 × 20 mm, Header J2</text>
-  <text x="645" y="156" text-anchor="middle" font-size="12" fill="#57606a">Pins 1–5: 3V3, GND, TX, RX, OT2</text>
-
-  <!-- Antenne, Symbol -->
+  <text x="660" y="98" text-anchor="middle" font-weight="600" fill="#1f2328">Waveshare HMMD</text>
+  <text x="660" y="118" text-anchor="middle" font-weight="600" fill="#1f2328">mmWave Sensor</text>
+  <text x="660" y="138" text-anchor="middle" font-size="12" fill="#57606a">24-GHz-Radar, 20 × 20 mm, Header J2</text>
+  <text x="660" y="156" text-anchor="middle" font-size="12" fill="#57606a">Pins 1–5: 3V3, GND, TX, RX, OT2</text>
   <g stroke="#57606a" stroke-width="1.5" fill="none">
-    <path d="M 690 230 q 20 -20 0 -40"/>
-    <path d="M 702 240 q 36 -30 0 -60"/>
-    <path d="M 714 250 q 52 -40 0 -80"/>
+    <path d="M 700 230 q 20 -20 0 -40"/>
+    <path d="M 712 240 q 36 -30 0 -60"/>
+    <path d="M 724 250 q 52 -40 0 -80"/>
   </g>
-  <text x="645" y="262" text-anchor="middle" font-size="12" fill="#57606a">Antenne mit freiem Blick zum Sitzplatz</text>
+  <text x="660" y="268" text-anchor="middle" font-size="12" fill="#57606a">Antenne mit freiem Blick zum Sitzplatz</text>
+
+  <!-- VEML7700, Rahmen -->
+  <rect x="540" y="450" width="240" height="200" rx="10" fill="#f6f8fa" stroke="#1f2328" stroke-width="2"/>
+  <!-- VEML7700-Pins -->
+  <g fill="#1f2328">
+    <circle cx="540" cy="510" r="4"/>
+    <circle cx="540" cy="540" r="4"/>
+    <circle cx="540" cy="570" r="4"/>
+    <circle cx="540" cy="600" r="4"/>
+    <circle cx="540" cy="630" r="4" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/>
+  </g>
+  <g font-size="13" fill="#1f2328" font-weight="600">
+    <text x="552" y="514">VIN</text>
+    <text x="552" y="544">GND</text>
+    <text x="552" y="574">SCL</text>
+    <text x="552" y="604">SDA</text>
+    <text x="552" y="634" font-weight="400" fill="#57606a">3Vo (bleibt frei)</text>
+  </g>
+
+  <!-- VEML7700 -->
+  <text x="660" y="476" text-anchor="middle" font-weight="600" fill="#1f2328">VEML7700-Modul</text>
+  <text x="660" y="494" text-anchor="middle" font-size="12" fill="#57606a">Umgebungslicht in Lux, I2C, 3–5 V</text>
+  <circle cx="735" cy="585" r="14" fill="#fff8c5" stroke="#9a6700" stroke-width="1.5"/>
+  <g stroke="#9a6700" stroke-width="1.5" stroke-linecap="round">
+    <line x1="735" y1="562" x2="735" y2="566"/>
+    <line x1="735" y1="604" x2="735" y2="608"/>
+    <line x1="712" y1="585" x2="716" y2="585"/>
+    <line x1="754" y1="585" x2="758" y2="585"/>
+    <line x1="719" y1="569" x2="722" y2="572"/>
+    <line x1="748" y1="598" x2="751" y2="601"/>
+    <line x1="751" y1="569" x2="748" y2="572"/>
+    <line x1="722" y1="598" x2="719" y2="601"/>
+  </g>
 
   <!-- Fußnoten -->
   <g font-size="12" fill="#57606a">
-    <text x="60" y="490">Alle Pegel 3,3 V. Ohne Radar zieht ein Pull-up GPIO4 auf HIGH: Die App sieht „anwesend“, die Bildschirme bleiben an.</text>
-    <text x="60" y="510">Pins stehen unter „substitutions“ in Firmware/screendim-desk.yaml und lassen sich dort ändern.</text>
+    <text x="60" y="680">Alle Pegel 3,3 V. Das DevKitC-1 hat zwei 3V3-Pins und mehrere GND-Pins; sonst eine Steckplatine nehmen.</text>
+    <text x="60" y="700">Ohne Radar meldet der Sensor „anwesend“ (Pull-up an GPIO4), ohne VEML7700 fehlt nur das Licht.</text>
+    <text x="60" y="720">Pins stehen unter „substitutions“ in Firmware/screendim-desk.yaml und lassen sich dort ändern.</text>
   </g>
 </svg>

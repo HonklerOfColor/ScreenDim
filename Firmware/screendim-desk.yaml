@@ -1,11 +1,12 @@
-# ScreenDim-Schreibtisch-Sensor: ESP32-S3 mit Waveshare HMMD mmWave (24 GHz, S3KM1110).
+# ScreenDim-Schreibtisch-Sensor: ESP32-S3 mit Waveshare HMMD mmWave (24 GHz, S3KM1110)
+# und VEML7700 (Umgebungslicht, I2C).
 #
 # Schnittstelle zur App (ScreenDimKit, `SensorProtocol`):
 # - mDNS `_screendim._tcp`, TXT `proto=esphome-sse`, `fw=<Version>`; Instanzname gleich
 #   Hostname (`screendim-desk-xxxxxx`).
 # - Webserver mit Digest-Login, Nutzer `screendim`, Passwort = Kopplungscode.
 #   `GET /events` (SSE, Ping alle 10 s), `GET /binary_sensor/Presence`,
-#   `GET /text_sensor/Pairing Code`.
+#   `GET /sensor/Ambient Light`, `GET /text_sensor/Pairing Code`.
 # - BOOT kurz drücken: Kopplungsfenster (2 min ohne Login, LED pulsiert blau).
 #   BOOT 10 s halten: neuer Code, alte Kopplung ungültig, danach Kopplungsfenster.
 #
@@ -18,6 +19,9 @@ substitutions:
   presence_pin: GPIO4 # OT2: HIGH = anwesend
   radar_rx_pin: GPIO18 # ← TX des Radars
   radar_tx_pin: GPIO17 # → RX des Radars
+  # Verdrahtung VEML7700 → ESP32-S3 (I2C, das Modul hat eigene Pull-ups)
+  i2c_sda_pin: GPIO8
+  i2c_scl_pin: GPIO9
   # RGB-LED (WS2812) der DevKitC-1-Nachbauten; DevKitC-1 v1.1: GPIO38
   led_pin: GPIO48
   # Zusätzlich zur Abfallverzögerung im Radar
@@ -121,6 +125,27 @@ uart:
       timeout: 20ms
     sequence:
       - lambda: UARTDebug::log_string(direction, bytes);
+
+i2c:
+  sda: ${i2c_sda_pin}
+  scl: ${i2c_scl_pin}
+
+sensor:
+  # Umgebungslicht. Ohne Modul am Bus meldet ESPHome den Sensor als ausgefallen; die App
+  # bekommt dann kein Lux und regelt nicht nach dem Licht, Anwesenheit geht weiter.
+  - platform: veml7700
+    address: 0x10
+    # Verstärkung und Integrationszeit wählt der Treiber selbst (auto_mode).
+    update_interval: 2s
+    ambient_light:
+      name: Ambient Light
+      id: ambient_light
+      filters:
+        # Melden bei 3 % Änderung, sonst alle 30 s als Lebenszeichen: Die App gibt den
+        # Sensor nach 45 s ohne Ereignis auf.
+        - or:
+            - delta: 3%
+            - heartbeat: 30s
 
 binary_sensor:
   - platform: gpio

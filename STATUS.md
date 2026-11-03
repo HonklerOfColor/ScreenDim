@@ -40,7 +40,9 @@ Auf echter Hardware noch nicht geprüft. Die Tests decken nur die Logik ab.
 - [ ] RGB-LED: pulsiert sie blau nach kurzem BOOT? Sonst `led_pin` (GPIO38 statt 48).
 - [ ] HMMD anschließen (OT2 → GPIO4, TX → GPIO18, RX → GPIO17, 3,3 V): Anwesenheit im
       Log, UART-Rohdaten ansehen und daraus Entfernung und Abfallverzögerung machen.
-- [ ] Lichtsensor (`sensor/Ambient Light`) fehlt in der Firmware noch.
+- [ ] VEML7700 anschließen (VIN → 3V3, SDA → GPIO8, SCL → GPIO9): Lux im Log,
+      `GET /sensor/Ambient Light`, Heartbeat alle 30 s im SSE-Strom. Firmware bisher nur
+      mit `esphome config` geprüft, nicht geflasht.
 - [ ] Bonjour-Suche zeigt den Sensor (Hostname, Firmware); macOS fragt einmal nach dem
       lokalen Netzwerk.
 - [ ] Kopplung im Kopplungsfenster automatisch; danach 401 → BOOT kurz drücken → Code kommt;
