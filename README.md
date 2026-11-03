@@ -11,6 +11,29 @@ seine Hintergrundbeleuchtung regelst du wie gewohnt mit den Helligkeitstasten. O
 regelt ein Schreibtisch-Sensor (ESP32) die Helligkeit nach dem Umgebungslicht und
 schaltet die Bildschirme bei Abwesenheit ab.
 
+Auf Wunsch dunkelt ScreenDim alle Monitore ab, wenn du eine Weile weder Maus noch Tastatur
+benutzt (Zeit und Helligkeit wählbar, z. B. nach 15 min auf 5 %). Jede Eingabe bringt die
+Helligkeit sofort zurück.
+
+## So sieht es aus
+
+<p align="center">
+  <img src="docs/screenshots/menue.png" width="346" alt="Menü in der Menüleiste: ein Regler für alle Monitore und einer je Monitor, darunter Sensor-Status und Einstellungen">
+</p>
+
+<table>
+  <tr>
+    <th>Allgemein</th>
+    <th>Licht</th>
+    <th>Sensor</th>
+  </tr>
+  <tr>
+    <td valign="top"><img src="docs/screenshots/einstellungen-allgemein.png" alt="Einstellungen, Tab Allgemein: Login, Tastenkürzel, Abdunkeln bei Inaktivität und Verfahren je Monitor (DDC/CI, Gamma, Overlay)"></td>
+    <td valign="top"><img src="docs/screenshots/einstellungen-licht.png" alt="Einstellungen, Tab Licht: Lichtkurve je Monitor, Helligkeit über Lux"></td>
+    <td valign="top"><img src="docs/screenshots/einstellungen-sensor.png" alt="Einstellungen, Tab Sensor: gekoppelter Schreibtisch-Sensor, Status, Demo-Modus"></td>
+  </tr>
+</table>
+
 ScreenDim ist Open Source und wird außerhalb des Mac App Store verteilt (Developer ID,
 notarisiert): DDC/CI auf Apple Silicon braucht `IOAVService`, eine private API, die Apple
 im App Store nicht zulässt. Die App läuft deshalb ohne Sandbox.

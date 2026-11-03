@@ -17,6 +17,12 @@
   und die App-Review-Notizen sind weg.
 
 ### Neu
+- Abdunkeln bei Inaktivität (Einstellungen → Allgemein, Standard: aus): Nach 1–120 min
+  ohne Maus und Tastatur gehen alle Monitore auf höchstens die gewählte Helligkeit
+  (0–50 %), auch während ein Video läuft. Jede Eingabe, Regler und Tastenkürzel bringen
+  sie sofort zurück. Gedeckelt wird nur die Ausgabe; eingestellte und gespeicherte Werte
+  und die Lichtregelung bleiben.
+- Screenshots im README (`docs/screenshots/`).
 - Sensor-Firmware `Firmware/screendim-desk.yaml` (ESPHome 2026.10, ESP32-S3, Waveshare
   HMMD mmWave): Anwesenheit über OT2 an GPIO4 (ohne Radar „anwesend“), Kopplungscode
   im NVS, BOOT kurz = Kopplungsfenster 2 min, BOOT 10 s = neuer Code, Digest-Login,
