@@ -1,6 +1,66 @@
 {
   "sourceLanguage" : "de",
   "strings" : {
+    "Alle Monitore dunkler" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All displays darker"
+          }
+        }
+      }
+    },
+    "Alle Monitore heller" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All displays brighter"
+          }
+        }
+      }
+    },
+    "Allgemein" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "General"
+          }
+        }
+      }
+    },
+    "Anmeldeobjekte …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Login Items…"
+          }
+        }
+      }
+    },
+    "Der Start wartet auf deine Erlaubnis in den Systemeinstellungen." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launching awaits your approval in System Settings."
+          }
+        }
+      }
+    },
+    "Die Kürzel sind von einer anderen App belegt." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Another app has claimed these shortcuts."
+          }
+        }
+      }
+    },
     "– (eingebautes Display)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12,26 +72,6 @@
         }
       }
     },
-    "%@ – der eingebaute Sensor springt ein." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ – the built-in sensor takes over."
-          }
-        }
-      }
-    },
-    "%@ – der Schreibtisch-Sensor springt ein." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ – the desk sensor takes over."
-          }
-        }
-      }
-    },
     "%@ (eingebaut)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -39,6 +79,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ (built-in)"
+          }
+        }
+      }
+    },
+    "Gemessen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measured"
+          }
+        }
+      }
+    },
+    "Helligkeit dem Umgebungslicht anpassen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjust brightness to ambient light"
+          }
+        }
+      }
+    },
+    "Jeder Druck ändert die Helligkeit um %lld %%." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each press changes the brightness by %lld%%."
+          }
+        }
+      }
+    },
+    "Kein Display gefunden." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No display found."
           }
         }
       }
@@ -205,16 +285,6 @@
         }
       }
     },
-    "⌃⌥↑ / ⌃⌥↓  alle Monitore ±%@ %%" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⌃⌥↑ / ⌃⌥↓  all displays ±%@%%"
-          }
-        }
-      }
-    },
     "Abbrechen" : {
       "localizations" : {
         "en" : {
@@ -242,16 +312,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Querying"
-          }
-        }
-      }
-    },
-    "Aktiv" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Active"
           }
         }
       }
@@ -469,16 +529,6 @@
         }
       }
     },
-    "Deckel zu" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lid closed"
-          }
-        }
-      }
-    },
     "Demo-Modus" : {
       "localizations" : {
         "en" : {
@@ -559,16 +609,6 @@
         }
       }
     },
-    "Die des eingebauten Displays regelst du weiter mit den Helligkeitstasten." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use the brightness keys to adjust the built-in display’s backlight."
-          }
-        }
-      }
-    },
     "Die Hardware ist nicht im Kauf enthalten. Der Sensor ist optional; ScreenDim funktioniert vollständig ohne ihn." : {
       "localizations" : {
         "en" : {
@@ -609,16 +649,6 @@
         }
       }
     },
-    "Eingebauter Sensor meldet nichts" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Built-in sensor reports nothing"
-          }
-        }
-      }
-    },
     "Eingebauter Sensor, sonst Schreibtisch-Sensor" : {
       "localizations" : {
         "en" : {
@@ -645,16 +675,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Unpair"
-          }
-        }
-      }
-    },
-    "Erneut prüfen" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Check Again"
           }
         }
       }
@@ -695,16 +715,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Asking the sensor for its code…"
-          }
-        }
-      }
-    },
-    "Frage Monitor per DDC/CI ab …" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Querying display via DDC/CI…"
           }
         }
       }
@@ -854,32 +864,12 @@
         }
       }
     },
-    "Helligkeit anpassen nach" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adjust brightness using"
-          }
-        }
-      }
-    },
     "Helligkeit je Monitor" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Brightness per monitor"
-          }
-        }
-      }
-    },
-    "Helligkeit lässt sich gerade nicht lesen oder setzen." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Brightness can't be read or set right now."
           }
         }
       }
@@ -922,16 +912,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "I2C timeout, channel blocked"
-          }
-        }
-      }
-    },
-    "In den Systemeinstellungen erlauben …" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Allow in System Settings…"
           }
         }
       }
@@ -1036,16 +1016,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "no bytes"
-          }
-        }
-      }
-    },
-    "Keine Quelle" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No source"
           }
         }
       }
@@ -1296,6 +1266,26 @@
         }
       }
     },
+    "Monitore" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Displays"
+          }
+        }
+      }
+    },
+    "Monitore neu suchen, z. B. nach dem Umstecken" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rescan displays, e.g. after replugging"
+          }
+        }
+      }
+    },
     "Monitor %lld" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1323,6 +1313,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "After probe"
+          }
+        }
+      }
+    },
+    "Neu suchen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rescan"
           }
         }
       }
@@ -1531,12 +1531,12 @@
         }
       }
     },
-    "Schalte den Schreibtisch-Sensor oder den Demo-Modus ein, dann regelt das Umgebungslicht die Helligkeit jedes Monitors." : {
+    "Schalte dafür im Tab „Sensor“ den Schreibtisch-Sensor oder den Demo-Modus ein." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Turn on the desk sensor or demo mode, and ambient light will control the brightness of each monitor."
+            "value" : "Turn on the desk sensor or demo mode in the “Sensor” tab first."
           }
         }
       }
@@ -1547,16 +1547,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Desk sensor"
-          }
-        }
-      }
-    },
-    "Schreibtisch-Sensor aus" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Desk sensor off"
           }
         }
       }
@@ -1628,6 +1618,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ScreenDim Diagnostics, %@"
+          }
+        }
+      }
+    },
+    "ScreenDim dimmt per Software. Die Hintergrundbeleuchtung bleibt, wie sie ist; die des eingebauten Displays regelst du mit den Helligkeitstasten." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ScreenDim dims in software. The backlight stays as it is; use the brightness keys for the built-in display."
           }
         }
       }
@@ -1785,6 +1785,16 @@
         }
       }
     },
+    "Tastenkürzel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keyboard Shortcuts"
+          }
+        }
+      }
+    },
     "Tastenkürzel ⌃⌥↑/↓ sind von einer anderen App belegt" : {
       "localizations" : {
         "en" : {
@@ -1892,16 +1902,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The real sensor is disconnected while demo mode is on."
-          }
-        }
-      }
-    },
-    "Während des Demo-Modus kommt das Licht aus der Simulation." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "While demo mode is on, the light level is simulated."
           }
         }
       }
@@ -2046,16 +2046,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "External Displays"
-          }
-        }
-      }
-    },
-    "ScreenDim dimmt per Software. Die Hintergrundbeleuchtung bleibt, wie sie ist." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ScreenDim dims in software. The backlight stays as it is."
           }
         }
       }

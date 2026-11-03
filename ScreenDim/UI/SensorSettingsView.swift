@@ -2,15 +2,23 @@ import Charts
 import ScreenDimKit
 import SwiftUI
 
-/// Einstellungsfenster in zwei Tabs: „Sensor“ (Kopplung, Demo, Diagnose) und
-/// „Helligkeit“ (Lichtquelle, Kurven je Monitor). Jeder Tab ist so hoch wie sein Inhalt,
-/// gescrollt wird nicht.
+/// Einstellungsfenster in drei Tabs: „Allgemein“ (Login, Tastenkürzel, Monitore),
+/// „Sensor“ (Kopplung, Demo, Diagnose) und „Licht“ (Umgebungslicht, Kurven je Monitor).
+/// Jeder Tab ist so hoch wie sein Inhalt, gescrollt wird nicht.
 struct SettingsView: View {
     let sensor: SensorController
     let manager: DisplayManager
+    let loginItem: LoginItem
 
     var body: some View {
         TabView {
+            Tab("Allgemein", systemImage: "gearshape") {
+                SettingsPage(sensor: sensor) {
+                    LoginSection(loginItem: loginItem)
+                    ShortcutSection(manager: manager)
+                    MonitorSection(manager: manager)
+                }
+            }
             Tab("Sensor", systemImage: "sensor") {
                 SettingsPage(sensor: sensor) {
                     SensorSection(sensor: sensor)
@@ -19,28 +27,146 @@ struct SettingsView: View {
                     BuildYourOwnSection()
                 }
             }
-            Tab("Helligkeit", systemImage: "sun.max") {
+            Tab("Licht", systemImage: "sun.max") {
                 SettingsPage(sensor: sensor) {
                     LightSection(sensor: sensor)
                     if showsLightCurves {
                         LightCurveSection(sensor: sensor, manager: manager)
-                    } else {
-                        Section {
-                            Text("Schalte den Schreibtisch-Sensor oder den Demo-Modus ein, dann regelt das Umgebungslicht die Helligkeit jedes Monitors.")
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
                     }
                 }
             }
         }
         // Auto-Helligkeit frisch lesen, damit der Hinweis zum Display stimmt.
-        .onAppear { sensor.refreshAutoBrightness() }
+        .onAppear {
+            loginItem.reload()
+            sensor.refreshAutoBrightness()
+        }
     }
 
     /// Kurven nur, wenn überhaupt Licht kommen kann.
     private var showsLightCurves: Bool {
         sensor.effectiveLightSource != .off && (sensor.isEnabled || sensor.isDemoActive)
+    }
+}
+
+// MARK: - Allgemein
+
+private struct LoginSection: View {
+    let loginItem: LoginItem
+
+    var body: some View {
+        Section {
+            Toggle("Bei Login starten", isOn: Binding(get: { loginItem.isEnabled }, set: { loginItem.setEnabled($0) }))
+            if loginItem.needsApproval {
+                HStack {
+                    Text("Der Start wartet auf deine Erlaubnis in den Systemeinstellungen.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Anmeldeobjekte …") { loginItem.openSystemSettings() }
+                }
+            }
+            if let error = loginItem.lastError {
+                Text(verbatim: error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+}
+
+private struct ShortcutSection: View {
+    let manager: DisplayManager
+
+    var body: some View {
+        Section("Tastenkürzel") {
+            LabeledContent("Alle Monitore heller") { Text(verbatim: "⌃⌥↑") }
+            LabeledContent("Alle Monitore dunkler") { Text(verbatim: "⌃⌥↓") }
+            if manager.hotKeysAvailable {
+                Text("Jeder Druck ändert die Helligkeit um \(Int(DisplayManager.hotKeyStep)) %.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Label("Die Kürzel sind von einer anderen App belegt.", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+}
+
+/// Je Monitor das Dimmverfahren; der Hinweis zur Software-Dimmung steht einmal darunter.
+private struct MonitorSection: View {
+    let manager: DisplayManager
+
+    var body: some View {
+        Section {
+            if manager.monitors.isEmpty {
+                Text("Kein Display gefunden.").foregroundStyle(.secondary)
+            }
+            ForEach(manager.monitors) { monitor in
+                MonitorRow(monitor: monitor, manager: manager)
+            }
+            HStack {
+                Text("ScreenDim dimmt per Software. Die Hintergrundbeleuchtung bleibt, wie sie ist; die des eingebauten Displays regelst du mit den Helligkeitstasten.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer()
+                Button("Neu suchen") { manager.refresh(force: true) }
+                    .help("Monitore neu suchen, z. B. nach dem Umstecken")
+            }
+        } header: {
+            Text("Monitore")
+        }
+    }
+}
+
+private struct MonitorRow: View {
+    let monitor: DisplayManager.Monitor
+    let manager: DisplayManager
+
+    var body: some View {
+        LabeledContent {
+            if monitor.usesSoftwareDimming {
+                Picker("Abdunkeln über", selection: Binding(
+                    get: { monitor.dimming },
+                    set: { manager.setDimmingMethod($0, for: monitor.id) }
+                )) {
+                    Text("Gamma").tag(DimmingMethod.gamma)
+                    Text("Overlay").tag(DimmingMethod.overlay)
+                }
+                .labelsHidden()
+                .fixedSize()
+                .disabled(monitor.gammaUnavailable)
+                .help("Gamma skaliert die Farbkurve des Displays. Overlay legt ein halbtransparentes Fenster darüber.")
+            }
+        } label: {
+            Label {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: monitor.name)
+                    if let detail {
+                        Text(detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } icon: {
+                Image(systemName: monitor.isBuiltIn ? "laptopcomputer" : "display")
+            }
+        }
+    }
+
+    /// Anschlussweg und, falls Gamma nicht geht, warum das Overlay dimmt.
+    private var detail: LocalizedStringKey? {
+        if monitor.gammaUnavailable { return "Gamma-Tabelle nicht nutzbar, Overlay aktiv." }
+        guard let intermediary = monitor.intermediary else { return nil }
+        return switch (intermediary, monitor.branchVendor) {
+        case (.dock, let vendor?): "Über Dock (\(vendor))"
+        case (.dock, nil): "Über Dock"
+        case (.adapter, let vendor?): "Über Adapter (\(vendor))"
+        case (.adapter, nil): "Über Adapter"
+        }
     }
 }
 
@@ -158,77 +284,49 @@ private struct SensorSection: View {
     }
 }
 
-/// Ob das Umgebungslicht die Helligkeit regelt. Die Wahl erscheint erst mit verbundenem
-/// Schreibtisch-Sensor; eine andere Lichtquelle gibt es nicht.
+/// Ob das Umgebungslicht die Helligkeit regelt. Ohne eingebauten Lichtsensor gibt es nur
+/// den Schreibtisch-Sensor, darum ein Schalter statt einer Quellenwahl.
 private struct LightSection: View {
     let sensor: SensorController
 
-    private var deskSensorConnected: Bool {
-        sensor.isEnabled && !sensor.isDemoActive && sensor.status == .connected
-    }
+    private var hasLight: Bool { sensor.isEnabled || sensor.isDemoActive }
 
     var body: some View {
-        if deskSensorConnected {
-            Section("Umgebungslicht") {
-                Picker("Helligkeit anpassen nach", selection: Binding(
-                    get: { sensor.effectiveLightSource }, set: { sensor.setLightSource($0) }
-                )) {
-                    ForEach(sensor.availableLightSources, id: \.self) { source in
-                        Text(lightSourceName(source, hasBuiltIn: sensor.hasBuiltInLightSensor)).tag(source)
-                    }
-                }
-                if sensor.effectiveLightSource != .off {
-                    activeStatus
-                }
+        Section("Umgebungslicht") {
+            Toggle("Helligkeit dem Umgebungslicht anpassen", isOn: Binding(
+                get: { sensor.effectiveLightSource != .off },
+                set: { sensor.setLightSource($0 ? .deskSensorOnly : .off) }
+            ))
+            .disabled(!hasLight)
+            if !hasLight {
+                caption("Schalte dafür im Tab „Sensor“ den Schreibtisch-Sensor oder den Demo-Modus ein.")
+            } else if sensor.effectiveLightSource != .off {
+                activeStatus
             }
         }
     }
 
-    /// „Aktiv: …“ und, wenn nötig, warum.
+    /// Woher das Licht gerade kommt, oder warum keins kommt.
     @ViewBuilder
     private var activeStatus: some View {
-        LabeledContent("Aktiv") {
+        LabeledContent("Lichtquelle") {
             switch sensor.activeLightOrigin {
             case .deskSensor?: Text("Schreibtisch-Sensor")
             case .builtIn?: Text("Eingebauter Lichtsensor")
             case .demo?: Text("Demo-Modus (simuliert)")
-            case nil: Text("Keine Quelle").foregroundStyle(.secondary)
+            case nil: Text(deskSensorReason).foregroundStyle(.orange)
             }
         }
-        if sensor.isDemoActive {
-            caption("Während des Demo-Modus kommt das Licht aus der Simulation.")
-        } else if sensor.isLightFallback {
-            switch sensor.activeLightOrigin {
-            case .builtIn?: reason("\(Text(deskSensorReason)) – der eingebaute Sensor springt ein.")
-            case .deskSensor?: reason("\(Text(builtInReason)) – der Schreibtisch-Sensor springt ein.")
-            default: EmptyView()
-            }
-        } else if sensor.activeLightOrigin == nil {
-            ForEach(sensor.effectiveLightSource.order, id: \.self) { origin in
-                reason(origin == .builtIn ? builtInReason : deskSensorReason)
-            }
-        } else if sensor.activeLightOrigin == .builtIn, let lux = sensor.builtInLux {
-            LabeledContent("Umgebungslicht") {
+        if let lux = sensor.activeLux {
+            LabeledContent("Gemessen") {
                 Text("\(Int(lux.rounded())) lx").monospacedDigit()
             }
         }
     }
 
     private var deskSensorReason: LocalizedStringKey {
-        if !sensor.isEnabled { return "Schreibtisch-Sensor aus" }
         if sensor.status != .connected { return "Schreibtisch-Sensor getrennt" }
         return "Schreibtisch-Sensor meldet kein Licht"
-    }
-
-    private var builtInReason: LocalizedStringKey {
-        sensor.isBuiltInLightSensorCovered ? "Deckel zu" : "Eingebauter Sensor meldet nichts"
-    }
-
-    private func reason(_ text: LocalizedStringKey) -> some View {
-        Text(text)
-            .font(.caption)
-            .foregroundStyle(.orange)
-            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func caption(_ text: LocalizedStringKey) -> some View {

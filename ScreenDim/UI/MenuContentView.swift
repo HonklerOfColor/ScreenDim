@@ -1,8 +1,9 @@
 import ScreenDimKit
 import SwiftUI
 
-/// Fenster der Menüleiste im Stil des Kontrollzentrums: oben die Helligkeit als Karten,
-/// darunter Zeilen wie in einem Menü.
+/// Fenster der Menüleiste, aufs Wesentliche reduziert: oben die Helligkeit als Regler im
+/// Stil des Kontrollzentrums, darunter drei Zeilen. Alles Technische (Login, Dimmverfahren,
+/// Tastenkürzel) steht in den Einstellungen.
 struct MenuContentView: View {
     let manager: DisplayManager
     let sensor: SensorController
@@ -10,31 +11,28 @@ struct MenuContentView: View {
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             if sensor.isDemoActive {
                 DemoBanner(sensor: sensor, title: "Demo-Modus aktiv")
             }
 
-            brightness
+            brightnessCard
 
-            MenuDivider()
-
-            VStack(spacing: 0) {
-                loginRow
-                sensorRow
+            if !manager.hotKeysAvailable {
+                Label("Tastenkürzel ⌃⌥↑/↓ sind von einer anderen App belegt", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 6)
             }
-            .buttonStyle(MenuRowStyle())
 
             MenuDivider()
 
             VStack(spacing: 0) {
+                sensorRow
                 Button { showSettings() } label: {
                     MenuRowLabel("Einstellungen …", systemImage: "gearshape", shortcut: "⌘,")
                 }
                 .keyboardShortcut(",")
-                Button { manager.refresh(force: true) } label: {
-                    MenuRowLabel("Monitore neu suchen", systemImage: "arrow.clockwise")
-                }
             }
             .buttonStyle(MenuRowStyle())
 
@@ -46,8 +44,8 @@ struct MenuContentView: View {
             .keyboardShortcut("q")
             .buttonStyle(MenuRowStyle())
         }
-        .padding(8)
-        .frame(width: 320)
+        .padding(6)
+        .frame(width: 300)
         .onAppear {
             loginItem.reload()
             Task { await manager.syncBuiltInBrightness() }
@@ -56,87 +54,38 @@ struct MenuContentView: View {
 
     // MARK: - Helligkeit
 
-    private var brightness: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Helligkeit")
-                .font(.headline)
-                .padding(.horizontal, 6)
-                .padding(.top, 2)
-
+    /// Eine Karte für alle Regler: bei mehreren Monitoren zuerst „Alle Monitore“, dann je
+    /// Monitor sein Name und sein Regler.
+    private var brightnessCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
             if manager.monitors.isEmpty {
                 Label("Kein Display gefunden", systemImage: "display.trianglebadge.exclamationmark")
                     .foregroundStyle(.secondary)
-                    .menuCard()
             } else {
                 if manager.monitors.count > 1 {
-                    BrightnessSlider(
+                    BrightnessControl(
                         title: String(localized: "Alle Monitore"),
                         systemImage: "sun.max.fill",
                         value: Binding(get: { manager.masterBrightness }, set: { manager.setAllBrightness($0) }),
                         isEnabled: manager.monitors.contains(where: \.isAdjustable)
                     )
-                    .menuCard()
                 }
                 ForEach(manager.monitors) { monitor in
-                    MonitorRow(monitor: monitor, manager: manager)
-                        .menuCard()
+                    BrightnessControl(
+                        title: monitor.name,
+                        systemImage: monitor.isBuiltIn ? "laptopcomputer" : "display",
+                        value: Binding(get: { monitor.brightness }, set: { manager.setBrightness($0, for: monitor.id) }),
+                        isEnabled: monitor.isAdjustable
+                    )
                 }
             }
-
-            footnotes
-                .padding(.horizontal, 6)
         }
-    }
-
-    @ViewBuilder
-    private var footnotes: some View {
-        if manager.monitors.contains(where: \.usesSoftwareDimming) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("ScreenDim dimmt per Software. Die Hintergrundbeleuchtung bleibt, wie sie ist.")
-                if manager.monitors.contains(where: { $0.isBuiltIn && $0.usesSoftwareDimming }) {
-                    Text("Die des eingebauten Displays regelst du weiter mit den Helligkeitstasten.")
-                }
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        Group {
-            if manager.hotKeysAvailable {
-                Text("⌃⌥↑ / ⌃⌥↓  alle Monitore ±\(Int(DisplayManager.hotKeyStep).formatted()) %")
-                    .foregroundStyle(.secondary)
-            } else {
-                Label("Tastenkürzel ⌃⌥↑/↓ sind von einer anderen App belegt", systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-            }
-        }
-        .font(.caption)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.fill.quaternary, in: .rect(cornerRadius: 12))
     }
 
     // MARK: - Zeilen
-
-    private var loginRow: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Toggle(isOn: Binding(get: { loginItem.isEnabled }, set: { loginItem.setEnabled($0) })) {
-                MenuRowLabel("Bei Login starten", systemImage: "person.crop.circle")
-            }
-            .toggleStyle(.switch)
-            .controlSize(.mini)
-            .padding(.trailing, 8)
-            if loginItem.needsApproval {
-                Button("In den Systemeinstellungen erlauben …") { loginItem.openSystemSettings() }
-                    .buttonStyle(.link)
-                    .font(.caption)
-                    .padding(.leading, MenuMetrics.textInset)
-            }
-            if let error = loginItem.lastError {
-                Text(verbatim: error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .padding(.leading, MenuMetrics.textInset)
-            }
-        }
-    }
 
     /// Mit Sensor: sein Zustand. Ohne: der Weg zur Einrichtung. Beides öffnet die Einstellungen.
     @ViewBuilder
@@ -156,9 +105,7 @@ struct MenuContentView: View {
             .help("Hilfe: optionalen Anwesenheits- und Lichtsensor koppeln oder den Demo-Modus testen")
         }
     }
-}
 
-extension MenuContentView {
     /// Menüleisten-App: Das Fenster käme sonst hinter anderen Apps hoch.
     private func showSettings() {
         openSettings()
@@ -166,156 +113,90 @@ extension MenuContentView {
     }
 }
 
-private struct MonitorRow: View {
-    let monitor: DisplayManager.Monitor
-    let manager: DisplayManager
+// MARK: - Helligkeitsregler
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            BrightnessSlider(
-                title: monitor.name,
-                systemImage: monitor.isBuiltIn ? "laptopcomputer" : "display",
-                value: Binding(get: { monitor.brightness }, set: { manager.setBrightness($0, for: monitor.id) }),
-                isEnabled: monitor.isAdjustable
-            ) {
-                if let connection {
-                    Label(connection, systemImage: monitor.intermediary == .dock ? "dock.rectangle" : "cable.connector")
-                }
-            }
-            if monitor.usesSoftwareDimming {
-                dimmingPicker
-            }
-            switch monitor.state {
-            case .probing:
-                HStack(spacing: 6) {
-                    ProgressView().controlSize(.mini)
-                    Text("Frage Monitor per DDC/CI ab …")
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            case _ where monitor.isBuiltIn && monitor.state.isFailure:
-                hint("Helligkeit lässt sich gerade nicht lesen oder setzen.", retry: true)
-            default:
-                // Software-Dimmung ist der Normalfall; der Hinweis steht einmal unten.
-                EmptyView()
-            }
-        }
-    }
-
-    /// Gamma oder Overlay. Geht Gamma bei diesem Display nicht, dimmt das Overlay.
-    private var dimmingPicker: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Picker("Abdunkeln über", selection: Binding(
-                get: { monitor.dimming },
-                set: { manager.setDimmingMethod($0, for: monitor.id) }
-            )) {
-                Text("Gamma").tag(DimmingMethod.gamma)
-                Text("Overlay").tag(DimmingMethod.overlay)
-            }
-            .pickerStyle(.segmented)
-            .controlSize(.small)
-            .help("Gamma skaliert die Farbkurve des Displays. Overlay legt ein halbtransparentes Fenster darüber.")
-            if monitor.gammaUnavailable {
-                Text("Gamma-Tabelle nicht nutzbar, Overlay aktiv.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    /// „Über Dock (Realtek)“; `nil` bei direktem Anschluss.
-    private var connection: LocalizedStringKey? {
-        guard let intermediary = monitor.intermediary else { return nil }
-        return switch (intermediary, monitor.branchVendor) {
-        case (.dock, let vendor?): "Über Dock (\(vendor))"
-        case (.dock, nil): "Über Dock"
-        case (.adapter, let vendor?): "Über Adapter (\(vendor))"
-        case (.adapter, nil): "Über Adapter"
-        }
-    }
-
-    private func hint(
-        _ text: LocalizedStringKey,
-        systemImage: String = "exclamationmark.triangle.fill",
-        color: Color = .orange,
-        retry: Bool
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Image(systemName: systemImage)
-                    .foregroundStyle(color)
-                Text(text)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if retry {
-                Button("Erneut prüfen") { manager.retry(monitor.id) }
-                    .buttonStyle(.link)
-                    .padding(.leading, 18)
-            }
-        }
-        .font(.caption)
-    }
-}
-
-/// Kopf mit rundem Symbol, Name und Wert, darunter der Regler zwischen zwei Sonnen.
-private struct BrightnessSlider<Subtitle: View>: View {
+/// Name und Wert in einer Zeile, darunter der Regler.
+private struct BrightnessControl: View {
     /// Schon lokalisiert bzw. Monitorname.
     let title: String
     let systemImage: String
     @Binding var value: Double
     let isEnabled: Bool
-    @ViewBuilder var subtitle: Subtitle
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(isEnabled ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
-                    .frame(width: 26, height: 26)
-                    .background(isEnabled ? AnyShapeStyle(.tint) : AnyShapeStyle(.quaternary), in: .circle)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(verbatim: title)
-                        .fontWeight(.medium)
-                        .lineLimit(1)
-                    subtitle
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 4)
+            HStack {
+                Text(verbatim: title)
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
+                Spacer(minLength: 8)
                 Text(verbatim: "\(Int(value)) %")
-                    .monospacedDigit()
+                    .font(.subheadline.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
-            Slider(value: $value, in: 0...100, step: 1) {
-                Text("Helligkeit \(title)")
-            } minimumValueLabel: {
-                Image(systemName: "sun.min")
-                    .foregroundStyle(.secondary)
-            } maximumValueLabel: {
-                Image(systemName: "sun.max")
-                    .foregroundStyle(.secondary)
-            }
-            .labelsHidden()
+            BrightnessBar(value: $value, systemImage: systemImage)
+                .accessibilityLabel(Text("Helligkeit \(title)"))
         }
         .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.5)
     }
 }
 
-extension BrightnessSlider where Subtitle == EmptyView {
-    init(title: String, systemImage: String, value: Binding<Double>, isEnabled: Bool) {
-        self.init(title: title, systemImage: systemImage, value: value, isEnabled: isEnabled) { EmptyView() }
+/// Regler wie im Kontrollzentrum: eine Kapsel, deren weiße Füllung die Helligkeit zeigt,
+/// links das Symbol. Ziehen oder Klicken setzt den Wert, Pfeiltasten über die
+/// Bedienungshilfen.
+private struct BrightnessBar: View {
+    @Binding var value: Double
+    let systemImage: String
+    @Environment(\.isEnabled) private var isEnabled
+
+    private static let height: CGFloat = 28
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(.fill.secondary)
+                Capsule()
+                    .fill(.white)
+                    .shadow(color: .black.opacity(0.12), radius: 1, y: 0.5)
+                    .frame(width: max(Self.height, width * value / 100))
+                Image(systemName: systemImage)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.black.opacity(0.7))
+                    .frame(width: Self.height, height: Self.height)
+            }
+            .contentShape(.capsule)
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { gesture in
+                        guard isEnabled, width > 0 else { return }
+                        value = (gesture.location.x / width * 100).rounded().clamped(to: 0...100)
+                    }
+            )
+        }
+        .frame(height: Self.height)
+        .accessibilityElement()
+        .accessibilityValue(Text("\(Int(value)) %"))
+        .accessibilityAdjustableAction { direction in
+            let step = DisplayManager.hotKeyStep
+            switch direction {
+            case .increment: value = (value + step).clamped(to: 0...100)
+            case .decrement: value = (value - step).clamped(to: 0...100)
+            @unknown default: break
+            }
+        }
+    }
+}
+
+private extension Double {
+    func clamped(to range: ClosedRange<Double>) -> Double {
+        min(max(self, range.lowerBound), range.upperBound)
     }
 }
 
 // MARK: - Menü-Bausteine
-
-private enum MenuMetrics {
-    /// Einzug des Titels einer Menüzeile (Rand, Symbolspalte, Abstand), für Zeilen darunter.
-    static let textInset: CGFloat = 8 + 20 + 6
-}
 
 /// Inhalt einer Menüzeile: Symbol in fester Spalte, Titel, rechts Kürzel oder Zustand.
 private struct MenuRowLabel<Trailing: View>: View {
@@ -340,7 +221,7 @@ private struct MenuRowLabel<Trailing: View>: View {
                 .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 5)
+        .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(.rect)
     }
@@ -386,14 +267,5 @@ private struct MenuRowStyle: ButtonStyle {
 private struct MenuDivider: View {
     var body: some View {
         Divider().padding(.horizontal, 8)
-    }
-}
-
-private extension View {
-    /// Karte wie ein Modul im Kontrollzentrum.
-    func menuCard() -> some View {
-        padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.fill.quaternary, in: .rect(cornerRadius: 12))
     }
 }
