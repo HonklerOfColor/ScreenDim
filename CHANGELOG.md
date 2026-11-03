@@ -39,6 +39,11 @@
   halbiert).
 - Sensor-Diagnose: je Helligkeitsauftrag ein Eintrag mit Grund, Start (gemerkt/echt), Ziel
   und Dauer; dazu `log.info` in der Kategorie `light`.
+- Direct: Dritte, späte Probe-Runde (5 s) nach verstümmelter DDC-Antwort: Manche
+  Monitore liefern nach dem Einstecken einige Sekunden Zufallsbytes (JapanNext 6K),
+  landeten bisher in der Software-Dimmung und kamen erst mit der nächsten
+  Neu-Enumeration zurück. Nach Null-Antwort, Timeout oder I/O-Fehler bleibt es bei zwei
+  Runden.
 - Direct: Schalter „Hintergrundbeleuchtung per DDC/CI regeln“ (Einstellungen →
   „Helligkeit“ → „Externe Monitore“, Standard: an). Aus: keine DDC-Kanäle und kein
   I2C-Verkehr, externe Monitore dimmen per Software (Gamma oder Overlay) wie in der

@@ -25,6 +25,7 @@ struct DisplayManagerTests {
             store: BrightnessStore(storage: setup.preferences),
             timing: .immediate,
             probeRetryDelay: .milliseconds(1),
+            probeLateRetryDelay: .milliseconds(20),
             systemFadeDuration: systemFade,
             sleep: { duration in
                 if let sleeper { await sleeper.sleep(duration) } else { try? await Task.sleep(for: duration) }
@@ -130,6 +131,53 @@ struct DisplayManagerTests {
 
         #expect(await eventually { state(manager, 2) != .probing })
         #expect(state(manager, 2) == expected)
+    }
+
+    @Test("Verstümmelte Antwort: dritte, späte Runde; der Monitor ist dann hochgefahren")
+    func garbledReplyGetsThirdRound() async {
+        let control = StubControl(read: .failure(.checksumMismatch))
+        setup.displays = [Self.external(2, avService: 0x100)]
+        setup.makeControl = { _ in control }
+        let manager = makeManager()
+        manager.refresh(force: true)
+
+        // Nach zwei Fehlrunden wartet die Probe auf die dritte; erst dann antwortet der Monitor.
+        #expect(await eventually { control.reads == 2 })
+        #expect(state(manager, 2) == .probing)
+        control.setRead(.success(VCPReading(current: 70, maximum: 100)))
+        #expect(await eventually { state(manager, 2) == .ready })
+        #expect(control.reads == 3)
+        #expect(monitor(manager, 2)?.usesSoftwareDimming == false)
+        #expect(monitor(manager, 2)?.brightness == 70)
+    }
+
+    @Test("Keine dritte Runde nach Null-Antwort, Timeout oder I/O-Fehler", arguments: [
+        DDCError.nullReply, .timeout, .hung, .readFailed(-1),
+    ])
+    func noThirdRoundAfterSilence(_ error: DDCError) async {
+        let control = StubControl(read: .failure(error))
+        setup.displays = [Self.external(2, avService: 0x100)]
+        setup.makeControl = { _ in control }
+        let manager = makeManager()
+        manager.refresh(force: true)
+
+        #expect(await eventually { state(manager, 2) != .probing })
+        #expect(control.reads == 2)
+        #expect(monitor(manager, 2)?.usesSoftwareDimming == true)
+    }
+
+    @Test("Verstümmelt, dann verstümmelt: nach der dritten Runde Software-Dimmung")
+    func garbledThreeTimesFallsBack() async {
+        let control = StubControl(read: .failure(.malformedReply))
+        setup.displays = [Self.external(2, avService: 0x100)]
+        setup.makeControl = { _ in control }
+        let manager = makeManager()
+        manager.refresh(force: true)
+
+        #expect(await eventually { state(manager, 2) != .probing })
+        #expect(control.reads == 3)
+        #expect(state(manager, 2) == .noResponse)
+        #expect(monitor(manager, 2)?.usesSoftwareDimming == true)
     }
 
     @Test("Probe erfolgreich: .ready")

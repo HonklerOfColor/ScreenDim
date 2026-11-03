@@ -91,8 +91,11 @@ public final class DisplayManager {
     @ObservationIgnored private let gamma: any SoftwareDimming
     @ObservationIgnored private let overlay: any SoftwareDimming
     @ObservationIgnored private let blanker: any ScreenBlanking
-    /// Pause zwischen den beiden Probe-Runden eines externen Monitors.
+    /// Pause zwischen der ersten und zweiten Probe-Runde eines externen Monitors.
     @ObservationIgnored private let probeRetryDelay: Duration
+    /// Pause vor der dritten Runde, die es nur nach einer verstümmelten Antwort gibt:
+    /// Der Monitor spricht, ist aber noch nicht hochgefahren.
+    @ObservationIgnored private let probeLateRetryDelay: Duration
     /// Dauer einer Überblendung nach Licht, unabhängig von der Größe des Sprungs.
     @ObservationIgnored private let fadeDuration: Duration
     /// Kürzere Überblendung für Wege des Managers selbst: Wert nach der Prüfung,
@@ -114,6 +117,7 @@ public final class DisplayManager {
         store: BrightnessStore = BrightnessStore(),
         timing: DDCTiming = .configured(from: .standard),
         probeRetryDelay: Duration = .seconds(2),
+        probeLateRetryDelay: Duration = .seconds(5),
         fadeDuration: Duration = .seconds(2),
         systemFadeDuration: Duration = .milliseconds(500),
         sleep: @escaping @Sendable (Duration) async -> Void = { try? await Task.sleep(for: $0) },
@@ -127,6 +131,7 @@ public final class DisplayManager {
         self.store = store
         self.timing = timing
         self.probeRetryDelay = probeRetryDelay
+        self.probeLateRetryDelay = probeLateRetryDelay
         self.fadeDuration = fadeDuration
         self.systemFadeDuration = systemFadeDuration
         self.sleep = sleep
@@ -606,21 +611,24 @@ public final class DisplayManager {
     }
 
     /// Liest die aktuelle Helligkeit (mit Retry) und stellt bei externen Monitoren danach
-    /// den gespeicherten Wert her.
+    /// den gespeicherten Wert her. Externe Monitore bekommen zwei Runden; eine dritte,
+    /// spätere nur nach verstümmelter Antwort (siehe `probeDelay`).
     private func probe(_ id: CGDirectDisplayID, generation: Int) async {
         guard let channel = channels[id], let monitor = monitors.first(where: { $0.id == id }) else { return }
         let saved = monitor.isBuiltIn ? nil : store.brightness(for: monitor.storageKey, mode: .ddc)
 
         var reading: VCPReading?
         var lastError: DDCError?
-        for round in 1...(monitor.isBuiltIn ? 1 : 2) where reading == nil {
+        var round = 0
+        while reading == nil {
+            round += 1
             do throws(DDCError) {
                 reading = try await channel.control.read(.brightness)
             } catch {
                 lastError = error
                 log.error("Read Helligkeit Display \(id), Runde \(round): \(error.description, privacy: .public)")
-                if case .unsupportedCode = error { break }
-                if round == 1 { try? await Task.sleep(for: probeRetryDelay) }
+                guard let delay = probeDelay(after: error, round: round, isBuiltIn: monitor.isBuiltIn) else { break }
+                try? await Task.sleep(for: delay)
             }
             guard generation == self.generation else { return }
         }
@@ -645,6 +653,23 @@ public final class DisplayManager {
             }
         }
         onMonitorReady?(id)
+    }
+
+    /// Pause vor der nächsten Probe-Runde; `nil` beendet die Prüfung.
+    ///
+    /// Eine verstümmelte Antwort (Prüfsumme, Aufbau) heißt: Der Monitor spricht, sein
+    /// Scaler ist aber noch nicht hochgefahren; der JapanNext 6K liefert nach dem
+    /// Einstecken etwa 5 s lang Zufallsbytes. Dafür die dritte, späte Runde. Nach
+    /// Null-Antwort (DDC/CI aus), Timeout oder I/O-Fehler (Dock hängt) nicht: Jeder
+    /// weitere Aufruf kann dort im Kernel blockieren.
+    private func probeDelay(after error: DDCError, round: Int, isBuiltIn: Bool) -> Duration? {
+        guard !isBuiltIn else { return nil }
+        return switch (round, error) {
+        case (_, .unsupportedCode): nil
+        case (1, _): probeRetryDelay
+        case (2, .checksumMismatch), (2, .malformedReply): probeLateRetryDelay
+        default: nil
+        }
     }
 
     private func writeFailed(_ key: ChannelKey, raw: UInt16, error: DDCError) {

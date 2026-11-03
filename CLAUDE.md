@@ -110,5 +110,8 @@ Schlüsselbildung: `Int` → `%lld`, `String` → `%@`, ein `%` neben einer Inte
   unzuverlässig. Der S34CG50 blieb nach einem doppelten Write im Kernel hängen
   (Aufrufe blockierten etwa 8 s). Deshalb: nie schnell hintereinander abfragen, nicht
   doppelt schreiben.
+- JapanNext 6K (6720×3780): über USB-C→DP (Sabrent-Adapter) nur Null-Messages, außer
+  einmal beim Einstecken vor dem EDID; über HDMI geht DDC/CI. Nach dem Einstecken etwa
+  5 s Zufallsbytes (`checksumMismatch`), daher die dritte Probe-Runde.
 - In zsh ist `log` ein Builtin; immer `/usr/bin/log show|stream` verwenden.
 - Codesign im iCloud-Ordner scheitert an FinderInfo-xattrs; DerivedData daher unter `/tmp`.
