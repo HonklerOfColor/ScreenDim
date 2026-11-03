@@ -271,6 +271,8 @@ private struct EventLog: View {
         case .softwareFallback: "Software-Dimmung"
         case .wake: "Aufwachen/Umstecken"
         case .externalChange: "Fremde Änderung"
+        case .idleDim: "Leerlauf"
+        case .idleEnd: "Leerlauf beendet"
         }
     }
 

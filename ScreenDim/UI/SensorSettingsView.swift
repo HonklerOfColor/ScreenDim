@@ -2,12 +2,13 @@ import Charts
 import ScreenDimKit
 import SwiftUI
 
-/// Einstellungsfenster in drei Tabs: „Allgemein“ (Login, Tastenkürzel, Monitore),
+/// Einstellungsfenster in drei Tabs: „Allgemein“ (Login, Tastenkürzel, Leerlauf, Monitore),
 /// „Sensor“ (Kopplung, Demo, Diagnose) und „Licht“ (Umgebungslicht, Kurven je Monitor).
 /// Jeder Tab ist so hoch wie sein Inhalt, gescrollt wird nicht.
 struct SettingsView: View {
     let sensor: SensorController
     let manager: DisplayManager
+    let idle: IdleDimmer
     let loginItem: LoginItem
 
     var body: some View {
@@ -16,6 +17,7 @@ struct SettingsView: View {
                 SettingsPage(sensor: sensor) {
                     LoginSection(loginItem: loginItem)
                     ShortcutSection(manager: manager)
+                    IdleSection(idle: idle)
                     MonitorSection(manager: manager)
                 }
             }
@@ -91,6 +93,50 @@ private struct ShortcutSection: View {
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
+        }
+    }
+}
+
+/// Abdunkeln nach einer Weile ohne Maus und Tastatur: Wartezeit und Helligkeit.
+private struct IdleSection: View {
+    let idle: IdleDimmer
+
+    var body: some View {
+        Section("Bei Inaktivität") {
+            Toggle("Bildschirme abdunkeln, wenn du nichts tust", isOn: Binding(
+                get: { idle.isEnabled }, set: { idle.setEnabled($0) }
+            ))
+            if idle.isEnabled {
+                Picker("Nach", selection: Binding(
+                    get: { idle.timeoutMinutes }, set: { idle.setTimeout(.seconds($0 * 60)) }
+                )) {
+                    ForEach(IdleDimmer.timeoutChoices, id: \.self) { minutes in
+                        Text("\(minutes) min").tag(minutes)
+                    }
+                }
+                LabeledContent("Helligkeit") {
+                    HStack(spacing: 8) {
+                        Slider(
+                            value: Binding(get: { idle.level }, set: { idle.setLevel($0) }),
+                            in: IdleDimmer.levelRange
+                        ) {
+                            Text("Helligkeit")
+                        }
+                        .labelsHidden()
+                        Text("\(Int(idle.level)) %")
+                            .monospacedDigit()
+                            .frame(width: 44, alignment: .trailing)
+                    }
+                }
+                Toggle("Nicht, während eine App den Bildschirm wach hält", isOn: Binding(
+                    get: { idle.pausesWhileKeptAwake }, set: { idle.setPausesWhileKeptAwake($0) }
+                ))
+                .help("Etwa bei Videos, Präsentationen oder Videokonferenzen. Genauso schiebt macOS das Ausschalten des Displays auf.")
+            }
+            Text("Jede Mausbewegung oder Taste bringt die Helligkeit sofort zurück. Dunklere Monitore bleiben, wie sie sind. Wann macOS die Displays ausschaltet, stellst du weiter in den Systemeinstellungen ein.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

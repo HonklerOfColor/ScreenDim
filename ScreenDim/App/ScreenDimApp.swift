@@ -18,7 +18,9 @@ struct ScreenDimApp: App {
         .menuBarExtraStyle(.window)
 
         Settings {
-            SettingsView(sensor: appDelegate.sensor, manager: appDelegate.manager, loginItem: appDelegate.loginItem)
+            SettingsView(
+                sensor: appDelegate.sensor, manager: appDelegate.manager, idle: appDelegate.idle, loginItem: appDelegate.loginItem
+            )
         }
 
         Window("Sensor-Diagnose", id: SensorDebugView.windowID) {
@@ -44,12 +46,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     })
     /// Optionaler Schreibtisch-Sensor; ohne Einstellung passiert nichts.
     lazy var sensor = SensorController(manager: manager)
+    /// Abdunkeln nach einer Weile ohne Eingabe; ohne Einstellung passiert nichts.
+    lazy var idle = IdleDimmer(manager: manager)
     let loginItem = LoginItem()
     private let hotKeys = HotKeyCenter()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         manager.start()
         sensor.start()
+        idle.start()
 
         let modifiers = controlKey | optionKey
         let up = hotKeys.register(keyCode: kVK_UpArrow, modifiers: modifiers) { [manager] in
@@ -64,6 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         hotKeys.unregisterAll()
         sensor.stop()
+        idle.stop()
         manager.stop()
     }
 }

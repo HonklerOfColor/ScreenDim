@@ -26,6 +26,10 @@ public struct BrightnessJob: Equatable, Sendable {
         /// Ein anderer Regler (macOS, Helligkeitstasten) hat das Display verstellt; sein
         /// Wert wird übernommen.
         case externalChange
+        /// Eine Weile keine Eingabe: Die Ausgabe wird gedeckelt, der Wert bleibt.
+        case idleDim
+        /// Eingabe nach dem Abdunkeln: zurück zum eingestellten Wert.
+        case idleEnd
     }
 
     public let storageKey: String
@@ -79,6 +83,8 @@ extension BrightnessJob.Reason {
         case .softwareFallback: "softwareFallback"
         case .wake: "wake"
         case .externalChange: "externalChange"
+        case .idleDim: "idleDim"
+        case .idleEnd: "idleEnd"
         }
     }
 }

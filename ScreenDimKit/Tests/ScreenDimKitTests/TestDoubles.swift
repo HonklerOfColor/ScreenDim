@@ -425,6 +425,8 @@ final class StubInput: InputActivityMonitoring {
         onInput = nil
     }
 
+    var isObserving: Bool { onInput != nil }
+
     /// Simuliert eine Mausbewegung.
     func fire() {
         onInput?()

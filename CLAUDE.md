@@ -37,7 +37,8 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
     (CoreGraphics und IORegistry: Framebuffer ↔ `DCPAVServiceProxy`, DisplayPort-Links),
     `BrightnessStore` (DDC- und Software-Wert getrennt, Verfahren und DDC-Wahl je
     Monitor), `BrightnessMethod`, `SoftwareDimming` mit `GammaDimmer` und
-    `OverlayDimmer`, `ScreenBlanker`, `DisplayDiagnostics`.
+    `OverlayDimmer`, `ScreenBlanker`, `DisplayDiagnostics`, `IdleDimmer` (Leerlauf-Dimmung,
+    Standard aus).
   - `Sensor/`: optionaler Schreibtisch-Sensor. `SensorController` (Einstellungen, Kopplung,
     Quelle, Abwesenheit → `DisplayManager.setScreensBlanked`, Lux → Helligkeit),
     `SensorSource` mit `SSESensorSource` (Digest, SSE, Backoff) und
@@ -56,6 +57,14 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
     Schreibtisch-Sensor frisch durch jedes Ereignis (45 s).
   - Je Auftrag ein `BrightnessJob` mit Grund: Protokoll der Sensor-Diagnose und
     `log.info`, Kategorie `light`.
+- Leerlauf-Dimmung (`IdleDimmer`): Nach der gewählten Zeit ohne Eingabe (Zeit seit der
+  letzten Eingabe laut `CGEventSource`, ein Schlaf bis zum Ablauf, kein Takt) deckelt
+  `DisplayManager.beginIdleDim` nur die Ausgabe; `brightness`, gespeicherte Werte und
+  Lichtregelung laufen weiter. DDC schreibt nur geänderte Ausgaben. Maus weckt sofort
+  (Event-Monitor), Tasten über eine Prüfung je Sekunde, nur solange abgedunkelt ist (ohne
+  Bedienungshilfen-Freigabe sieht kein Event-Monitor fremde Tasten). Schlafen die
+  Bildschirme, ruht alles; nach ihrem Aufwachen kommt die Helligkeit 2 s später zurück.
+  Hält eine App den Bildschirm wach (`PreventUserIdleDisplaySleep`), wird nicht abgedunkelt.
 - `ScreenDim/` (App): `App/` (Einstieg, Fabrik für DDC), `UI/` (Menü, Einstellungen,
   Sensor-Diagnose, DDC-Diagnose), `System/` (Tastenkürzel, Login-Item, `IOAVService`),
   `Resources/` (Asset-Katalog, String-Katalog, Privacy-Manifest).
