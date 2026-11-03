@@ -246,7 +246,7 @@ public final class DisplayManager {
         let softwareDimmed = Set(visible.keys)
         var softwareTargets: [CGDirectDisplayID: Double] = [:]
         monitors = displays.map { display in
-            let key = display.identity.storageKey
+            let key = display.storageKey
             let software = channels[display.id] == nil || (!display.isBuiltIn && softwareDimmed.contains(key))
             let ddcEnabled = store.isDDCEnabled(for: key)
             if software {
@@ -297,13 +297,13 @@ public final class DisplayManager {
         switch display.kind {
         case .builtIn: .builtIn(display.id)
         case .external(let avServiceID):
-            store.isDDCEnabled(for: display.identity.storageKey) ? avServiceID.map(ChannelKey.avService) : nil
+            store.isDDCEnabled(for: display.storageKey) ? avServiceID.map(ChannelKey.avService) : nil
         }
     }
 
     /// Zustand eines Displays ohne Kanal.
     private func initialState(for display: DiscoveredDisplay) -> DDCState {
-        guard display.avServiceID != nil, !store.isDDCEnabled(for: display.identity.storageKey) else { return .noChannel }
+        guard display.avServiceID != nil, !store.isDDCEnabled(for: display.storageKey) else { return .noChannel }
         return .disabled
     }
 

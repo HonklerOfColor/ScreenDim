@@ -37,6 +37,44 @@ struct GammaDimmerTests {
         #expect(dimmer.apply([2: 40]).isEmpty)
     }
 
+    @Test("Write-Fehler nach erfolgreichem Dimmen: Kurve zurück, sobald es geht, nie doppelt gedimmt")
+    func writeFailureRestoresOriginal() {
+        let tables = StubGammaTables(displays: [2])
+        let dimmer = GammaDimmer(tables: tables)
+        #expect(dimmer.apply([2: 50]).isEmpty)
+        let dimmed = StubGammaTables.identity.scaled(by: GammaDimmer.factor(forPercent: 50))
+
+        // Write scheitert, auch das Zurückschreiben: Kurve steht noch skaliert, bleibt gemerkt.
+        tables.failWrites(to: [2])
+        #expect(dimmer.apply([2: 30]) == [2])
+        #expect(tables.table(2) == dimmed)
+
+        // Der Manager hat auf Overlay umgestellt und fragt Gamma ohne Display 2 an: Sobald
+        // Writes wieder gehen, kommt das Original zurück.
+        #expect(dimmer.apply([:]).isEmpty)
+        #expect(tables.table(2) == dimmed)
+        tables.failWrites(to: [])
+        #expect(dimmer.apply([:]).isEmpty)
+        #expect(tables.table(2) == StubGammaTables.identity)
+
+        // Zurück auf Gamma: skaliert wird die echte Originalkurve, nicht die gedimmte.
+        #expect(dimmer.apply([2: 30]).isEmpty)
+        #expect(tables.table(2) == StubGammaTables.identity.scaled(by: GammaDimmer.factor(forPercent: 30)))
+    }
+
+    @Test("Write-Fehler beim ersten Dimmen lässt nichts gemerkt zurück")
+    func firstWriteFailureLeavesNothing() {
+        let tables = StubGammaTables(displays: [2])
+        tables.failWrites(to: [2])
+        let dimmer = GammaDimmer(tables: tables)
+
+        #expect(dimmer.apply([2: 50]) == [2])
+        let writes = tables.writes
+        // Nichts zurückzuschreiben: kein weiterer Write-Versuch.
+        #expect(dimmer.apply([:]).isEmpty)
+        #expect(tables.writes == writes)
+    }
+
     @Test("Refresh schreibt nur betroffene Displays neu, ohne ColorSync-Reset")
     func refreshWithoutColorSync() {
         let tables = StubGammaTables(displays: [2, 3])

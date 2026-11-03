@@ -154,6 +154,8 @@ final class StubGammaTables: GammaTableAccess {
     private struct State {
         var tables: [CGDirectDisplayID: GammaTable] = [:]
         var unreadable: Set<CGDirectDisplayID> = []
+        /// Lesbar, aber jeder Write scheitert (etwa während einer Umkonfiguration).
+        var unwritable: Set<CGDirectDisplayID> = []
         var writes = 0
         var colorSyncResets = 0
     }
@@ -177,13 +179,18 @@ final class StubGammaTables: GammaTableAccess {
         state.withLock { $0.tables[id] = Self.identity }
     }
 
+    /// Ab jetzt scheitern Writes an diese Displays; Reads gehen weiter.
+    func failWrites(to ids: Set<CGDirectDisplayID>) {
+        state.withLock { $0.unwritable = ids }
+    }
+
     func read(_ id: CGDirectDisplayID) -> GammaTable? {
         state.withLock { $0.unreadable.contains(id) ? nil : $0.tables[id] }
     }
 
     func write(_ table: GammaTable, to id: CGDirectDisplayID) -> Bool {
         state.withLock { state in
-            guard !state.unreadable.contains(id), state.tables[id] != nil else { return false }
+            guard !state.unreadable.contains(id), !state.unwritable.contains(id), state.tables[id] != nil else { return false }
             state.writes += 1
             state.tables[id] = table
             return true

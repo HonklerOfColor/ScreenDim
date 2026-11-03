@@ -73,6 +73,19 @@
 - Logik als lokales Swift-Paket `ScreenDimKit`; Tests per `swift test`.
 
 ### Behoben
+- Gamma-Dimmung: Scheiterte ein Write, nachdem ein Display schon gedimmt war, blieb seine
+  Kurve skaliert stehen, und das Overlay dimmte obendrauf (doppelt dunkel, bis zum
+  nächsten ColorSync-Reset). Jetzt kommt die gemerkte Originalkurve zurück, sobald sich
+  das Display wieder beschreiben lässt.
+- Baugleiche Monitore ohne Seriennummer (viele melden 0) teilten sich Helligkeit,
+  Verfahren und DDC-Wahl, und der Monitor-Picker im Tab „Licht“ konnte den zweiten nicht
+  wählen. Jetzt bekommt jeder Zwilling einen eigenen Schlüssel (nach Lage in der
+  Anordnung; der linke behält den bisherigen), und der Picker geht über die Display-ID.
+- Schreibtisch-Sensor: Antwortete der Sensor mit 200 und schloss den Strom sofort
+  (Sendestau, Socket-Limit), verband die App im Sekundentakt neu. Als Verbindung zählt
+  erst die erste SSE-Nachricht; vorher wächst die Pause (1 s → 30 s) weiter.
+- Schreibtisch-Sensor: Jede neue Quelle (Koppeln, Demo, Ein/Aus) legte eine `URLSession`
+  an, die nie invalidiert wurde. Jetzt gibt es eine Session je Strom, am Ende invalidiert.
 - DDC/CI: Auf Apple Silicon kommt der erste I2C-Write nach einem
   Read beim Monitor nicht an (gemessen: W-R-W-R bleibt Null-Message, W-W-R antwortet;
   ein einzelner Set-VCP nach einem Read ging verloren). Jetzt geht nach jedem Read ein

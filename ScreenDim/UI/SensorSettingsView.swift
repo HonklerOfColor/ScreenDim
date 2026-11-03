@@ -443,19 +443,21 @@ func lightSourceName(_ source: SensorController.LightSource, hasBuiltIn: Bool) -
 struct LightCurveSection: View {
     let sensor: SensorController
     let manager: DisplayManager
-    @State private var selectedKey: String?
+    @State private var selectedID: CGDirectDisplayID?
 
     private var monitor: DisplayManager.Monitor? {
-        manager.monitors.first { $0.storageKey == selectedKey } ?? manager.monitors.first
+        manager.monitors.first { $0.id == selectedID } ?? manager.monitors.first
     }
 
     var body: some View {
         Section("Helligkeit je Monitor") {
             if let monitor {
                 if manager.monitors.count > 1 {
-                    Picker("Monitor", selection: Binding(get: { monitor.storageKey }, set: { selectedKey = $0 })) {
+                    // Tag ist die Display-ID: Baugleiche Monitore teilen sich Namen und
+                    // womöglich die Identität, nie die ID.
+                    Picker("Monitor", selection: Binding(get: { monitor.id }, set: { selectedID = $0 })) {
                         ForEach(manager.monitors) { monitor in
-                            Text(verbatim: displayName(monitor)).tag(monitor.storageKey)
+                            Text(verbatim: displayName(monitor)).tag(monitor.id)
                         }
                     }
                 }

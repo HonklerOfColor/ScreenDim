@@ -43,12 +43,19 @@ public final class GammaDimmer: SoftwareDimming {
     @discardableResult
     public func apply(_ levels: [CGDirectDisplayID: Double]) -> Set<CGDirectDisplayID> {
         let levels = levels.filter { $0.value < 100 }
-        for id in self.levels.keys where levels[id] == nil {
+        // Jedes Display mit gemerkter Kurve bekommt sie zurück, auch eines, dessen letzter
+        // Write scheiterte und das deshalb nicht mehr in `self.levels` steht.
+        for id in Array(originals.keys) where levels[id] == nil {
             restore(id)
         }
         var failed: Set<CGDirectDisplayID> = []
         for (id, level) in levels where self.levels[id] != level {
-            if !write(level, to: id) { failed.insert(id) }
+            guard !write(level, to: id) else { continue }
+            failed.insert(id)
+            // War das Display schon gedimmt, steht seine Kurve noch skaliert; bliebe sie so,
+            // dimmte das Overlay obendrauf. War es nie gedimmt, ist nur die gemerkte Kurve
+            // zu verwerfen.
+            if self.levels[id] != nil { restore(id) } else { originals[id] = nil }
         }
         self.levels = levels.filter { !failed.contains($0.key) }
         return failed
@@ -63,6 +70,7 @@ public final class GammaDimmer: SoftwareDimming {
         originals = [:]
         for (id, level) in levels where !write(level, to: id) {
             levels[id] = nil
+            originals[id] = nil
         }
     }
 
@@ -93,9 +101,13 @@ public final class GammaDimmer: SoftwareDimming {
         return true
     }
 
+    /// Schreibt die gemerkte Kurve zurück. Gelingt das nicht, bleibt sie gemerkt, und der
+    /// nächste `apply` versucht es wieder.
     private func restore(_ id: CGDirectDisplayID) {
-        guard let original = originals.removeValue(forKey: id) else { return }
-        tables.write(original, to: id)
+        guard let original = originals[id] else { return }
+        if tables.write(original, to: id) {
+            originals[id] = nil
+        }
     }
 }
 

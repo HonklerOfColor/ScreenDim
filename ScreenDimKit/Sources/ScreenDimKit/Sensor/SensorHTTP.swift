@@ -61,9 +61,9 @@ final class DigestDelegate: NSObject, URLSessionTaskDelegate, Sendable {
     }
 }
 
-extension URLSession {
+extension URLSessionConfiguration {
     /// Nur für den Sensor: keine Cookies, kein Cache, keine gespeicherten Zugangsdaten.
-    static func sensor(timeout: TimeInterval) -> URLSession {
+    static func sensor(timeout: TimeInterval) -> URLSessionConfiguration {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.urlCredentialStorage = nil
         configuration.httpCookieStorage = nil
@@ -71,7 +71,13 @@ extension URLSession {
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.timeoutIntervalForRequest = timeout
         configuration.waitsForConnectivity = false
-        return URLSession(configuration: configuration)
+        return configuration
+    }
+}
+
+extension URLSession {
+    static func sensor(timeout: TimeInterval) -> URLSession {
+        URLSession(configuration: .sensor(timeout: timeout))
     }
 }
 
@@ -132,25 +138,40 @@ public final class SSESensorSource: SensorSource {
 
     private let endpoint: SensorEndpoint
     private let code: PairingCode
-    private let session: URLSession
+    private let makeSession: @Sendable () -> URLSession
+    private let sleep: @Sendable (Duration) async -> Void
 
-    public init(endpoint: SensorEndpoint, code: PairingCode) {
+    public convenience init(endpoint: SensorEndpoint, code: PairingCode) {
+        self.init(endpoint: endpoint, code: code, makeSession: { .sensor(timeout: Self.idleTimeout) })
+    }
+
+    init(
+        endpoint: SensorEndpoint,
+        code: PairingCode,
+        makeSession: @escaping @Sendable () -> URLSession,
+        sleep: @escaping @Sendable (Duration) async -> Void = { try? await Task.sleep(for: $0) }
+    ) {
         self.endpoint = endpoint
         self.code = code
-        session = .sensor(timeout: Self.idleTimeout)
+        self.makeSession = makeSession
+        self.sleep = sleep
     }
 
     public func events() -> AsyncStream<SensorEvent> {
         AsyncStream { continuation in
             let task = Task { [self] in
-                await run(continuation)
+                // Eine Session je Strom, am Ende invalidiert: Ohne das lebt jede URLSession
+                // ewig, und jede neue Quelle (Koppeln, Demo, Ein/Aus) käme dazu.
+                let session = makeSession()
+                await run(continuation, session: session)
+                session.invalidateAndCancel()
                 continuation.finish()
             }
             continuation.onTermination = { _ in task.cancel() }
         }
     }
 
-    private func run(_ continuation: AsyncStream<SensorEvent>.Continuation) async {
+    private func run(_ continuation: AsyncStream<SensorEvent>.Continuation, session: URLSession) async {
         var backoff = ReconnectBackoff()
         var request = URLRequest(url: endpoint.url(SensorProtocol.eventsPath))
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
@@ -172,10 +193,18 @@ public final class SSESensorSource: SensorSource {
                 }
                 sensorLog.notice("Sensor \(self.endpoint.hostname, privacy: .public): verbunden")
                 continuation.yield(.connection(.connected))
-                backoff.reset()
                 var parser = SSEParser()
+                var received = false
                 for try await byte in bytes {
-                    if let message = parser.consume(byte), let event = ESPHomeEvents.event(from: message) {
+                    guard let message = parser.consume(byte) else { continue }
+                    // Erst eine Nachricht zählt als Verbindung. Schließt der Sensor den Strom
+                    // gleich nach dem Status 200 (Sendestau, Socket-Limit), wächst die Pause
+                    // weiter, statt im Sekundentakt neue Sockets zu belegen.
+                    if !received {
+                        received = true
+                        backoff.reset()
+                    }
+                    if let event = ESPHomeEvents.event(from: message) {
                         continuation.yield(event)
                     }
                 }
@@ -189,7 +218,7 @@ public final class SSESensorSource: SensorSource {
                 sensorLog.notice("Sensor \(self.endpoint.hostname, privacy: .public): \(error.localizedDescription, privacy: .public)")
             }
             continuation.yield(.connection(.searching))
-            try? await Task.sleep(for: backoff.next())
+            await sleep(backoff.next())
         }
     }
 }

@@ -60,6 +60,18 @@ public struct DiscoveredDisplay: Identifiable, Sendable {
     public let name: String
     public let kind: Kind
     public var link: DisplayPortLink?
+    /// Schlüssel für gespeicherte Werte: die EDID-Identität; bei baugleichen Monitoren
+    /// ohne Seriennummer um die Lage ergänzt (`DisplayDiscovery.withUniqueStorageKeys`).
+    public internal(set) var storageKey: String
+
+    init(id: CGDirectDisplayID, identity: DisplayIdentity, name: String, kind: Kind, link: DisplayPortLink? = nil) {
+        self.id = id
+        self.identity = identity
+        self.name = name
+        self.kind = kind
+        self.link = link
+        storageKey = identity.storageKey
+    }
 
     public var avServiceID: UInt64? {
         if case .external(let id) = kind { id } else { nil }
@@ -87,12 +99,35 @@ public enum DisplayDiscovery {
             )
         }
         let external = online.filter { CGDisplayIsBuiltin($0) == 0 }
-        guard scanRegistry else {
-            return builtIn + external.map { id in
+        let displays = if scanRegistry {
+            builtIn + externalDisplays(external)
+        } else {
+            builtIn + external.map { id in
                 DiscoveredDisplay(id: id, identity: identity(of: id), name: fallbackName(for: id), kind: .external(avServiceID: nil))
             }
         }
-        return builtIn + externalDisplays(external)
+        return withUniqueStorageKeys(displays) { CGDisplayBounds($0).origin }
+    }
+
+    /// Baugleiche Monitore ohne Seriennummer (viele melden 0) haben dieselbe Identität und
+    /// bekämen dieselben Einstellungen. Deshalb hängt an alle außer dem ersten ein Zähler,
+    /// geordnet nach ihrer Lage in der Anordnung (links vor rechts, oben vor unten); der
+    /// erste behält den bisherigen Schlüssel. Werden sie umgesteckt, tauschen sie die Werte.
+    static func withUniqueStorageKeys(
+        _ displays: [DiscoveredDisplay],
+        position: (CGDirectDisplayID) -> CGPoint
+    ) -> [DiscoveredDisplay] {
+        var result = displays
+        for indices in Dictionary(grouping: displays.indices, by: { displays[$0].identity }).values where indices.count > 1 {
+            let ordered = indices.sorted { a, b in
+                let p = position(displays[a].id), q = position(displays[b].id)
+                return (p.x, p.y, displays[a].id) < (q.x, q.y, displays[b].id)
+            }
+            for (rank, index) in ordered.enumerated() where rank > 0 {
+                result[index].storageKey = "\(displays[index].identity.storageKey)#\(rank + 1)"
+            }
+        }
+        return result
     }
 
     private static func externalDisplays(_ displays: [CGDirectDisplayID]) -> [DiscoveredDisplay] {
