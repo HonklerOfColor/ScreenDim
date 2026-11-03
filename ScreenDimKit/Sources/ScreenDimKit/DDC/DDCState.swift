@@ -16,6 +16,9 @@ public enum DDCState: Equatable, Sendable {
     /// Kein Steuerkanal: extern kein DDC-Kanal (oder Variante ohne DDC), intern lässt
     /// sich die Helligkeit nicht steuern.
     case noChannel
+    /// Der Nutzer hat DDC/CI in den Einstellungen ausgeschaltet; der Monitor läuft per
+    /// Software-Dimmung, ohne I2C-Verkehr.
+    case disabled
 
     public init(failure error: DDCError) {
         switch error {
@@ -34,7 +37,7 @@ public enum DDCState: Equatable, Sendable {
     /// beantworten keine Reads, nehmen Writes aber an.
     public var isAdjustable: Bool {
         switch self {
-        case .probing, .noChannel: false
+        case .probing, .noChannel, .disabled: false
         case .ready, .nullReply, .i2cTimeout, .ioError, .noResponse: true
         }
     }
@@ -42,7 +45,7 @@ public enum DDCState: Equatable, Sendable {
     public var isFailure: Bool {
         switch self {
         case .nullReply, .i2cTimeout, .ioError, .noResponse: true
-        case .probing, .ready, .noChannel: false
+        case .probing, .ready, .noChannel, .disabled: false
         }
     }
 
@@ -56,6 +59,7 @@ public enum DDCState: Equatable, Sendable {
         case .ioError(let status): String(localized: "I/O-Fehler \(IOReturnDescription.describe(status))")
         case .noResponse: String(localized: "Ungültige Antwort")
         case .noChannel: String(localized: "Kein Steuerkanal")
+        case .disabled: String(localized: "DDC/CI ausgeschaltet")
         }
     }
 }

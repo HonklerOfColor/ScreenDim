@@ -50,6 +50,18 @@ public struct BrightnessStore {
         defaults.set(method.rawValue, forKey: "dimmingMethod.\(storageKey)")
     }
 
+    /// DDC/CI für externe Monitore erlaubt (Standard: ja). Aus heißt: nur Software-Dimmung,
+    /// kein I2C-Verkehr; die Steuerung des eingebauten Displays bleibt davon unberührt.
+    public var isDDCEnabled: Bool {
+        defaults.object(forKey: Self.ddcEnabledKey) as? Bool ?? true
+    }
+
+    public func setDDCEnabled(_ enabled: Bool) {
+        defaults.set(enabled, forKey: Self.ddcEnabledKey)
+    }
+
+    static let ddcEnabledKey = "ddcEnabled"
+
     /// Der DDC-Schlüssel ist der aus Version 1, damit gespeicherte Werte erhalten bleiben.
     private func key(_ storageKey: String, _ mode: Mode) -> String {
         switch mode {

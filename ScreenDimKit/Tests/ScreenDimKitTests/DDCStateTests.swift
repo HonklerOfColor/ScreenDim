@@ -32,6 +32,8 @@ struct DDCStateTests {
         #expect(DDCState.ioError(-1).isAdjustable)
         #expect(!DDCState.probing.isAdjustable)
         #expect(!DDCState.noChannel.isAdjustable)
+        #expect(!DDCState.disabled.isAdjustable)
+        #expect(!DDCState.disabled.isFailure)
     }
 }
 

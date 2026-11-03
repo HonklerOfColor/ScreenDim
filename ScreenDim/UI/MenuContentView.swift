@@ -208,7 +208,8 @@ private struct MonitorRow: View {
                 .foregroundStyle(.secondary)
             case _ where monitor.usesSoftwareDimming:
                 #if SCREENDIM_DIRECT
-                hint(softwareReason, systemImage: "circle.lefthalf.filled", color: .secondary, retry: true)
+                // Ausgeschaltet ist kein Fehler; „Erneut prüfen“ brächte nichts.
+                hint(softwareReason, systemImage: "circle.lefthalf.filled", color: .secondary, retry: monitor.state != .disabled)
                 #else
                 // Ohne DDC ist Software-Dimmung der Normalfall; der Hinweis steht einmal unten.
                 EmptyView()
@@ -260,6 +261,7 @@ private struct MonitorRow: View {
             return "macOS erlaubt für dieses Display keine Helligkeitssteuerung. Software-Dimmung aktiv."
         }
         return switch (monitor.intermediary, monitor.state) {
+        case (_, .disabled): "DDC/CI ist in den Einstellungen ausgeschaltet. Software-Dimmung aktiv."
         case (.dock, _): "DDC kommt über das Dock nicht durch. Software-Dimmung aktiv."
         case (.adapter, _): "DDC kommt über den Adapter nicht durch. Software-Dimmung aktiv."
         case (nil, .nullReply): "Monitor antwortet leer – DDC/CI im Monitor-Menü aus? Software-Dimmung aktiv."

@@ -11,7 +11,9 @@ alle, dazu ⌃⌥↑ / ⌃⌥↓ für alle Monitore in 10-%-Schritten.
   eingebaute Display regelst du wie gewohnt mit den Helligkeitstasten.
 - **ScreenDim Direct (Developer ID):** regelt die Hintergrundbeleuchtung externer Monitore
   per DDC/CI und das eingebaute Display direkt. Wo DDC nicht durchkommt (manche Docks und
-  Adapter), dimmt sie per Software. Mit Diagnose-Fenster für DDC-Probleme.
+  Adapter), dimmt sie per Software. DDC/CI lässt sich in den Einstellungen ganz
+  abschalten, dann dimmt sie externe Monitore nur per Software. Mit Diagnose-Fenster für
+  DDC-Probleme.
 
 ## Voraussetzungen
 

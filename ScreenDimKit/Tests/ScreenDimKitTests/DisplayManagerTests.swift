@@ -322,6 +322,95 @@ struct DisplayManagerTests {
         #expect(manager.monitors.map(\.id) == [2, 3])
     }
 
+    // MARK: - DDC/CI ausschalten
+
+    @Test("DDC/CI aus: Kanal weg, Software-Dimmung ohne DDC-Writes; an: neuer Kanal, DDC übernimmt")
+    func ddcToggle() async {
+        let control = StubControl()
+        setup.displays = [Self.external(2, avService: 0x100)]
+        setup.makeControl = { _ in control }
+        let manager = makeManager()
+        #expect(manager.isDDCEnabled)
+        manager.refresh(force: true)
+        #expect(await eventually { state(manager, 2) == .ready })
+        manager.setBrightness(30, for: 2)
+        #expect(await eventually { control.writes == [30] })
+
+        manager.setDDCEnabled(false)
+        #expect(!manager.isDDCEnabled)
+        #expect(state(manager, 2) == .disabled)
+        #expect(monitor(manager, 2)?.usesSoftwareDimming == true)
+        #expect(monitor(manager, 2)?.isAdjustable == true)
+        // Die Beleuchtung steht auf 30 %; ohne gespeicherten Software-Wert nicht abdunkeln.
+        #expect(monitor(manager, 2)?.brightness == 100)
+        #expect(setup.gamma.levels == [2: 100])
+        #expect(setup.created == [0x100])
+
+        manager.setBrightness(60, for: 2)
+        #expect(setup.gamma.levels == [2: 60])
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(control.writes == [30])
+
+        // „Monitore neu suchen“ und „Erneut prüfen“ legen keinen Kanal an.
+        manager.refresh(force: true)
+        manager.retry(2)
+        #expect(setup.created == [0x100])
+        #expect(state(manager, 2) == .disabled)
+
+        // Wieder an: neuer Kanal, Software-Dimmung bleibt bis zur Prüfung, dann DDC-Wert.
+        control.setRead(.success(VCPReading(current: 50, maximum: 100)))
+        manager.setDDCEnabled(true)
+        #expect(setup.created == [0x100, 0x100])
+        #expect(state(manager, 2) == .probing)
+        #expect(setup.gamma.levels == [2: 60])
+        #expect(await eventually { state(manager, 2) == .ready })
+        #expect(monitor(manager, 2)?.usesSoftwareDimming == false)
+        #expect(setup.gamma.levels.isEmpty)
+        #expect(await eventually { control.writes == [30, 30] })
+    }
+
+    @Test("DDC/CI aus bleibt über den Neustart; der Software-Wert gilt sofort")
+    func ddcDisabledPersists() async {
+        setup.displays = [Self.external(2, avService: 0x100)]
+        let manager = makeManager()
+        manager.setDDCEnabled(false)
+        manager.setBrightness(40, for: 2)
+
+        let second = makeManager()
+        #expect(!second.isDDCEnabled)
+        second.refresh(force: true)
+        #expect(setup.created.isEmpty)
+        #expect(state(second, 2) == .disabled)
+        #expect(await eventually { setup.gamma.levels == [2: 40] })
+    }
+
+    @Test("DDC/CI aus betrifft das eingebaute Display nicht")
+    func ddcDisabledKeepsBuiltInControl() async {
+        let control = StubControl()
+        setup.displays = [Self.builtIn, Self.external(2, avService: 0x100)]
+        let manager = DisplayManager(
+            store: BrightnessStore(storage: setup.preferences),
+            timing: .immediate,
+            gamma: setup.gamma,
+            overlay: setup.overlay,
+            discover: { [setup] in setup.displays },
+            makeExternalControl: { [setup] avServiceID, _, _ in
+                setup.created.append(avServiceID)
+                return StubControl()
+            },
+            makeBuiltInControl: { _ in control }
+        )
+        manager.setDDCEnabled(false)
+        manager.refresh(force: true)
+
+        #expect(setup.created.isEmpty)
+        #expect(state(manager, 2) == .disabled)
+        #expect(await eventually { state(manager, 1) == .ready })
+        #expect(monitor(manager, 1)?.usesSoftwareDimming == false)
+        manager.setBrightness(70, for: 1)
+        #expect(await eventually { control.writes == [70] })
+    }
+
     // MARK: - Gamma oder Overlay
 
     @Test("Gamma-Tabelle nicht nutzbar: automatisch Overlay")

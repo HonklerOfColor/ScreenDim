@@ -30,8 +30,11 @@ Eine Codebasis, zwei App-Targets aus `project.yml`:
     Deadline, Sperre bei Hängern, höchstens 3 offene Aufrufe), `LatestValueThrottle`,
     `I2CTransport` (nur das Protokoll).
   - `Display/`: `DisplayManager` (Zustand, Kanal-Cache über Refreshes, Probe, Routing
-    der Software-Dimmung), `DisplayDiscovery` (CoreGraphics, optional IORegistry),
-    `BrightnessStore` (DDC- und Software-Wert getrennt, Verfahren je Monitor),
+    der Software-Dimmung; `isDDCEnabled`/`setDDCEnabled`: ohne DDC bekommt kein
+    externer Monitor einen Kanal, Zustand `DDCState.disabled`, Software-Dimmung),
+    `DisplayDiscovery` (CoreGraphics, optional IORegistry),
+    `BrightnessStore` (DDC- und Software-Wert getrennt, Verfahren je Monitor,
+    Schalter `ddcEnabled`),
     `SoftwareDimming` mit `GammaDimmer` und `OverlayDimmer`, `ScreenBlanker`, `DisplayDiagnostics`.
   - `Sensor/`: optionaler Schreibtisch-Sensor. `SensorController` (Einstellungen, Kopplung,
     Quelle, Abwesenheit → `DisplayManager.setScreensBlanked`, Lux → Helligkeit),

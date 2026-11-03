@@ -21,6 +21,9 @@ struct SettingsView: View {
             }
             Tab("Helligkeit", systemImage: "sun.max") {
                 SettingsPage(sensor: sensor) {
+                    #if SCREENDIM_DIRECT
+                    DDCSection(manager: manager)
+                    #endif
                     LightSection(sensor: sensor)
                     if showsLightCurves {
                         LightCurveSection(sensor: sensor, manager: manager)
@@ -158,6 +161,35 @@ private struct SensorSection: View {
         .onDisappear { browser.stop() }
     }
 }
+
+#if SCREENDIM_DIRECT
+/// DDC/CI für externe Monitore ein- oder ausschalten. Aus: Software-Dimmung wie in der
+/// App-Store-Variante, kein I2C-Verkehr; für Monitore und Docks, die auf DDC/CI hängen
+/// bleiben oder flackern.
+private struct DDCSection: View {
+    let manager: DisplayManager
+
+    var body: some View {
+        Section("Externe Monitore") {
+            Toggle("Hintergrundbeleuchtung per DDC/CI regeln", isOn: Binding(
+                get: { manager.isDDCEnabled }, set: { manager.setDDCEnabled($0) }
+            ))
+            if manager.isDDCEnabled {
+                caption("ScreenDim stellt die Hintergrundbeleuchtung externer Monitore direkt ein. Wo DDC/CI nicht durchkommt, dimmt die Software.")
+            } else {
+                caption("Externe Monitore werden nur per Software gedimmt (Gamma oder Overlay); die Hintergrundbeleuchtung bleibt, wie sie steht. Kein DDC/CI-Verkehr – hilft bei Monitoren oder Docks, die daran hängen bleiben.")
+            }
+        }
+    }
+
+    private func caption(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+#endif
 
 /// Woher das Licht für die Helligkeit kommt, mit Vorrang und Rückfall. Ohne Lichtsensor im
 /// Mac bleibt nur Schreibtisch-Sensor oder aus; die Wahl erscheint dann erst mit

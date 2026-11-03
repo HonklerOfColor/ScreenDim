@@ -25,6 +25,17 @@ struct BrightnessStoreTests {
         #expect(store.brightness(for: "1-2-3", mode: .software) == nil)
     }
 
+    @Test("DDC/CI ist standardmäßig an und lässt sich ausschalten")
+    func ddcEnabled() {
+        let store = BrightnessStore(storage: defaults)
+        #expect(store.isDDCEnabled)
+        store.setDDCEnabled(false)
+        #expect(!store.isDDCEnabled)
+        #expect(!BrightnessStore(storage: defaults).isDDCEnabled)
+        store.setDDCEnabled(true)
+        #expect(store.isDDCEnabled)
+    }
+
     @Test("Verfahren der Software-Dimmung pro Monitor")
     func dimmingMethod() {
         let store = BrightnessStore(storage: defaults)

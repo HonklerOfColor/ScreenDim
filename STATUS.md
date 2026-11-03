@@ -23,6 +23,9 @@ Auf echter Hardware noch nicht geprüft. Die Tests decken nur die Logik ab.
 - [ ] Direct: Monitore am Dock fallen ohne Hänger auf Software-Dimmung zurück; Hinweis
       „DDC kommt über das Dock nicht durch“.
 - [ ] Gespeicherte Werte: Wechsel direkt ↔ Dock ohne doppelte Abdunklung.
+- [ ] Direct: „Hintergrundbeleuchtung per DDC/CI regeln“ aus → Monitore sofort per Software
+      (Hinweis im Menü ohne „Erneut prüfen“), kein I2C-Verkehr im Log; wieder an → Prüfung,
+      gespeicherter DDC-Wert zurück, Gamma/Overlay weg.
 
 ### Aufwachen
 - [ ] Nach dem Ruhezustand: Software-Dimmung wieder aktiv (Gamma und Overlay), DDC-Werte

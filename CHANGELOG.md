@@ -39,6 +39,12 @@
   halbiert).
 - Sensor-Diagnose: je Helligkeitsauftrag ein Eintrag mit Grund, Start (gemerkt/echt), Ziel
   und Dauer; dazu `log.info` in der Kategorie `light`.
+- Direct: Schalter „Hintergrundbeleuchtung per DDC/CI regeln“ (Einstellungen →
+  „Helligkeit“ → „Externe Monitore“, Standard: an). Aus: keine DDC-Kanäle und kein
+  I2C-Verkehr, externe Monitore dimmen per Software (Gamma oder Overlay) wie in der
+  App-Store-Variante; das eingebaute Display bleibt bei seiner Steuerung. Für Monitore
+  und Docks, die auf DDC/CI hängen bleiben. Im Menü: „DDC/CI ist in den Einstellungen
+  ausgeschaltet“, in der Diagnose Zustand „DDC/CI ausgeschaltet“.
 - Zwei Varianten aus einer Codebasis: „ScreenDim“ für den Mac App Store (Sandbox, ohne
   private API, Software-Dimmung) und „ScreenDim Direct“ (Developer ID, DDC/CI).
 - Overlay-Dimmung als zweiter Weg neben Gamma: randloses Fenster über Menüleiste, allen

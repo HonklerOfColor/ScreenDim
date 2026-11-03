@@ -64,6 +64,10 @@ public final class DisplayManager {
     public var hotKeysAvailable = true
     /// Alle Bildschirme schwarz, weil der Schreibtisch-Sensor „weg“ meldet.
     public private(set) var screensBlanked = false
+    /// DDC/CI für externe Monitore (Einstellung, Standard: an). Aus: kein DDC-Kanal, kein
+    /// I2C-Verkehr, externe Monitore laufen per Software-Dimmung wie in der
+    /// App-Store-Variante. Das eingebaute Display bleibt bei seiner Steuerung.
+    public private(set) var isDDCEnabled: Bool
 
     public let timing: DDCTiming
 
@@ -132,6 +136,7 @@ public final class DisplayManager {
         self.discover = discover
         self.makeExternalControl = makeExternalControl
         self.makeBuiltInControl = makeBuiltInControl
+        self.isDDCEnabled = store.isDDCEnabled
     }
 
     /// Gibt allen Displays ihre ursprüngliche Kurve zurück und schließt die Overlays
@@ -205,7 +210,7 @@ public final class DisplayManager {
         var cache: [ChannelKey: Channel] = [:]
         channels = [:]
         for display in displays {
-            guard let key = Self.channelKey(for: display),
+            guard let key = channelKey(for: display),
                   let channel = cache[key] ?? channelCache[key] ?? makeChannel(key, for: display)
             else { continue }
             cache[key] = channel
@@ -243,7 +248,7 @@ public final class DisplayManager {
                 intermediary: display.link?.intermediary,
                 branchVendor: display.link?.branchVendor,
                 brightness: brightness,
-                state: channels[display.id] == nil ? .noChannel : .probing,
+                state: channels[display.id] != nil ? .probing : initialState(for: display),
                 usesSoftwareDimming: software,
                 preferredDimming: store.dimmingMethod(for: key) ?? .gamma
             )
@@ -261,11 +266,31 @@ public final class DisplayManager {
         }
     }
 
-    private static func channelKey(for display: DiscoveredDisplay) -> ChannelKey? {
+    /// Ohne DDC/CI bekommt kein externer Monitor einen Kanal; der des eingebauten Displays
+    /// ist keiner.
+    private func channelKey(for display: DiscoveredDisplay) -> ChannelKey? {
         switch display.kind {
         case .builtIn: .builtIn(display.id)
-        case .external(let avServiceID): avServiceID.map(ChannelKey.avService)
+        case .external(let avServiceID): isDDCEnabled ? avServiceID.map(ChannelKey.avService) : nil
         }
+    }
+
+    /// Zustand eines Displays ohne Kanal.
+    private func initialState(for display: DiscoveredDisplay) -> DDCState {
+        !display.isBuiltIn && !isDDCEnabled ? .disabled : .noChannel
+    }
+
+    /// Schaltet DDC/CI für externe Monitore ein oder aus und sucht die Monitore neu.
+    /// Aus: Die Kanäle werden verworfen (keine weiteren I2C-Aufrufe), die Monitore dimmen
+    /// ab jetzt per Software vom ungedimmten Stand aus; die Hintergrundbeleuchtung
+    /// bleibt, wie sie steht. An: neue Kanäle, Prüfung, danach gilt wieder der
+    /// gespeicherte DDC-Wert.
+    public func setDDCEnabled(_ enabled: Bool) {
+        guard enabled != isDDCEnabled else { return }
+        log.notice("DDC/CI für externe Monitore \(enabled ? "an" : "aus", privacy: .public)")
+        store.setDDCEnabled(enabled)
+        isDDCEnabled = enabled
+        refresh(force: true)
     }
 
     public func retry(_ id: CGDirectDisplayID) {
