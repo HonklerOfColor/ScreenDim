@@ -272,6 +272,7 @@ extension DDCTiming {
         writeAttempts: 2,
         writeRepeats: 1,
         writeRepeatGap: .zero,
+        primeAfterRead: false,
         deadline: .seconds(5)
     )
 }

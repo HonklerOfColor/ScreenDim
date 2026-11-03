@@ -61,6 +61,13 @@
 - Logik als lokales Swift-Paket `ScreenDimKit`; Tests per `swift test`.
 
 ### Behoben
+- DDC/CI: Auf Apple Silicon kommt der erste I2C-Write nach einem Read beim Monitor nicht
+  an (gemessen: W-R-W-R bleibt Null-Message, W-W-R antwortet; ein einzelner Set-VCP nach
+  einem Read ging verloren). Monitore antworteten deshalb nur direkt nach dem
+  Einstecken und verstummten nach dem ersten Refresh oder App-Neustart; Tastenkürzel
+  nach einer Prüfung bewirkten nichts. Jetzt geht nach jedem Read ein Vorlauf-Write
+  voraus (`DDCTiming.primeAfterRead`, Abstand 10 ms); abschaltbar per
+  `defaults write com.andreastrabi.ScreenDim.direct ddc.primeAfterRead -bool NO`.
 - DDCService: Zulassung und Eintrag eines Aufrufs liefen in zwei getrennten Locks;
   gleichzeitige Aufrufe konnten `maxPendingCalls` überschreiten.
 - DDCService: Feuerte der Deadline-Timer eines wartenden Aufrufs vor dem des hängenden,

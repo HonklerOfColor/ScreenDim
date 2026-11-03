@@ -107,9 +107,15 @@ Schlüsselbildung: `Int` → `%lld`, `String` → `%@`, ein `%` neben einer Inte
 ## Hardware-Erfahrungen
 
 - Monitore hinter dem StarTech-TB4-Dock (Realtek-MST-Hub, OUI 00 E0 4C) sind für DDC
-  unzuverlässig. Der S34CG50 blieb nach einem doppelten Write im Kernel hängen
-  (Aufrufe blockierten etwa 8 s). Deshalb: nie schnell hintereinander abfragen, nicht
-  doppelt schreiben.
+  unzuverlässig. Der S34CG50 blieb nach einem doppelten Set-VCP-Write (10 ms Abstand)
+  im Kernel hängen (Aufrufe blockierten etwa 8 s). Deshalb: nie schnell hintereinander
+  abfragen, `writeRepeats` bei 1 lassen.
+- Direkt am Mac (JapanNext 6K per TB4, U28E590 per USB-C→DP, 2026-11-03): Der erste
+  I2C-Write nach einem Read kommt nicht an. W-R-W-R bleibt Null-Message (mit dem Rest
+  der vorigen Antwort im Puffer), W-W-R antwortet immer, auch mit 160 ms Abstand; ein
+  einzelner Set-VCP nach einem Read geht verloren. Deshalb der Vorlauf-Write
+  (`DDCTiming.primeAfterRead`). Am Dock noch nicht geprüft; dort notfalls
+  `ddc.primeAfterRead -bool NO`. Mess-Werkzeug: eigenes Swift-CLI mit `IOAVService`.
 - JapanNext 6K (6720×3780): über USB-C→DP (Sabrent-Adapter) nur Null-Messages, außer
   einmal beim Einstecken vor dem EDID; über HDMI und über Thunderbolt-4-Kabel an seinem
   USB-C-Eingang geht DDC/CI (TB4: Antwort sofort in Runde 1). Nach dem Einstecken per

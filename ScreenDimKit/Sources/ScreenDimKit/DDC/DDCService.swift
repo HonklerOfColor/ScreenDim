@@ -29,6 +29,15 @@ public struct DDCTiming: Equatable, Sendable {
     /// einen zweiten Write nach 10 ms genackt und danach im Kernel gehangen.
     public var writeRepeats: Int
     public var writeRepeatGap: Duration
+    /// Vorlauf-Write: Folgte die letzte Übertragung auf einen Read, geht jedes Paket
+    /// zweimal hinaus (Abstand `writeRepeatGap`). Auf Apple Silicon kommt der erste
+    /// Write nach einem Read beim Monitor nicht an: W-R-W-R bleibt Null-Message, W-W-R
+    /// antwortet, auch bei 160 ms Abstand; ein einzelner Set-VCP nach einem Read ging
+    /// verloren (JapanNext 6K und U28E590 direkt am Mac, 2026-11-03). Frische Kanäle
+    /// antworteten nur deshalb, weil vor dem ersten Write kein Read lag.
+    /// Aus per `defaults write … ddc.primeAfterRead -bool NO`, etwa wenn ein Monitor
+    /// hinter einem Dock den zweiten Write nackt (S34CG50).
+    public var primeAfterRead: Bool
     /// Obergrenze pro Operation inklusive Retries. Ein fehlerhafter I2C-Aufruf kann im
     /// Kernel mehrere Sekunden blockieren; der Aufrufer wartet höchstens so lange.
     public var deadline: Duration
@@ -42,6 +51,7 @@ public struct DDCTiming: Equatable, Sendable {
         writeAttempts: 2,
         writeRepeats: 1,
         writeRepeatGap: .milliseconds(10),
+        primeAfterRead: true,
         deadline: .seconds(3)
     )
 
@@ -64,6 +74,7 @@ public struct DDCTiming: Equatable, Sendable {
         timing.writeAttempts = number("writeAttempts").map { max($0, 1) } ?? timing.writeAttempts
         timing.writeRepeats = number("writeRepeats").map { min(max($0, 1), 2) } ?? timing.writeRepeats
         timing.writeRepeatGap = milliseconds("writeRepeatGapMs") ?? timing.writeRepeatGap
+        timing.primeAfterRead = number("primeAfterRead").map { $0 != 0 } ?? timing.primeAfterRead
         timing.deadline = milliseconds("deadlineMs").map { max($0, .milliseconds(100)) } ?? timing.deadline
         return timing
     }
@@ -96,6 +107,9 @@ public final class DDCService: DDCControlling {
         /// Gesetzt, sobald der laufende Aufruf seine Deadline überschritten hat.
         var hungSince: (instant: ContinuousClock.Instant, date: Date)?
         var diagnostics = DDCDiagnostics()
+        /// Zu Beginn unbekannt (etwa nach Neustart der App am selben Proxy), also wie
+        /// nach einem Read behandeln.
+        var lastTransferWasRead = true
     }
 
     private struct PendingCall {
@@ -281,7 +295,7 @@ public final class DDCService: DDCControlling {
             guard ContinuousClock.now < deadline else { throw lastError }
             do throws(DDCError) {
                 return try exchange { () throws(DDCError) -> VCPReading in
-                    try transferWrite(request)
+                    try send(request)
                     pause(replyDelay)
                     let reply = try transferRead(count: DDCPacket.replyLength)
                     return try parse(reply, expecting: code)
@@ -305,7 +319,7 @@ public final class DDCService: DDCControlling {
             guard ContinuousClock.now < deadline else { throw lastError }
             do throws(DDCError) {
                 try exchange { () throws(DDCError) in
-                    try transferWrite(packet)
+                    try send(packet)
                     for _ in 1..<max(timing.writeRepeats, 1) {
                         pause(timing.writeRepeatGap)
                         try transferWrite(packet)
@@ -335,7 +349,16 @@ public final class DDCService: DDCControlling {
 
     // MARK: - I2C mit Logging
 
-    private func transferWrite(_ packet: [UInt8]) throws(DDCError) {
+    /// Schickt ein Paket, nach einem Read mit Vorlauf-Write (siehe `DDCTiming.primeAfterRead`).
+    private func send(_ packet: [UInt8]) throws(DDCError) {
+        if timing.primeAfterRead, state.withLock({ $0.lastTransferWasRead }) {
+            try transferWrite(packet, priming: true)
+            pause(timing.writeRepeatGap)
+        }
+        try transferWrite(packet)
+    }
+
+    private func transferWrite(_ packet: [UInt8], priming: Bool = false) throws(DDCError) {
         let started = ContinuousClock.now
         let outcome = Result { () throws(DDCError) in try transport.write(packet) }
         let duration = ContinuousClock.now - started
@@ -343,11 +366,12 @@ public final class DDCService: DDCControlling {
         record(I2CTransferRecord(direction: .write, status: Self.status(error), error: error, duration: duration, bytes: packet, date: Date()))
 
         let status = Self.statusText(error)
+        let kind = priming ? "I2C-Vorlauf-Write" : "I2C-Write"
         if let error {
-            ddcLog.error("\(self.label, privacy: .public) I2C-Write [\(packet.hexString, privacy: .public)]: \(status, privacy: .public), \(duration.milliseconds) ms")
+            ddcLog.error("\(self.label, privacy: .public) \(kind, privacy: .public) [\(packet.hexString, privacy: .public)]: \(status, privacy: .public), \(duration.milliseconds) ms")
             throw error
         }
-        ddcLog.info("\(self.label, privacy: .public) I2C-Write [\(packet.hexString, privacy: .public)]: \(status, privacy: .public), \(duration.milliseconds) ms")
+        ddcLog.info("\(self.label, privacy: .public) \(kind, privacy: .public) [\(packet.hexString, privacy: .public)]: \(status, privacy: .public), \(duration.milliseconds) ms")
     }
 
     private func transferRead(count: Int) throws(DDCError) -> [UInt8] {
@@ -387,6 +411,7 @@ public final class DDCService: DDCControlling {
 
     private func record(_ transfer: I2CTransferRecord) {
         state.withLock { state in
+            state.lastTransferWasRead = transfer.direction == .read
             switch transfer.direction {
             case .write: state.diagnostics.lastWrite = transfer
             case .read: state.diagnostics.lastRead = transfer

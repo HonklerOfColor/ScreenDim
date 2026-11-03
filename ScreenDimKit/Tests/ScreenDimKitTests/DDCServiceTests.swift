@@ -14,6 +14,37 @@ struct DDCServiceTests {
         #expect(transport.written == [[0x84, 0x03, 0x10, 0x00, 0x32, 0x9A]])
     }
 
+    @Test("Vorlauf-Write: nach einem Read doppelt, nach einem Write einfach, zu Beginn doppelt")
+    func primeAfterRead() async throws {
+        let transport = MockTransport()
+        var timing = DDCTiming.immediate
+        timing.primeAfterRead = true
+        let service = DDCService(transport: transport, label: "test", timing: timing)
+        let request: [UInt8] = [0x82, 0x01, 0x10, 0xAC]
+        let set50 = DDCPacket.setVCPRequest(0x10, value: 50)
+        let set60 = DDCPacket.setVCPRequest(0x10, value: 60)
+
+        // Vorgeschichte unbekannt: Vorlauf. Danach Read, also wieder Vorlauf vor dem Set.
+        transport.enqueueReply(.success(Replies.brightness(current: 50)))
+        let reading = try await service.read(.brightness)
+        #expect(reading.current == 50)
+        #expect(transport.written == [request, request])
+
+        try await service.write(.brightness, value: 50)
+        #expect(transport.written == [request, request, set50, set50])
+
+        // Write nach Write: kein Vorlauf (Regler, Überblendung).
+        try await service.write(.brightness, value: 60)
+        #expect(transport.written == [request, request, set50, set50, set60])
+
+        // Read nach Write: erster Versuch ohne Vorlauf; nach der Null-Message (ein Read)
+        // bekommt der zweite Versuch ihn wieder.
+        transport.enqueueReply(.success(Replies.null))
+        transport.enqueueReply(.success(Replies.brightness(current: 60)))
+        _ = try await service.read(.brightness)
+        #expect(transport.written == [request, request, set50, set50, set60, request, request, request])
+    }
+
     @Test("Write wiederholt nach einem I2C-Fehler")
     func writeRetries() async throws {
         let transport = MockTransport()
@@ -282,9 +313,11 @@ struct DDCTimingTests {
         defaults.set(80, forKey: "ddc.replyDelayMs")
         defaults.set(140, forKey: "ddc.nullReplyDelayMs")
 
+        defaults.set(false, forKey: "ddc.primeAfterRead")
         let timing = DDCTiming.configured(from: defaults)
 
         #expect(timing.writeRepeats == 2)
+        #expect(!timing.primeAfterRead)
         #expect(timing.replyDelay == .milliseconds(80))
         #expect(timing.nullReplyDelay == .milliseconds(140))
         #expect(timing.deadline == DDCTiming.standard.deadline)
@@ -294,6 +327,7 @@ struct DDCTimingTests {
     func standardValues() {
         let timing = DDCTiming.standard
         #expect(timing.writeRepeats == 1)
+        #expect(timing.primeAfterRead)
         #expect(timing.writeRepeatGap == .milliseconds(10))
         #expect(timing.replyDelay == .milliseconds(50))
         #expect((Duration.milliseconds(100)...Duration.milliseconds(150)).contains(timing.nullReplyDelay))
