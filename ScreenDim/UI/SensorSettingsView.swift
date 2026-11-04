@@ -798,8 +798,8 @@ private struct SensorReadings: View {
     var body: some View {
         LabeledContent("Anwesenheit") {
             switch sensor.presence {
-            case true?: Text("Da")
-            case false?: Text("Weg")
+            case true?: Text("Anwesend")
+            case false?: Text("Abwesend")
             case nil: Text(verbatim: "–")
             }
         }
@@ -942,10 +942,10 @@ private struct DemoSection: View {
                     }
                 }
                 Stepper(value: schedule(\.presentFor), in: 5...300, step: 5) {
-                    Text("Da: \(seconds(sensor.demoSchedule.presentFor)) s")
+                    Text("Anwesend: \(seconds(sensor.demoSchedule.presentFor)) s")
                 }
                 Stepper(value: schedule(\.awayFor), in: 5...300, step: 1) {
-                    Text("Weg: \(seconds(sensor.demoSchedule.awayFor)) s")
+                    Text("Abwesend: \(seconds(sensor.demoSchedule.awayFor)) s")
                 }
             }
         }

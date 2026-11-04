@@ -164,8 +164,8 @@ private struct DeskSourceBox: View {
                 GridRow {
                     Text("Anwesenheit").foregroundStyle(.secondary)
                     switch sensor.presence {
-                    case true?: Text("Da")
-                    case false?: Text("Weg")
+                    case true?: Text("Anwesend")
+                    case false?: Text("Abwesend")
                     case nil: Text(verbatim: "–")
                     }
                 }
@@ -258,7 +258,7 @@ private struct EventLog: View {
     private func eventText(_ event: SensorEvent) -> LocalizedStringKey {
         switch event {
         case .presence(true): "Anwesend"
-        case .presence(false): "Weg"
+        case .presence(false): "Abwesend"
         case .lux(let lux): "\(Int(lux.rounded())) lx"
         case .connection(.connected): "Verbunden"
         case .connection(.searching): "Suche …"
