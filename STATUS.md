@@ -61,6 +61,10 @@ Auf echter Hardware noch nicht geprüft. Die Tests decken nur die Logik ab.
       Displays, die macOS ausgeschaltet hat (auch auf dem Sperrbildschirm). Gehen alle
       Monitore nach dem Wecken wieder an (auch hinter dem Dock), und bleibt DDC danach
       nutzbar?
+- [ ] Reichweite (Firmware): Lauftest am XIAO bestanden (2026-11-04: `Range` in
+      Zentimetern, „Abwesend“ 5 s nach Überschreiten von 120 cm). Offen: im Sitzen kein
+      kurzes „Abwesend“ (einmal 5 s bei 135 cm, ungeklärt); „Distance“ und „Max Distance“
+      in der Weboberfläche; UART-Kabel ab → OT2 übernimmt.
 - [ ] Lux → Helligkeit: Kurve 10 lx → 20 %, 1000 lx → 100 % am Schreibtisch prüfen.
 - [ ] Demo-Modus: Banner, Menüeintrag, Symbol; nach Neustart aus.
 

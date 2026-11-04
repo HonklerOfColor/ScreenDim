@@ -147,6 +147,30 @@ Chrome auf <https://web.esphome.io> („Connect“ → „Configure Wi-Fi“, Im
 - Außerhalb des Fensters verlangt der Webserver Digest-Login: Nutzer `screendim`, Passwort
   der Code ohne Bindestrich.
 
+## Reichweite der Anwesenheit
+
+Das Radar sieht mit Werkseinstellung mehrere Meter weit. Damit „anwesend“ nur am
+Schreibtisch gilt, wertet die Firmware seine Textzeilen aus (UART, alle 100 ms `ON`/`OFF`
+und `Range <n>` in Zentimetern): Anwesend ist nur, wer innerhalb von **Max Distance**
+sitzt (Standard 120 cm). Gehst du weiter weg, meldet der Sensor nach 5 s
+(`presence_off_delay`) „abwesend“, statt erst, wenn du den Raum verlassen hast. Schweigt
+der UART, gilt wie früher der Ausgang OT2 allein.
+
+Einstellen in der Weboberfläche des Sensors (`http://screendim-desk-xxxxxx.local`, Login
+`screendim`, Passwort der Kopplungscode ohne Bindestrich):
+
+- **Distance** zeigt, wie weit das Radar dich gerade sieht (leer: niemand erkannt).
+- **Max Distance** (30–800 cm) bleibt über Neustarts gespeichert. Setz die Grenze etwa
+  30–50 cm über den Wert, den „Distance“ zeigt, wenn du normal sitzt und dich anlehnst.
+  Bleibt „anwesend“ beim Aufstehen zu lange, verkleinere sie; meldet der Sensor dich im
+  Sitzen kurz als abwesend, vergrößere sie.
+
+Sitzt eine zweite Person näher am Radar als du, zählt ihre Entfernung.
+
+Am XIAO geprüft (2026-11-04, Grenze 120 cm): Beim Weggehen blieb das Radar `ON` und maß
+314–398 cm, der Sensor meldete 5 s nach dem Überschreiten der Grenze „abwesend“. Zurück
+am Schreibtisch kam „anwesend“ bei 73–113 cm. `Range` ist also in Zentimetern.
+
 ## Was die App erwartet
 
 Feste Angaben in `ScreenDimKit/Sources/ScreenDimKit/Sensor/SensorEvent.swift`
@@ -156,16 +180,21 @@ Feste Angaben in `ScreenDimKit/Sources/ScreenDimKit/Sensor/SensorEvent.swift`
 - `GET /events`: SSE mit `state` (`binary_sensor/Presence`, `sensor/Ambient Light`) und
   `ping` alle 10 s
 - `GET /binary_sensor/Presence`, `GET /sensor/Ambient Light`,
-  `GET /text_sensor/Pairing Code`
+  `GET /text_sensor/Pairing Code`; `sensor/Distance` und `number/Max Distance` kommen im
+  SSE-Strom mit, die App übergeht sie
 - Lux kommt bei 3 % Änderung, sonst alle 30 s: Nach 45 s ohne Ereignis gilt der Sensor
   in der App als ausgefallen, und die Lichtregelung stoppt.
 
 ## Offen
 
 - UART des HMMD: Er sendet Text, etwa alle 100 ms `ON` bzw. `OFF` und `Range <n>`
-  (vermutlich Zentimeter: am Schreibtisch 5–80, beim Weggehen stetig steigend bis über
-  400). Daraus Entfernung und Einstellungen (Abfallverzögerung, Reichweite) machen. Mit
-  Werkseinstellung meldet das Radar eine Person in etwa 3,5 m Abstand noch als anwesend.
+  (am Schreibtisch 5–80, beim Weggehen stetig steigend bis über 400; bei Toren von 70 cm
+  gäbe es nur 0–15, also Zentimeter). Die Firmware begrenzt damit die Reichweite
+  (Abschnitt „Reichweite der Anwesenheit“). Mit Werkseinstellung meldet das Radar eine
+  Person in etwa 3,5 m Abstand noch als anwesend. Noch offen: Abfallverzögerung und
+  Empfindlichkeit im Radar selbst einstellen. Das Wiki dokumentiert nur das Lesen von
+  Parametern (`0x0008`), nicht das Schreiben; vermutlich steht es im PC-Programm
+  `HMMD-mmWave-Sensor-Tools.zip` von Waveshare.
 - Abwesenheit am XIAO geprüft (2026-11-04): Nach dem Verlassen des Raums meldet das
   Radar nach etwa 40 s `OFF`, OT2 folgt gleichzeitig, „Anwesenheit: nein“ kommt 5 s
   später (`presence_off_delay`). Beim Zurückkommen gehen UART und D8 sofort auf „ja“.

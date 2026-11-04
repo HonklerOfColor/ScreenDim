@@ -53,6 +53,12 @@
   im NVS, BOOT kurz = Kopplungsfenster 2 min, BOOT 10 s = neuer Code, Digest-Login,
   mDNS `_screendim._tcp`, WLAN per Captive Portal oder Improv. UART des Radars wird
   vorerst nur mitgeloggt.
+- Reichweite der Anwesenheit (Firmware): Anwesend ist nur, wer innerhalb von „Max
+  Distance“ sitzt (Standard 120 cm, 30–800 cm, in der Weboberfläche des Sensors änderbar
+  und gemerkt). Die Firmware wertet dafür die Textzeilen des Radars aus (`ON`/`OFF`,
+  `Range <cm>`); „Distance“ zeigt die aktuelle Entfernung. Wer aufsteht und weggeht, gilt
+  nach etwa 5 s als abwesend statt erst nach Verlassen des Raums (Werkseinstellung des
+  Radars: mehrere Meter, rund 40 s Abfallzeit). Schweigt der UART, gilt OT2 wie bisher.
 - Lichtsensor in der Firmware: VEML7700 per I2C (SDA GPIO8, SCL GPIO9, Adresse 0x10),
   `sensor/Ambient Light` in Lux, gemeldet bei 3 % Änderung, sonst alle 30 s. Ohne Modul
   läuft der Rest weiter. Jeder gemeldete Wert steht im Log (`Licht: … lx`, INFO).

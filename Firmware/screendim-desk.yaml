@@ -7,6 +7,8 @@
 # - Webserver mit Digest-Login, Nutzer `screendim`, Passwort = Kopplungscode.
 #   `GET /events` (SSE, Ping alle 10 s), `GET /binary_sensor/Presence`,
 #   `GET /sensor/Ambient Light`, `GET /text_sensor/Pairing Code`.
+#   Dazu für die Weboberfläche: `sensor/Distance` (Entfernung laut Radar) und
+#   `number/Max Distance` (bis dahin zählt jemand als anwesend).
 # - BOOT kurz drücken: Kopplungsfenster (2 min, LED pulsiert blau): Der Code ist ohne
 #   Login abrufbar; alles andere bleibt hinter dem Login.
 #   BOOT 10 s halten: neuer Code, alte Kopplung ungültig, danach Kopplungsfenster.
@@ -27,6 +29,9 @@ substitutions:
   led_pin: GPIO48
   # Zusätzlich zur Abfallverzögerung im Radar
   presence_off_delay: 5s
+  # Anwesend nur bis zu dieser Entfernung (cm); änderbar in der Weboberfläche
+  # („Max Distance“), gemerkt über Neustarts.
+  presence_max_distance: "120"
   pairing_window: 2min
 
 esphome:
@@ -72,6 +77,21 @@ globals:
     type: uint64_t
     restore_value: true
     initial_value: "0"
+  # Letzte Textzeilen des Radars (UART, etwa alle 100 ms): „ON“/„OFF“ und „Range <n>“.
+  # `…_at`: millis() der letzten solchen Zeile; 0 = noch keine.
+  - id: radar_on
+    type: bool
+    initial_value: "false"
+  - id: radar_state_at
+    type: uint32_t
+    initial_value: "0"
+  # Zentimeter: am Schreibtisch 5–80, beim Weggehen bis über 400 (Gates zählten nur 0–15).
+  - id: radar_distance
+    type: int
+    initial_value: "-1"
+  - id: radar_distance_at
+    type: uint32_t
+    initial_value: "0"
 
 wifi:
   # Ohne gespeichertes WLAN: Zugangspunkt `screendim-desk-xxxxxx` mit Captive Portal,
@@ -116,8 +136,9 @@ uart:
       input: true
       pullup: true
   baud_rate: 115200
-  # Vorerst nur mitlesen: Das Ausgabeformat des HMMD ist nicht dokumentiert
-  # (laut Waveshare „ON/OFF und Entfernungstor“, Takt 100 ms).
+  # Das Radar schreibt Textzeilen „ON“/„OFF“ und „Range <n>“ (laut Waveshare „ON/OFF und
+  # Entfernung“, Takt 100 ms). Eine eigene ESPHome-Komponente gibt es nicht; der Debugger
+  # liest als einziger Empfänger zeilenweise und wertet aus.
   debug:
     direction: RX
     dummy_receiver: true
@@ -125,13 +146,48 @@ uart:
       delimiter: "\n"
       timeout: 20ms
     sequence:
-      - lambda: UARTDebug::log_string(direction, bytes);
+      - lambda: |-
+          std::string line(bytes.begin(), bytes.end());
+          const char *blank = " \r\n\t";
+          line.erase(line.find_last_not_of(blank) + 1);
+          line.erase(0, line.find_first_not_of(blank));
+          if (line == "ON" || line == "OFF") {
+            id(radar_on) = line == "ON";
+            id(radar_state_at) = millis();
+          } else if (line.rfind("Range ", 0) == 0) {
+            char *end = nullptr;
+            long cm = strtol(line.c_str() + 6, &end, 10);
+            if (end == line.c_str() + 6 || cm < 0) {
+              ESP_LOGD("radar", "Unlesbar: %s", line.c_str());
+              return;
+            }
+            id(radar_distance) = (int) cm;
+            id(radar_distance_at) = millis();
+          } else if (!line.empty()) {
+            ESP_LOGD("radar", "Unbekannt: %s", line.c_str());
+          }
 
 i2c:
   sda: ${i2c_sda_pin}
   scl: ${i2c_scl_pin}
 
 sensor:
+  # Entfernung der Person laut Radar, zum Einstellen von „Max Distance“; leer, wenn das
+  # Radar niemanden sieht oder nichts meldet. Die App liest es nicht.
+  - platform: template
+    id: distance
+    name: Distance
+    icon: mdi:ruler
+    unit_of_measurement: cm
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    update_interval: 2s
+    lambda: |-
+      uint32_t now = millis();
+      bool fresh = id(radar_distance_at) != 0 && now - id(radar_distance_at) <= 1000;
+      if (!fresh || !id(radar_on)) return NAN;
+      return (float) id(radar_distance);
+
   # Umgebungslicht. Ohne Modul am Bus meldet ESPHome den Sensor als ausgefallen; die App
   # bekommt dann kein Lux und regelt nicht nach dem Licht, Anwesenheit geht weiter.
   - platform: veml7700
@@ -155,17 +211,59 @@ sensor:
             format: "Licht: %.1f lx"
             args: [x]
 
+number:
+  # Bis zu dieser Entfernung zählt jemand als anwesend. Das Radar sieht mit Werkseinstellung
+  # mehrere Meter weit; ohne Grenze bliebe „anwesend“, solange man im Raum ist.
+  - platform: template
+    id: max_distance
+    name: Max Distance
+    icon: mdi:signal-distance-variant
+    unit_of_measurement: cm
+    entity_category: config
+    mode: box
+    min_value: 30
+    max_value: 800
+    step: 10
+    optimistic: true
+    restore_value: true
+    initial_value: ${presence_max_distance}
+    on_value:
+      - logger.log:
+          level: INFO
+          tag: screendim
+          format: "Anwesend bis %.0f cm"
+          args: [x]
+
 binary_sensor:
+  # OT2 des Radars: HIGH = anwesend, mit der Abfallverzögerung des Radars. Gilt nur, wenn
+  # der UART schweigt. Ohne Radar bleibt der Eingang HIGH: „anwesend“, die Bildschirme
+  # bleiben an.
   - platform: gpio
-    id: presence
-    name: Presence
-    device_class: occupancy
+    id: radar_ot2
+    internal: true
     pin:
       number: ${presence_pin}
-      # Ohne Radar bleibt der Eingang HIGH: „anwesend“, die Bildschirme bleiben an.
       mode:
         input: true
         pullup: true
+
+  # Anwesend: Das Radar meldet „ON“, und die Entfernung liegt bis „Max Distance“. Kommt
+  # keine Entfernung, gilt „ON“ allein; schweigt der UART (über 1 s), gilt OT2.
+  - platform: template
+    id: presence
+    name: Presence
+    device_class: occupancy
+    lambda: |-
+      uint32_t now = millis();
+      bool state_fresh = id(radar_state_at) != 0 && now - id(radar_state_at) <= 1000;
+      if (!state_fresh)
+        return id(radar_ot2).state;
+      if (!id(radar_on))
+        return false;
+      bool distance_fresh = id(radar_distance_at) != 0 && now - id(radar_distance_at) <= 1000;
+      if (!distance_fresh)
+        return true;
+      return id(radar_distance) <= id(max_distance).state;
     filters:
       - delayed_on: 100ms
       - delayed_off: ${presence_off_delay}
@@ -175,8 +273,12 @@ binary_sensor:
       - logger.log:
           level: INFO
           tag: screendim
-          format: "Anwesenheit: %s"
-          args: ['x ? "ja" : "nein"']
+          format: "Anwesenheit: %s (Radar %s, %d cm, Grenze %.0f cm)"
+          args:
+            - 'x ? "ja" : "nein"'
+            - 'id(radar_on) ? "ON" : "OFF"'
+            - id(radar_distance)
+            - id(max_distance).state
 
   - platform: gpio
     id: boot_button

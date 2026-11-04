@@ -91,7 +91,10 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
   `README.md`. Variante Seeed Studio XIAO ESP32S3: `screendim-desk-xiao.yaml` bindet
   `screendim-desk.yaml` als Paket ein und ersetzt Board, Pins, LED und die Skripte
   `led_pairing`/`led_new_code` (per `!remove`), Schaltplan `schaltplan-xiao.svg`.
-  Muss zu `SensorProtocol` passen (Entitätsnamen, mDNS-TXT, Nutzer `screendim`). YAML
+  Muss zu `SensorProtocol` passen (Entitätsnamen, mDNS-TXT, Nutzer `screendim`).
+  Anwesenheit: Textzeilen des Radars (UART-Debugger als Empfänger, `ON`/`OFF`,
+  `Range <cm>`) bis „Max Distance“ (Template-Number, Standard 120 cm); schweigt der UART,
+  gilt OT2. YAML
   prüfen: `esphome config` für beide Dateien. ESPHome im venv
   `~/.venvs/esphome`, Build immer mit `ESPHOME_DATA_DIR=/tmp/screendim-esphome` (nicht in
   iCloud). Zwischen USB-Resets mindestens 60 s laufen lassen, sonst zählt Safe Mode mit
