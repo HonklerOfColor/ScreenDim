@@ -147,6 +147,13 @@ sensor:
         - or:
             - delta: 3%
             - heartbeat: 30s
+      # ESPHome loggt Messwerte nur auf VERBOSE; gemeldete Werte hier sichtbar machen.
+      on_value:
+        - logger.log:
+            level: INFO
+            tag: screendim
+            format: "Licht: %.1f lx"
+            args: [x]
 
 binary_sensor:
   - platform: gpio

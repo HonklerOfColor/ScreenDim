@@ -161,9 +161,19 @@ Feste Angaben in `ScreenDimKit/Sources/ScreenDimKit/Sensor/SensorEvent.swift`
 
 ## Offen
 
-- UART-Format des HMMD auslesen (die Firmware loggt die Rohdaten) und daraus Entfernung
-  und Einstellungen (Abfallverzögerung, Reichweite) machen.
-- VEML7700 am Gerät prüfen: Lux im Log und unter `GET /sensor/Ambient Light`, Heartbeat
-  alle 30 s im SSE-Strom. Die Konfiguration ist bisher nur mit `esphome config` geprüft.
-- XIAO-Variante am Gerät prüfen (bisher nur `esphome config`): Radar an D8–D10, LED an
-  GPIO21, Kopplung über „B“.
+- UART des HMMD: Er sendet Text, etwa alle 100 ms `ON` bzw. `OFF` und `Range <n>`
+  (vermutlich Zentimeter: am Schreibtisch 5–80, beim Weggehen stetig steigend bis über
+  400). Daraus Entfernung und Einstellungen (Abfallverzögerung, Reichweite) machen. Mit
+  Werkseinstellung meldet das Radar eine Person in etwa 3,5 m Abstand noch als anwesend.
+- Abwesenheit am XIAO geprüft (2026-11-04): Nach dem Verlassen des Raums meldet das
+  Radar nach etwa 40 s `OFF`, OT2 folgt gleichzeitig, „Anwesenheit: nein“ kommt 5 s
+  später (`presence_off_delay`). Beim Zurückkommen gehen UART und D8 sofort auf „ja“.
+  Eine Abfallzeit von zusammen etwa 45 s; kürzer geht nur über die Einstellungen des
+  Radars (UART). Ohne angeschlossenes OT2 meldet D8 wegen des Pull-ups immer
+  „anwesend“, auch wenn das Radar sonst läuft.
+- VEML7700 über WLAN prüfen: `GET /sensor/Ambient Light` und Heartbeat im SSE-Strom.
+  Per USB am XIAO geprüft (2026-11-04): Lux im Log, abgedeckt etwa 2 lx, unter der Lampe
+  etwa 270 lx, bei gleichem Wert kommt der Heartbeat.
+- XIAO-Variante: Radar an D8–D10 und VEML7700 an D4/D5 laufen (2026-11-04). Offen: LED
+  an GPIO21, Kopplung über „B“. Die DevKitC-Variante ist mit VEML7700 noch nicht am
+  Gerät geprüft.

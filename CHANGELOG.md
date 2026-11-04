@@ -44,7 +44,7 @@
   vorerst nur mitgeloggt.
 - Lichtsensor in der Firmware: VEML7700 per I2C (SDA GPIO8, SCL GPIO9, Adresse 0x10),
   `sensor/Ambient Light` in Lux, gemeldet bei 3 % Änderung, sonst alle 30 s. Ohne Modul
-  läuft der Rest weiter.
+  läuft der Rest weiter. Jeder gemeldete Wert steht im Log (`Licht: … lx`, INFO).
 - Nachbau des Sensors: Stückliste (ESP32-S3-DevKitC-1 N8R8, Waveshare HMMD mmWave
   Sensor, VEML7700-Modul) und Schaltplan `Firmware/schaltplan.svg` in
   `Firmware/README.md`, Verweis im README.
