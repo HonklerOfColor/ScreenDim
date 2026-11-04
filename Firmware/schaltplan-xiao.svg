@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ScreenDim-Schreibtisch-Sensor: Verdrahtung Seeed Studio XIAO ESP32S3 ↔ Waveshare HMMD mmWave
+     Sensor und VEML7700. Pins wie in screendim-desk-xiao.yaml (substitutions).
+     XIAO in Draufsicht (USB-C oben): links D0–D6, rechts 5V, GND, 3V3, D10–D7. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="700" viewBox="0 0 960 700"
+     font-family="-apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14">
+  <title>ScreenDim-Sensor: Seeed Studio XIAO ESP32S3, Waveshare HMMD mmWave Sensor und VEML7700</title>
+  <desc>Radar: 3V3 an 3V3, GND an GND, TX an D10 (GPIO9), RX an D9 (GPIO8), OT2 an D8 (GPIO7, HIGH = anwesend). Lichtsensor VEML7700: VIN an 3V3, GND an GND, SCL an D5 (GPIO6), SDA an D4 (GPIO5), 3Vo bleibt frei.</desc>
+
+  <rect width="960" height="700" fill="#ffffff"/>
+
+  <text x="480" y="40" text-anchor="middle" font-size="18" font-weight="600" fill="#1f2328">ScreenDim-Schreibtisch-Sensor: Verdrahtung mit Seeed Studio XIAO ESP32S3</text>
+  <text x="480" y="62" text-anchor="middle" font-size="12" fill="#57606a">Alle Module von oben gesehen. Pins wie in Firmware/screendim-desk-xiao.yaml.</text>
+
+  <!-- ========== Leitungen (unter den Bauteilen gezeichnet) ========== -->
+
+  <!-- Versorgung des VEML7700 über die Oberseite: 3V3 außen, GND innen -->
+  <g stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 230 286 H 260 V 104 H 695 V 286" stroke="#d1242f"/>
+    <path d="M 230 358 H 280 V 128 H 600 V 286" stroke="#1f2328"/>
+  </g>
+  <g font-size="11">
+    <text x="480" y="98" text-anchor="middle" fill="#d1242f">3V3 vom XIAO zum VIN des VEML7700</text>
+    <text x="440" y="122" text-anchor="middle" fill="#1f2328">GND vom XIAO zum VEML7700</text>
+  </g>
+
+  <!-- XIAO → Radar: GND und 3V3 kreuzen (XIAO: GND über 3V3, Radar: 3V3 über GND) -->
+  <g stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 580 286 H 620 L 660 322 H 730" stroke="#1f2328"/>
+    <path d="M 620 322 L 660 286" stroke="#ffffff" stroke-width="9"/>
+    <path d="M 580 322 H 620 L 660 286 H 730" stroke="#d1242f"/>
+    <line x1="580" y1="358" x2="730" y2="358" stroke="#0969da"/>
+    <line x1="580" y1="394" x2="730" y2="394" stroke="#1a7f37"/>
+    <line x1="580" y1="430" x2="730" y2="430" stroke="#bf8700"/>
+  </g>
+  <g font-size="10.5" text-anchor="middle">
+    <text x="655" y="351" fill="#0969da">Radar TX → ESP RX</text>
+    <text x="655" y="387" fill="#1a7f37">ESP TX → Radar RX</text>
+    <text x="655" y="423" fill="#bf8700">OT2: HIGH = anwesend</text>
+  </g>
+
+  <!-- Abzweige für den VEML7700 -->
+  <circle cx="600" cy="286" r="5" fill="#1f2328"/>
+  <circle cx="695" cy="286" r="5" fill="#d1242f"/>
+
+  <!-- XIAO → VEML7700: I2C kreuzt (XIAO: SDA über SCL, Modul: SCL über SDA) -->
+  <g stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 230 394 H 300 L 340 430 H 380" stroke="#8250df"/>
+    <path d="M 300 430 L 340 394" stroke="#ffffff" stroke-width="9"/>
+    <path d="M 230 430 H 300 L 340 394 H 380" stroke="#0e7490"/>
+  </g>
+  <g font-size="10.5">
+    <text x="240" y="387" fill="#8250df">I2C SCL</text>
+    <text x="240" y="449" fill="#0e7490">I2C SDA</text>
+  </g>
+
+  <!-- ========== Seeed Studio XIAO ESP32S3 ========== -->
+  <rect x="380" y="176" width="200" height="320" rx="14" fill="#f6f8fa" stroke="#1f2328" stroke-width="2"/>
+  <rect x="445" y="162" width="70" height="30" rx="9" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/>
+  <text x="480" y="181" text-anchor="middle" font-size="10" fill="#1f2328">USB-C</text>
+  <text x="480" y="222" text-anchor="middle" font-size="13" font-weight="600" fill="#1f2328">XIAO ESP32S3</text>
+
+  <!-- Abschirmhaube des ESP32-S3 -->
+  <rect x="452" y="238" width="56" height="242" rx="4" fill="#eaeef2" stroke="#8c959f" stroke-width="1.2"/>
+  <text x="480" y="363" text-anchor="middle" font-size="10.5" fill="#57606a" transform="rotate(-90 480 359)">ESP32-S3 · 8 MB Flash · 8 MB PSRAM</text>
+
+  <!-- Pads, links D0–D6, rechts 5V, GND, 3V3, D10–D7 (Raster 2,54 mm) -->
+  <g stroke="#9a6700" stroke-width="1">
+    <rect x="372" y="242" width="16" height="16" rx="3" fill="#f0e2b6"/>
+    <rect x="372" y="278" width="16" height="16" rx="3" fill="#f0e2b6"/>
+    <rect x="372" y="314" width="16" height="16" rx="3" fill="#f0e2b6"/>
+    <rect x="372" y="350" width="16" height="16" rx="3" fill="#f0e2b6"/>
+    <rect x="372" y="386" width="16" height="16" rx="3" fill="#d4a72c"/>
+    <rect x="372" y="422" width="16" height="16" rx="3" fill="#d4a72c"/>
+    <rect x="372" y="458" width="16" height="16" rx="3" fill="#f0e2b6"/>
+    <rect x="572" y="242" width="16" height="16" rx="3" fill="#f0e2b6"/>
+    <rect x="572" y="278" width="16" height="16" rx="3" fill="#d4a72c"/>
+    <rect x="572" y="314" width="16" height="16" rx="3" fill="#d4a72c"/>
+    <rect x="572" y="350" width="16" height="16" rx="3" fill="#d4a72c"/>
+    <rect x="572" y="386" width="16" height="16" rx="3" fill="#d4a72c"/>
+    <rect x="572" y="422" width="16" height="16" rx="3" fill="#d4a72c"/>
+    <rect x="572" y="458" width="16" height="16" rx="3" fill="#f0e2b6"/>
+  </g>
+  <g fill="#1f2328">
+    <circle cx="380" cy="394" r="4"/>
+    <circle cx="380" cy="430" r="4"/>
+    <circle cx="580" cy="286" r="4"/>
+    <circle cx="580" cy="322" r="4"/>
+    <circle cx="580" cy="358" r="4"/>
+    <circle cx="580" cy="394" r="4"/>
+    <circle cx="580" cy="430" r="4"/>
+  </g>
+
+  <!-- Beschriftung links: Name, darunter GPIO; frei = grau -->
+  <g font-size="13" font-weight="600">
+    <text x="398" y="248" fill="#8c959f">D0</text>
+    <text x="398" y="284" fill="#8c959f">D1</text>
+    <text x="398" y="320" fill="#8c959f">D2</text>
+    <text x="398" y="356" fill="#8c959f">D3</text>
+    <text x="398" y="392" fill="#1f2328">D4</text>
+    <text x="398" y="428" fill="#1f2328">D5</text>
+    <text x="398" y="464" fill="#8c959f">D6</text>
+  </g>
+  <g font-size="10">
+    <text x="398" y="261" fill="#8c959f">GPIO1</text>
+    <text x="398" y="297" fill="#8c959f">GPIO2</text>
+    <text x="398" y="333" fill="#8c959f">GPIO3</text>
+    <text x="398" y="369" fill="#8c959f">GPIO4</text>
+    <text x="398" y="405" fill="#57606a">GPIO5</text>
+    <text x="398" y="441" fill="#57606a">GPIO6</text>
+    <text x="398" y="477" fill="#8c959f">GPIO43</text>
+  </g>
+  <!-- Beschriftung rechts -->
+  <g font-size="13" font-weight="600" text-anchor="end">
+    <text x="562" y="248" fill="#8c959f">5V</text>
+    <text x="562" y="284" fill="#1f2328">GND</text>
+    <text x="562" y="320" fill="#1f2328">3V3</text>
+    <text x="562" y="356" fill="#1f2328">D10</text>
+    <text x="562" y="392" fill="#1f2328">D9</text>
+    <text x="562" y="428" fill="#1f2328">D8</text>
+    <text x="562" y="464" fill="#8c959f">D7</text>
+  </g>
+  <g font-size="10" text-anchor="end">
+    <text x="562" y="369" fill="#57606a">GPIO9</text>
+    <text x="562" y="405" fill="#57606a">GPIO8</text>
+    <text x="562" y="441" fill="#57606a">GPIO7</text>
+    <text x="562" y="477" fill="#8c959f">GPIO44</text>
+  </g>
+
+  <!-- Unter dem XIAO -->
+  <g text-anchor="middle">
+    <text x="480" y="526" font-size="14" font-weight="600" fill="#1f2328">Seeed Studio XIAO ESP32S3</text>
+    <text x="480" y="546" font-size="12" fill="#1f2328">Taster B (BOOT, GPIO0): kurz = Kopplung, 10 s halten = neuer Kopplungscode</text>
+    <text x="480" y="564" font-size="12" fill="#1f2328">Nutzer-LED (GPIO21): pulsiert = Kopplungsfenster offen, blinkt schnell = neuer Code</text>
+    <text x="480" y="582" font-size="12" fill="#1f2328">Mitgelieferte WLAN-Antenne an den U.FL-Anschluss stecken</text>
+  </g>
+
+  <!-- ========== Waveshare HMMD ========== -->
+  <rect x="730" y="180" width="200" height="316" rx="10" fill="#f6f8fa" stroke="#1f2328" stroke-width="2"/>
+  <text x="830" y="208" text-anchor="middle" font-weight="600" fill="#1f2328">Waveshare HMMD</text>
+  <text x="830" y="226" text-anchor="middle" font-weight="600" fill="#1f2328">mmWave Sensor</text>
+  <text x="830" y="246" text-anchor="middle" font-size="12" fill="#57606a">24-GHz-Radar, Header J2</text>
+  <g fill="#1f2328">
+    <circle cx="730" cy="286" r="4"/>
+    <circle cx="730" cy="322" r="4"/>
+    <circle cx="730" cy="358" r="4"/>
+    <circle cx="730" cy="394" r="4"/>
+    <circle cx="730" cy="430" r="4"/>
+  </g>
+  <g font-size="13" fill="#1f2328" font-weight="600">
+    <text x="742" y="290">1 · 3V3</text>
+    <text x="742" y="326">2 · GND</text>
+    <text x="742" y="362">3 · TX</text>
+    <text x="742" y="398">4 · RX</text>
+    <text x="742" y="434">5 · OT2</text>
+  </g>
+  <g stroke="#57606a" stroke-width="1.5" fill="none">
+    <path d="M 868 400 q 20 -20 0 -40"/>
+    <path d="M 880 410 q 36 -30 0 -60"/>
+    <path d="M 892 420 q 52 -40 0 -80"/>
+  </g>
+  <text x="830" y="476" text-anchor="middle" font-size="11" fill="#57606a">Antennenseite zum Sitzplatz</text>
+
+  <!-- ========== VEML7700 ========== -->
+  <rect x="30" y="180" width="200" height="316" rx="10" fill="#f6f8fa" stroke="#1f2328" stroke-width="2"/>
+  <text x="130" y="208" text-anchor="middle" font-weight="600" fill="#1f2328">VEML7700-Modul</text>
+  <text x="130" y="226" text-anchor="middle" font-size="12" fill="#57606a">Umgebungslicht in Lux</text>
+  <text x="130" y="244" text-anchor="middle" font-size="12" fill="#57606a">I2C-Adresse 0x10</text>
+  <g fill="#1f2328">
+    <circle cx="230" cy="286" r="4"/>
+    <circle cx="230" cy="322" r="4" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/>
+    <circle cx="230" cy="358" r="4"/>
+    <circle cx="230" cy="394" r="4"/>
+    <circle cx="230" cy="430" r="4"/>
+  </g>
+  <g font-size="13" fill="#1f2328" font-weight="600" text-anchor="end">
+    <text x="218" y="290">VIN</text>
+    <text x="218" y="326" font-weight="400" fill="#57606a">3Vo (frei)</text>
+    <text x="218" y="362">GND</text>
+    <text x="218" y="398">SCL</text>
+    <text x="218" y="434">SDA</text>
+  </g>
+  <circle cx="78" cy="376" r="14" fill="#fff8c5" stroke="#9a6700" stroke-width="1.5"/>
+  <g stroke="#9a6700" stroke-width="1.5" stroke-linecap="round">
+    <line x1="78" y1="353" x2="78" y2="357"/>
+    <line x1="78" y1="395" x2="78" y2="399"/>
+    <line x1="55" y1="376" x2="59" y2="376"/>
+    <line x1="97" y1="376" x2="101" y2="376"/>
+    <line x1="62" y1="360" x2="65" y2="363"/>
+    <line x1="91" y1="389" x2="94" y2="392"/>
+    <line x1="94" y1="360" x2="91" y2="363"/>
+    <line x1="65" y1="389" x2="62" y2="392"/>
+  </g>
+  <text x="130" y="476" text-anchor="middle" font-size="11" fill="#57606a">Sensorfenster nach oben</text>
+
+  <!-- Fußnoten -->
+  <g font-size="12" fill="#57606a">
+    <text x="30" y="626">Alle Pegel 3,3 V, das Radar nur an 3V3 (3,0–3,6 V), nicht an 5V. Gekreuzte Leitungen ohne Punkt sind nicht verbunden.</text>
+    <text x="30" y="646">Der XIAO hat nur einen 3V3- und einen GND-Pin: Beide Module dort zusammenführen (Steckplatine, Klemme oder gelötet).</text>
+    <text x="30" y="666">Ohne Radar meldet der Sensor „anwesend“ (Pull-up an D8), ohne VEML7700 fehlt nur das Licht.</text>
+    <text x="30" y="686">Pins stehen unter „substitutions“ in Firmware/screendim-desk-xiao.yaml und lassen sich dort ändern.</text>
+  </g>
+</svg>

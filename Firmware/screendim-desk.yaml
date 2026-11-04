@@ -207,13 +207,7 @@ script:
       - lambda: |-
           screendim::set_pairing_open(true);
           ESP_LOGI("screendim", "Kopplungsfenster offen");
-      - light.turn_on:
-          id: status_led
-          red: 0%
-          green: 20%
-          blue: 100%
-          brightness: 40%
-          effect: Kopplung
+      - script.execute: led_pairing
       - delay: ${pairing_window}
       - lambda: |-
           screendim::set_pairing_open(false);
@@ -228,6 +222,24 @@ script:
           id(pairing_code).publish_state(screendim::encode(id(code_bits)));
           screendim::set_pairing_open(false);
           ESP_LOGW("screendim", "Neuer Kopplungscode, alte Kopplung ungültig");
+      - script.execute: led_new_code
+      - delay: 2s
+      - lambda: global_preferences->sync();
+      - script.execute: open_pairing
+
+  # LED-Anzeigen. screendim-desk-xiao.yaml ersetzt beide für die einfarbige LED des XIAO.
+  - id: led_pairing
+    then:
+      - light.turn_on:
+          id: status_led
+          red: 0%
+          green: 20%
+          blue: 100%
+          brightness: 40%
+          effect: Kopplung
+
+  - id: led_new_code
+    then:
       - light.turn_on:
           id: status_led
           red: 100%
@@ -235,9 +247,6 @@ script:
           blue: 0%
           brightness: 40%
           effect: Neuer Code
-      - delay: 2s
-      - lambda: global_preferences->sync();
-      - script.execute: open_pairing
 
 light:
   - platform: esp32_rmt_led_strip

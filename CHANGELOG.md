@@ -48,6 +48,11 @@
 - Nachbau des Sensors: Stückliste (ESP32-S3-DevKitC-1 N8R8, Waveshare HMMD mmWave
   Sensor, VEML7700-Modul) und Schaltplan `Firmware/schaltplan.svg` in
   `Firmware/README.md`, Verweis im README.
+- Sensor auf dem Seeed Studio XIAO ESP32S3: Schaltplan `Firmware/schaltplan-xiao.svg`
+  (Radar an D8–D10 neben 3V3/GND, VEML7700 an D4/D5) und Firmware
+  `Firmware/screendim-desk-xiao.yaml`, die `screendim-desk.yaml` einbindet und nur Board,
+  Pins und LED ändert (einfarbige Nutzer-LED an GPIO21). Die LED-Anzeigen stehen dafür in
+  eigenen Skripten.
 - Optionaler Schreibtisch-Sensor (ESP32/ESPHome, DIY): Suche per Bonjour
   (`_screendim._tcp`), Kopplung mit Code (automatisch im Kopplungsfenster, sonst BOOT-Taste
   oder Eingabe), Digest-Login, SSE-Strom mit Neuverbindung (1 s → 30 s). Abwesenheit

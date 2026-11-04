@@ -74,8 +74,11 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
 - `Firmware/` (ESPHome, ESP32-S3 + Waveshare HMMD mmWave + VEML7700 per I2C):
   `screendim-desk.yaml`, Kopplungscode und Auth-Umschaltung in `screendim_pairing.h`,
   Stückliste und Schaltplan (`schaltplan.svg`, von Hand geschriebenes SVG) in
-  `README.md`. Muss zu `SensorProtocol` passen (Entitätsnamen, mDNS-TXT, Nutzer
-  `screendim`). YAML prüfen: `esphome config screendim-desk.yaml`. ESPHome im venv
+  `README.md`. Variante Seeed Studio XIAO ESP32S3: `screendim-desk-xiao.yaml` bindet
+  `screendim-desk.yaml` als Paket ein und ersetzt Board, Pins, LED und die Skripte
+  `led_pairing`/`led_new_code` (per `!remove`), Schaltplan `schaltplan-xiao.svg`.
+  Muss zu `SensorProtocol` passen (Entitätsnamen, mDNS-TXT, Nutzer `screendim`). YAML
+  prüfen: `esphome config` für beide Dateien. ESPHome im venv
   `~/.venvs/esphome`, Build immer mit `ESPHOME_DATA_DIR=/tmp/screendim-esphome` (nicht in
   iCloud). Zwischen USB-Resets mindestens 60 s laufen lassen, sonst zählt Safe Mode mit
   (10 schnelle Neustarts). Zustandswechsel loggt ESPHome 2026.10 nur auf VERBOSE.

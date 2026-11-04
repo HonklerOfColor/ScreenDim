@@ -1,0 +1,73 @@
+# ScreenDim-Schreibtisch-Sensor auf dem Seeed Studio XIAO ESP32S3 (8 MB Flash, 8 MB PSRAM)
+# mit Waveshare HMMD mmWave und VEML7700.
+#
+# Gleiche Firmware wie screendim-desk.yaml (als Paket eingebunden); anders sind nur das
+# Board, die Pins und die LED: Der XIAO hat statt der RGB-LED eine einfarbige Nutzer-LED
+# an GPIO21 (LOW = an). Verdrahtung: schaltplan-xiao.svg, Tabellen in README.md.
+#
+# Bauen und flashen: siehe Firmware/README.md, mit dieser Datei statt screendim-desk.yaml.
+
+substitutions:
+  # Verdrahtung HMMD → XIAO: alle fünf Leitungen an der rechten Stiftleiste
+  # (GND, 3V3, D10, D9, D8 liegen nebeneinander).
+  presence_pin: GPIO7 # D8 ← OT2: HIGH = anwesend
+  radar_rx_pin: GPIO9 # D10 ← TX des Radars
+  radar_tx_pin: GPIO8 # D9 → RX des Radars
+  # Verdrahtung VEML7700 → XIAO, I2C an den Standard-Pins des XIAO
+  i2c_sda_pin: GPIO5 # D4
+  i2c_scl_pin: GPIO6 # D5
+  # Nutzer-LED des XIAO
+  led_pin: GPIO21
+
+packages:
+  base: !include screendim-desk.yaml
+
+esp32:
+  board: seeed_xiao_esp32s3
+
+output:
+  - platform: ledc
+    id: status_led_output
+    pin:
+      number: ${led_pin}
+      inverted: true
+
+light:
+  # Statt der RGB-LED (WS2812) des DevKitC-1
+  - id: !remove status_led
+  - platform: monochromatic
+    id: status_led
+    internal: true
+    output: status_led_output
+    restore_mode: ALWAYS_OFF
+    default_transition_length: 0s
+    effects:
+      - pulse:
+          name: Kopplung
+          transition_length: 500ms
+          update_interval: 500ms
+      - strobe:
+          name: Neuer Code
+          colors:
+            - state: true
+              brightness: 100%
+              duration: 150ms
+            - state: false
+              duration: 150ms
+
+script:
+  # Einfarbig: Kopplungsfenster pulsiert, neuer Code blinkt schnell.
+  - id: !remove led_pairing
+  - id: !remove led_new_code
+  - id: led_pairing
+    then:
+      - light.turn_on:
+          id: status_led
+          brightness: 100%
+          effect: Kopplung
+  - id: led_new_code
+    then:
+      - light.turn_on:
+          id: status_led
+          brightness: 100%
+          effect: Neuer Code

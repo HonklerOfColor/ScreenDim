@@ -13,7 +13,8 @@ regelt ein Schreibtisch-Sensor (ESP32) die Helligkeit nach dem Umgebungslicht un
 schaltet die Bildschirme bei Abwesenheit ab. Den Sensor baust du selbst aus einem
 ESP32-S3-DevKitC-1, einem Waveshare HMMD mmWave Sensor (Anwesenheit) und einem
 VEML7700-Modul (Licht), neun Leitungen; Stückliste, Schaltplan und Firmware stehen in
-[`Firmware/`](Firmware/README.md).
+[`Firmware/`](Firmware/README.md), dort auch eine kleinere Variante mit dem Seeed Studio
+XIAO ESP32S3.
 
 Auf Wunsch dunkelt ScreenDim alle Monitore ab, wenn du eine Weile weder Maus noch Tastatur
 benutzt (Zeit und Helligkeit wählbar, z. B. nach 15 min auf 5 %). Jede Eingabe bringt die
@@ -72,6 +73,7 @@ Die Tests brauchen weder die App noch Hardware.
   I2C-Transport über `IOAVService`).
 - `project.yml`: Projektbeschreibung für XcodeGen.
 - `Firmware/`: ESPHome-Firmware des Schreibtisch-Sensors mit Stückliste und Schaltplan
-  (`schaltplan.svg`).
+  (`schaltplan.svg`; für den XIAO ESP32S3 `screendim-desk-xiao.yaml` und
+  `schaltplan-xiao.svg`).
 
 Weitere Details stehen in `CLAUDE.md`. Offene Punkte stehen in `STATUS.md`, Änderungen in `CHANGELOG.md`.
