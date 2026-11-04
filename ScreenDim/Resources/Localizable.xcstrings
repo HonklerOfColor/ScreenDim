@@ -267,6 +267,26 @@
         }
       }
     },
+    "Alle Monitore werden ignoriert" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All displays are ignored"
+          }
+        }
+      }
+    },
+    "Alle Monitore werden ignoriert." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All displays are ignored."
+          }
+        }
+      }
+    },
     "Allgemein" : {
       "localizations" : {
         "en" : {
@@ -571,22 +591,22 @@
         }
       }
     },
-    "DDC/CI regelt die Hintergrundbeleuchtung des Monitors. Gamma skaliert die Farbkurve des Displays, Overlay legt ein halbtransparentes Fenster darüber." : {
+    "DDC/CI regelt die Hintergrundbeleuchtung des Monitors. Gamma skaliert die Farbkurve des Displays, Overlay legt ein halbtransparentes Fenster darüber. Ignorieren nimmt den Monitor ganz aus der Dimmung." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DDC/CI controls the display's backlight. Gamma scales the display's color curve, Overlay places a semi-transparent window over it."
+            "value" : "DDC/CI controls the display's backlight. Gamma scales the display's color curve, Overlay places a semi-transparent window over it. Ignore leaves the display out of dimming entirely."
           }
         }
       }
     },
-    "DDC/CI stellt die Hintergrundbeleuchtung des Monitors ein. Gamma und Overlay dimmen per Software; die Hintergrundbeleuchtung bleibt dann, wie sie ist. Die des eingebauten Displays regelst du mit den Helligkeitstasten." : {
+    "DDC/CI stellt die Hintergrundbeleuchtung des Monitors ein. Gamma und Overlay dimmen per Software; die Hintergrundbeleuchtung bleibt dann, wie sie ist. Die des eingebauten Displays regelst du mit den Helligkeitstasten. „Ignorieren“ nimmt einen Monitor ganz aus der Dimmung, etwa einen Beamer." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DDC/CI sets the display's backlight. Gamma and Overlay dim in software; the backlight then stays as it is. The built-in display's backlight is controlled with the brightness keys."
+            "value" : "DDC/CI sets the display's backlight. Gamma and Overlay dim in software; the backlight then stays as it is. The built-in display's backlight is controlled with the brightness keys. “Ignore” leaves a display out of dimming entirely, such as a projector."
           }
         }
       }
@@ -1150,6 +1170,27 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "I2C write"
+          }
+        }
+      }
+    },
+    "Ignorieren" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ignore"
+          }
+        }
+      }
+    },
+    "Ignoriert" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ignored"
           }
         }
       }
@@ -2310,6 +2351,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Away: %lld s"
+          }
+        }
+      }
+    },
+    "Wird nie gedimmt, auch nicht bei Inaktivität oder Abwesenheit." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Never dimmed, not even when idle or away."
           }
         }
       }

@@ -514,6 +514,135 @@ struct DisplayManagerTests {
         #expect(await eventually { control.writes == [70] })
     }
 
+    // MARK: - Ignorieren
+
+    @Test("Ignorieren: kein Kanal, keine Dimmung, kein Schwarzfenster, kein Leerlauf; bleibt über den Neustart")
+    func ignoredMonitorIsLeftAlone() async {
+        let control = StubControl()
+        setup.displays = [Self.external(2, avService: 0x100), Self.external(3, avService: nil), Self.external(4, avService: nil)]
+        setup.makeControl = { _ in control }
+        let manager = makeManager()
+        manager.refresh(force: true)
+        #expect(await eventually { state(manager, 2) == .ready })
+        manager.setBrightness(30, for: 2)
+        #expect(await eventually { control.writes == [30] })
+        manager.setBrightness(40, for: 3)
+        manager.setBrightness(50, for: 4)
+        #expect(setup.gamma.levels == [3: 40, 4: 50])
+
+        manager.setBrightnessMethod(.ignored, for: 2)
+        manager.setBrightnessMethod(.ignored, for: 3)
+        for id: CGDirectDisplayID in [2, 3] {
+            #expect(state(manager, id) == .ignored)
+            #expect(monitor(manager, id)?.preferredMethod == .ignored)
+            #expect(monitor(manager, id)?.isAdjustable == false)
+            #expect(monitor(manager, id)?.usesSoftwareDimming == false)
+        }
+        // DDC/CI bleibt wählbar; die Gamma-Kurve von 3 ist zurückgesetzt.
+        #expect(monitor(manager, 2)?.canUseDDC == true)
+        #expect(setup.gamma.levels == [4: 50])
+
+        // Regler „Alle Monitore“, Tastenkürzel, Leerlauf und Schwarzschalten lassen sie aus.
+        manager.setAllBrightness(10)
+        manager.stepAll(by: -10)
+        #expect(await eventually { setup.gamma.levels == [4: 0] })
+        manager.beginIdleDim(to: 0)
+        manager.setScreensBlanked(true)
+        #expect(setup.blanker.blanked == [4])
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(control.writes == [30])
+        #expect(manager.masterBrightness == 0)
+
+        // Neustart: kein Kanal, keine Prüfung, keine Dimmung; gespeicherte Werte bleiben.
+        let second = makeManager()
+        second.refresh(force: true)
+        #expect(setup.created == [0x100])
+        #expect(state(second, 2) == .ignored)
+        #expect(state(second, 3) == .ignored)
+        #expect(await eventually { setup.gamma.levels == [4: 0] })
+        let store = BrightnessStore(storage: setup.preferences)
+        #expect(store.brightness(for: "19501-3148-2", mode: .ddc) == 30)
+        #expect(store.brightness(for: "19501-3148-3", mode: .software) == 40)
+    }
+
+    @Test("Ignorieren aufheben: DDC/CI prüft neu und stellt den DDC-Wert her; Gamma oder Overlay blenden zum Software-Wert")
+    func stopIgnoring() async {
+        let control = StubControl()
+        setup.displays = [Self.external(2, avService: 0x100)]
+        setup.makeControl = { _ in control }
+        let manager = makeManager()
+        manager.refresh(force: true)
+        #expect(await eventually { state(manager, 2) == .ready })
+        manager.setBrightness(30, for: 2)
+        #expect(await eventually { control.writes == [30] })
+
+        manager.setBrightnessMethod(.ignored, for: 2)
+        manager.setScreensBlanked(true)
+        #expect(setup.blanker.blanked.isEmpty)
+        manager.setBrightnessMethod(.ddc, for: 2)
+        #expect(setup.blanker.blanked == [2])
+        manager.setScreensBlanked(false)
+        #expect(setup.created == [0x100, 0x100])
+        #expect(await eventually { state(manager, 2) == .ready })
+        #expect(monitor(manager, 2)?.preferredMethod == .ddc)
+        #expect(await eventually { control.writes == [30, 30] })
+
+        // Ignorieren, dann Gamma: kein Kanal, Software vom ungedimmten Stand aus.
+        manager.setBrightnessMethod(.ignored, for: 2)
+        manager.setBrightnessMethod(.gamma, for: 2)
+        #expect(setup.created == [0x100, 0x100])
+        #expect(state(manager, 2) == .disabled)
+        #expect(monitor(manager, 2)?.preferredMethod == .gamma)
+        #expect(monitor(manager, 2)?.usesSoftwareDimming == true)
+        #expect(setup.gamma.levels == [2: 100])
+        manager.setBrightness(40, for: 2)
+        #expect(setup.gamma.levels == [2: 40])
+
+        // Ignorieren, dann Overlay: gespeicherter Software-Wert gilt wieder.
+        manager.setBrightnessMethod(.ignored, for: 2)
+        #expect(setup.gamma.levels.isEmpty)
+        manager.setBrightnessMethod(.overlay, for: 2)
+        #expect(setup.overlay.levels == [2: 40])
+        #expect(setup.gamma.levels.isEmpty)
+        #expect(monitor(manager, 2)?.preferredMethod == .overlay)
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(control.writes == [30, 30])
+    }
+
+    @Test("Ignorieren während der Prüfung: Die späte Antwort macht den Monitor nicht wieder regelbar")
+    func ignoreWhileProbing() async {
+        let gate = GatedControl()
+        setup.displays = [Self.external(2, avService: 0x100)]
+        setup.makeControl = { _ in gate }
+        let manager = makeManager()
+        manager.refresh(force: true)
+        #expect(state(manager, 2) == .probing)
+
+        manager.setBrightnessMethod(.ignored, for: 2)
+        gate.release(with: .success(VCPReading(current: 50, maximum: 100)))
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(state(manager, 2) == .ignored)
+        #expect(monitor(manager, 2)?.isAdjustable == false)
+    }
+
+    @Test("Eingebautes Display ohne Steuerung: ignorieren und zurück zur Software-Dimmung")
+    func ignoreBuiltIn() async {
+        setup.displays = [Self.builtIn]
+        let manager = makeStoreManager()
+        manager.refresh(force: true)
+        manager.setBrightness(40, for: 1)
+        #expect(setup.gamma.levels == [1: 40])
+
+        manager.setBrightnessMethod(.ignored, for: 1)
+        #expect(state(manager, 1) == .ignored)
+        #expect(setup.gamma.levels.isEmpty)
+
+        manager.setBrightnessMethod(.gamma, for: 1)
+        #expect(state(manager, 1) == .noChannel)
+        #expect(monitor(manager, 1)?.usesSoftwareDimming == true)
+        #expect(await eventually { setup.gamma.levels == [1: 40] })
+    }
+
     // MARK: - Gamma oder Overlay
 
     @Test("Gamma-Tabelle nicht nutzbar: automatisch Overlay")

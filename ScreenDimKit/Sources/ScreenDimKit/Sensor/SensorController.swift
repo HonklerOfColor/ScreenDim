@@ -499,9 +499,9 @@ public final class SensorController {
     }
 
     /// Jeder Monitor folgt seinem eigenen Lichtprofil, gleich aus welcher Quelle das Licht
-    /// kommt. Ausgelassen werden Monitore ohne „folgt dem Licht“, in einer Pause (Regler,
-    /// fremde Änderung) und das eingebaute Display, solange macOS es selbst regelt: Es gibt
-    /// nur einen Schreiber. Die Hysterese gilt gegen den Wert, auf den der Monitor gerade
+    /// kommt. Ausgelassen werden ignorierte Monitore, Monitore ohne „folgt dem Licht“, in
+    /// einer Pause (Regler, fremde Änderung) und das eingebaute Display, solange macOS es
+    /// selbst regelt: Es gibt nur einen Schreiber. Die Hysterese gilt gegen den Wert, auf den der Monitor gerade
     /// zugeht; neue Werte blendet der `DisplayManager` vom echten Wert aus über.
     /// - Parameters:
     ///   - lux: geglättetes Lux der Quelle.
@@ -523,7 +523,7 @@ public final class SensorController {
         for monitor in manager.monitors {
             let key = monitor.storageKey
             let profile = lightProfile(for: monitor)
-            guard only == nil || only == key, profile.followsLight, !macOSRegulates(monitor) else { continue }
+            guard only == nil || only == key, !monitor.isIgnored, profile.followsLight, !macOSRegulates(monitor) else { continue }
             if let hold = holds[key] {
                 if hold.isActive(at: at, lux: value) { continue }
                 holds[key] = nil

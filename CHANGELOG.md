@@ -17,6 +17,12 @@
   und die App-Review-Notizen sind weg.
 
 ### Neu
+- Monitor ignorieren: Der Picker je Monitor (Einstellungen → Allgemein) hat den Punkt
+  „Ignorieren“, etwa für einen Beamer. Der Monitor bekommt dann keinen DDC-Kanal (kein
+  I2C-Verkehr) und keine Software-Dimmung; Licht, Leerlauf, Abwesenheit, „Alle Monitore“
+  und Tastenkürzel lassen ihn aus, Menü und Tab „Licht“ zeigen ihn nicht. Die
+  Hintergrundbeleuchtung bleibt, wie sie steht. Gemerkt pro Monitor; gespeicherte Werte
+  und Verfahren gelten wieder, sobald er nicht mehr ignoriert wird.
 - Weniger Arbeit im Hintergrund: Die IORegistry wird nur noch durchlaufen, wenn sich die
   Display-Menge geändert hat oder neu gesucht wird (vorher bei jeder Umkonfiguration, rund
   13 ms auf dem Hauptthread). Der Wechsel des Verfahrens eines Monitors betrifft nur noch

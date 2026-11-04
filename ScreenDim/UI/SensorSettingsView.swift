@@ -137,7 +137,8 @@ private struct IdleSection: View {
     }
 }
 
-/// Je Monitor das Verfahren (DDC/CI, Gamma, Overlay); der Hinweis dazu steht einmal darunter.
+/// Je Monitor das Verfahren (DDC/CI, Gamma, Overlay, Ignorieren); der Hinweis dazu steht
+/// einmal darunter.
 private struct MonitorSection: View {
     let manager: DisplayManager
     @Environment(\.openWindow) private var openWindow
@@ -151,7 +152,7 @@ private struct MonitorSection: View {
                 MonitorRow(monitor: monitor, manager: manager)
             }
             HStack(alignment: .top) {
-                Text("DDC/CI stellt die Hintergrundbeleuchtung des Monitors ein. Gamma und Overlay dimmen per Software; die Hintergrundbeleuchtung bleibt dann, wie sie ist. Die des eingebauten Displays regelst du mit den Helligkeitstasten.")
+                Text("DDC/CI stellt die Hintergrundbeleuchtung des Monitors ein. Gamma und Overlay dimmen per Software; die Hintergrundbeleuchtung bleibt dann, wie sie ist. Die des eingebauten Displays regelst du mit den Helligkeitstasten. „Ignorieren“ nimmt einen Monitor ganz aus der Dimmung, etwa einen Beamer.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -183,7 +184,9 @@ private struct MonitorRow: View {
                     Button("Erneut prüfen") { manager.retry(monitor.id) }
                         .controlSize(.small)
                 }
-                if monitor.canUseDDC || monitor.usesSoftwareDimming {
+                if monitor.canUseDDC || monitor.usesSoftwareDimming || monitor.isIgnored {
+                    // Auch ohne nutzbare Gamma-Tabelle wählbar: „Ignorieren“ muss immer gehen,
+                    // und Gamma wird bei der Wahl neu versucht.
                     Picker("Helligkeit regeln über", selection: Binding(
                         get: { monitor.preferredMethod },
                         set: { manager.setBrightnessMethod($0, for: monitor.id) }
@@ -193,11 +196,12 @@ private struct MonitorRow: View {
                         }
                         Text("Gamma").tag(BrightnessMethod.gamma)
                         Text("Overlay").tag(BrightnessMethod.overlay)
+                        Divider()
+                        Text("Ignorieren").tag(BrightnessMethod.ignored)
                     }
                     .labelsHidden()
                     .fixedSize()
-                    .disabled(monitor.gammaUnavailable && !monitor.canUseDDC)
-                    .help("DDC/CI regelt die Hintergrundbeleuchtung des Monitors. Gamma skaliert die Farbkurve des Displays, Overlay legt ein halbtransparentes Fenster darüber.")
+                    .help("DDC/CI regelt die Hintergrundbeleuchtung des Monitors. Gamma skaliert die Farbkurve des Displays, Overlay legt ein halbtransparentes Fenster darüber. Ignorieren nimmt den Monitor ganz aus der Dimmung.")
                 }
             }
         } label: {
@@ -230,8 +234,10 @@ private struct MonitorRow: View {
         ddcFallback || (monitor.isBuiltIn && monitor.state.isFailure) || monitor.gammaUnavailable
     }
 
-    /// Was gerade wirkt und warum: Prüfung, DDC-Rückfall, Overlay statt Gamma, Anschlussweg.
+    /// Was gerade wirkt und warum: Ignoriert, Prüfung, DDC-Rückfall, Overlay statt Gamma,
+    /// Anschlussweg.
     private var detail: LocalizedStringKey? {
+        if monitor.isIgnored { return "Wird nie gedimmt, auch nicht bei Inaktivität oder Abwesenheit." }
         if monitor.preferredMethod == .ddc, monitor.state == .probing { return "DDC/CI wird geprüft …" }
         if ddcFallback { return fallbackReason }
         if monitor.isBuiltIn, monitor.state.isFailure { return "Helligkeit lässt sich gerade nicht lesen oder setzen." }
@@ -445,23 +451,30 @@ struct LightCurveSection: View {
     let manager: DisplayManager
     @State private var selectedID: CGDirectDisplayID?
 
+    /// Ignorierte Monitore folgen keinem Licht.
+    private var monitors: [DisplayManager.Monitor] {
+        manager.monitors.filter { !$0.isIgnored }
+    }
+
     private var monitor: DisplayManager.Monitor? {
-        manager.monitors.first { $0.id == selectedID } ?? manager.monitors.first
+        monitors.first { $0.id == selectedID } ?? monitors.first
     }
 
     var body: some View {
         Section("Helligkeit je Monitor") {
             if let monitor {
-                if manager.monitors.count > 1 {
+                if monitors.count > 1 {
                     // Tag ist die Display-ID: Baugleiche Monitore teilen sich Namen und
                     // womöglich die Identität, nie die ID.
                     Picker("Monitor", selection: Binding(get: { monitor.id }, set: { selectedID = $0 })) {
-                        ForEach(manager.monitors) { monitor in
+                        ForEach(monitors) { monitor in
                             Text(verbatim: displayName(monitor)).tag(monitor.id)
                         }
                     }
                 }
                 LightProfileEditor(sensor: sensor, manager: manager, monitor: LightMonitor(monitor))
+            } else if !manager.monitors.isEmpty {
+                Text("Alle Monitore werden ignoriert.").foregroundStyle(.secondary)
             } else {
                 Text("Kein Monitor gefunden.").foregroundStyle(.secondary)
             }

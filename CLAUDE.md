@@ -13,8 +13,10 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
 - Externe Monitore regelt die App per DDC/CI (Hintergrundbeleuchtung des Monitors); das
   ist der Standard, sobald ein DDC-Kanal (`DCPAVServiceProxy`) gefunden wird. Kommt DDC
   nicht durch (Null-Antwort, Timeout, I/O-Fehler), dimmt automatisch die Software (Gamma
-  oder Overlay). Der Nutzer wählt je Monitor DDC/CI, Gamma oder Overlay
+  oder Overlay). Der Nutzer wählt je Monitor DDC/CI, Gamma, Overlay oder Ignorieren
   (`BrightnessMethod`); Gamma/Overlay statt DDC/CI heißt: kein Kanal, kein I2C-Verkehr.
+  Ignorieren (`DDCState.ignored`, etwa für einen Beamer): kein Kanal, keine
+  Software-Dimmung, kein Licht, kein Leerlauf, kein Schwarzschalten.
 - Das eingebaute Display lässt sich per Software dimmen; seine Hintergrundbeleuchtung
   regelt macOS (Helligkeitstasten). Die frühere Steuerung über `DisplayServices` und der
   eingebaute Lichtsensor (IOHIDEventSystem) sind entfernt; ihr Code steht in der

@@ -58,6 +58,8 @@ public struct DisplayDiagnostics: Identifiable, Sendable {
     }
 
     public var stateText: String {
+        // Ignoriert: ScreenDim kennt weder Beleuchtung noch Dimmung.
+        guard state != .ignored else { return state.summary }
         var parts = [state.summary]
         switch softwareDimming {
         case .gamma: parts.append(String(localized: "Software-Dimmung (Gamma)"))

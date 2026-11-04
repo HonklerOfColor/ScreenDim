@@ -65,6 +65,17 @@ public struct BrightnessStore {
         defaults.set(enabled, forKey: "ddcEnabled.\(storageKey)")
     }
 
+    /// Monitor von der Dimmung ausgenommen (Standard: nein). Gewähltes Software-Verfahren
+    /// und DDC-Wahl bleiben gespeichert und gelten wieder, sobald er nicht mehr ignoriert wird.
+    public func isIgnored(_ storageKey: String) -> Bool {
+        defaults.object(forKey: "ignored.\(storageKey)") as? Bool ?? false
+    }
+
+    public func setIgnored(_ ignored: Bool, for storageKey: String) {
+        guard isIgnored(storageKey) != ignored else { return }
+        defaults.set(ignored, forKey: "ignored.\(storageKey)")
+    }
+
     /// Der DDC-Schlüssel ist der aus Version 1, damit gespeicherte Werte erhalten bleiben.
     private func key(_ storageKey: String, _ mode: Mode) -> String {
         switch mode {

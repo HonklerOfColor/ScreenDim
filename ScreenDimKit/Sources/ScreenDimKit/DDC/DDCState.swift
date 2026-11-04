@@ -19,6 +19,9 @@ public enum DDCState: Equatable, Sendable {
     /// Der Nutzer hat DDC/CI in den Einstellungen ausgeschaltet; der Monitor läuft per
     /// Software-Dimmung, ohne I2C-Verkehr.
     case disabled
+    /// Der Nutzer lässt den Monitor ignorieren (etwa einen Beamer): kein Kanal, keine
+    /// Software-Dimmung, kein Licht, kein Leerlauf, kein Schwarzschalten.
+    case ignored
 
     public init(failure error: DDCError) {
         switch error {
@@ -37,7 +40,7 @@ public enum DDCState: Equatable, Sendable {
     /// beantworten keine Reads, nehmen Writes aber an.
     public var isAdjustable: Bool {
         switch self {
-        case .probing, .noChannel, .disabled: false
+        case .probing, .noChannel, .disabled, .ignored: false
         case .ready, .nullReply, .i2cTimeout, .ioError, .noResponse: true
         }
     }
@@ -45,7 +48,7 @@ public enum DDCState: Equatable, Sendable {
     public var isFailure: Bool {
         switch self {
         case .nullReply, .i2cTimeout, .ioError, .noResponse: true
-        case .probing, .ready, .noChannel, .disabled: false
+        case .probing, .ready, .noChannel, .disabled, .ignored: false
         }
     }
 
@@ -60,6 +63,7 @@ public enum DDCState: Equatable, Sendable {
         case .noResponse: String(localized: "Ungültige Antwort")
         case .noChannel: String(localized: "Kein Steuerkanal")
         case .disabled: String(localized: "DDC/CI ausgeschaltet")
+        case .ignored: String(localized: "Ignoriert")
         }
     }
 }

@@ -18,6 +18,9 @@ Auf echter Hardware noch nicht geprüft. Die Tests decken nur die Logik ab.
 - [ ] Gamma-Dimmung bei 100 %, 50 %, 0 % (Untergrenze 10 %), Farben bleiben kalibriert.
 - [ ] Umschalter auf Overlay: deckt Menüleiste, alle Spaces und Vollbild-Apps ab,
       Mausklicks gehen durch, kein Fokuswechsel.
+- [ ] „Ignorieren“: kein I2C-Verkehr mehr (Diagnose „Ignoriert“), Gamma/Overlay weg,
+      Monitor fehlt im Menü, bleibt bei Abwesenheit und Inaktivität hell; zurück auf
+      „DDC/CI“ prüft neu und stellt den gespeicherten Wert her.
 - [ ] Signiert (Developer ID, Hardened Runtime): Gamma-Tabelle, Tastenkürzel, Login-Item
       und `IOAVService` funktionieren.
 

@@ -6,7 +6,8 @@ alle, dazu ⌃⌥↑ / ⌃⌥↓ für alle Monitore in 10-%-Schritten.
 Externe Monitore regelt ScreenDim per DDC/CI, also an der Hintergrundbeleuchtung des
 Monitors selbst. Wo DDC/CI nicht durchkommt (manche Docks und Adapter, DDC/CI im
 Monitor-Menü aus), dimmt die Software: Gamma-Kurve oder halbtransparentes Overlay. Das
-Verfahren ist pro Monitor wählbar. Das eingebaute Display lässt sich per Software dimmen;
+Verfahren ist pro Monitor wählbar; „Ignorieren“ nimmt einen Monitor wie einen Beamer ganz
+aus der Dimmung. Das eingebaute Display lässt sich per Software dimmen;
 seine Hintergrundbeleuchtung regelst du wie gewohnt mit den Helligkeitstasten. Optional
 regelt ein Schreibtisch-Sensor (ESP32) die Helligkeit nach dem Umgebungslicht und
 schaltet die Bildschirme bei Abwesenheit ab. Den Sensor baust du selbst aus einem

@@ -194,6 +194,29 @@ struct SensorControllerTests {
         #expect(brightness == 20)
     }
 
+    @Test("Ignorierter Monitor folgt keinem Licht und bleibt beim Schwarzschalten sichtbar")
+    func ignoredMonitor() async {
+        manager.setBrightnessMethod(.ignored, for: 7)
+        let controller = makeController()
+        controller.start()
+        source.send(.connection(.connected), .lux(10))
+        #expect(await eventually { controller.lux == 10 })
+        #expect(brightness == 100)
+        #expect(controller.lightLevels.isEmpty)
+
+        source.send(.presence(true), .presence(false))
+        #expect(await eventually { manager.screensBlanked })
+        #expect(blanker.blanked.isEmpty)
+
+        // Wieder Gamma: Schwarzschalten und Licht gelten wieder.
+        manager.setBrightnessMethod(.gamma, for: 7)
+        #expect(blanker.blanked == [7])
+        source.send(.presence(true), .lux(1000))
+        #expect(await eventually { brightness == 100 && controller.lux == 1000 && !manager.screensBlanked })
+        source.send(.lux(10))
+        #expect(await eventually { brightness == 20 })
+    }
+
     @Test("Jeder Monitor folgt seinem eigenen Profil; eins ohne Licht bleibt stehen")
     func perMonitorProfiles() async {
         let laptop = makeLaptopManager(builtInControl: StubControl())

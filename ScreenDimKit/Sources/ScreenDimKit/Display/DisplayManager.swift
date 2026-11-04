@@ -11,7 +11,7 @@ private let log = ddcLog
 /// Monitore herein (`IOAVService`), optional die Steuerung des eingebauten Displays.
 /// Displays ohne Kanal dimmt der Manager per Software (Gamma oder Overlay), ebenso
 /// externe Monitore, bei denen DDC nicht durchkommt oder die der Nutzer auf Gamma oder
-/// Overlay gestellt hat.
+/// Overlay gestellt hat. Ignorierte Monitore (etwa ein Beamer) lässt er ganz in Ruhe.
 @MainActor
 @Observable
 public final class DisplayManager {
@@ -41,12 +41,19 @@ public final class DisplayManager {
         /// Verfahren, das tatsächlich dimmt.
         public var dimming: DimmingMethod { gammaUnavailable ? .overlay : preferredDimming }
 
-        /// Verfahren, das der Nutzer gewählt hat: DDC/CI, solange es möglich und nicht
-        /// abgewählt ist, sonst das Software-Verfahren. Bei DDC/CI sagt
-        /// `usesSoftwareDimming`, ob gerade die Software als Rückfall dimmt.
-        public var preferredMethod: BrightnessMethod { canUseDDC && ddcEnabled ? .ddc : BrightnessMethod(dimming) }
+        /// Vom Nutzer von der Dimmung ausgenommen: kein Kanal, keine Software-Dimmung, kein
+        /// Licht, kein Leerlauf, kein Schwarzschalten.
+        public var isIgnored: Bool { state == .ignored }
 
-        public var isAdjustable: Bool { usesSoftwareDimming || state.isAdjustable }
+        /// Verfahren, das der Nutzer gewählt hat: „Ignorieren“, sonst DDC/CI, solange es
+        /// möglich und nicht abgewählt ist, sonst das Software-Verfahren. Bei DDC/CI sagt
+        /// `usesSoftwareDimming`, ob gerade die Software als Rückfall dimmt.
+        public var preferredMethod: BrightnessMethod {
+            if isIgnored { return .ignored }
+            return canUseDDC && ddcEnabled ? .ddc : BrightnessMethod(dimming)
+        }
+
+        public var isAdjustable: Bool { !isIgnored && (usesSoftwareDimming || state.isAdjustable) }
     }
 
     /// Ein Steuerkanal überdauert Refreshes. Der Schlüssel ist die Hardware dahinter,
@@ -254,7 +261,8 @@ public final class DisplayManager {
         var softwareTargets: [CGDirectDisplayID: Double] = [:]
         monitors = displays.map { display in
             let key = display.storageKey
-            let software = channels[display.id] == nil || (!display.isBuiltIn && softwareDimmed.contains(key))
+            let ignored = store.isIgnored(key)
+            let software = !ignored && (channels[display.id] == nil || (!display.isBuiltIn && softwareDimmed.contains(key)))
             let ddcEnabled = store.isDDCEnabled(for: key)
             if software {
                 softwareTargets[display.id] = store.brightness(for: key, mode: .software) ?? 100
@@ -262,8 +270,11 @@ public final class DisplayManager {
             // Software: zuerst der sichtbare Stand (neu angesteckt: nicht abgedunkelt), das
             // Ziel folgt per Überblendung. Eingebaut mit Kanal: Platzhalter bis zur Prüfung,
             // nie Startwert einer Überblendung (während der Prüfung nicht regelbar).
+            // Ignoriert: ungedimmt, soweit es ScreenDim betrifft.
             let brightness: Double = if software {
                 visible[key] ?? 100
+            } else if ignored {
+                100
             } else if display.isBuiltIn {
                 50
             } else {
@@ -280,8 +291,9 @@ public final class DisplayManager {
                 state: channels[display.id] != nil ? .probing : initialState(for: display),
                 usesSoftwareDimming: software,
                 preferredDimming: store.dimmingMethod(for: key) ?? .gamma,
-                // Abgewählt: Kein Kanal, aber die Fabrik bekäme einen; sonst zählt der Kanal.
-                canUseDDC: display.avServiceID != nil && (channels[display.id] != nil || !ddcEnabled),
+                // Abgewählt oder ignoriert: Kein Kanal, aber die Fabrik bekäme einen; sonst
+                // zählt der Kanal.
+                canUseDDC: display.avServiceID != nil && (channels[display.id] != nil || !ddcEnabled || ignored),
                 ddcEnabled: ddcEnabled
             )
         }
@@ -298,10 +310,11 @@ public final class DisplayManager {
         }
     }
 
-    /// Hat der Nutzer DDC/CI für einen Monitor abgewählt, bekommt er keinen Kanal; der
-    /// des eingebauten Displays ist keiner.
+    /// Hat der Nutzer DDC/CI für einen Monitor abgewählt oder ignoriert er ihn, bekommt er
+    /// keinen Kanal; der des eingebauten Displays ist keiner.
     private func channelKey(for display: DiscoveredDisplay) -> ChannelKey? {
-        switch display.kind {
+        guard !store.isIgnored(display.storageKey) else { return nil }
+        return switch display.kind {
         case .builtIn: .builtIn(display.id)
         case .external(let avServiceID):
             store.isDDCEnabled(for: display.storageKey) ? avServiceID.map(ChannelKey.avService) : nil
@@ -310,20 +323,26 @@ public final class DisplayManager {
 
     /// Zustand eines Displays ohne Kanal.
     private func initialState(for display: DiscoveredDisplay) -> DDCState {
+        if store.isIgnored(display.storageKey) { return .ignored }
         guard display.avServiceID != nil, !store.isDDCEnabled(for: display.storageKey) else { return .noChannel }
         return .disabled
     }
 
-    /// Wählt für einen Monitor DDC/CI, Gamma oder Overlay und merkt sich die Wahl.
-    /// DDC/CI: neuer Kanal und Prüfung, danach gilt wieder der gespeicherte DDC-Wert.
+    /// Wählt für einen Monitor DDC/CI, Gamma, Overlay oder „Ignorieren“ und merkt sich die
+    /// Wahl. DDC/CI: neuer Kanal und Prüfung, danach gilt wieder der gespeicherte DDC-Wert.
     /// Gamma oder Overlay bei bisher DDC/CI: Der Kanal wird verworfen (keine weiteren
     /// I2C-Aufrufe), der Monitor dimmt ab jetzt per Software vom ungedimmten Stand aus;
-    /// die Hintergrundbeleuchtung bleibt, wie sie steht. Betrifft nur diesen Monitor: Ein
-    /// Refresh würde die IORegistry durchlaufen und alle Monitore neu prüfen.
+    /// die Hintergrundbeleuchtung bleibt, wie sie steht. „Ignorieren“: siehe `ignore(at:)`.
+    /// Betrifft nur diesen Monitor: Ein Refresh würde die IORegistry durchlaufen und alle
+    /// Monitore neu prüfen.
     public func setBrightnessMethod(_ method: BrightnessMethod, for id: CGDirectDisplayID) {
         guard let index = index(of: id) else { return }
         let monitor = monitors[index]
-        if let dimming = method.dimming {
+        if method == .ignored {
+            ignore(at: index)
+        } else if monitor.isIgnored {
+            stopIgnoring(at: index, method: method)
+        } else if let dimming = method.dimming {
             setDimmingMethod(dimming, for: id)
             guard monitor.canUseDDC, monitor.ddcEnabled else { return }
             log.notice("Display \(id): DDC/CI aus, \(dimming.rawValue, privacy: .public)")
@@ -340,30 +359,87 @@ public final class DisplayManager {
     /// DDC/CI abgewählt: Kanal weg (auch aus dem Cache, damit kein Refresh ihn wiederholt),
     /// ab jetzt Software vom ungedimmten Stand aus.
     private func dropChannel(at index: Int) {
+        closeChannel(at: index)
+        monitors[index].ddcEnabled = false
+        monitors[index].state = .disabled
+        switchToSoftwareDimming(index)
+    }
+
+    /// Kanal und Überblendung eines Monitors weg, auch aus dem Cache, damit kein Refresh
+    /// den Kanal wiederholt. Eine laufende Prüfung verfällt (`probe` prüft den Kanal).
+    private func closeChannel(at index: Int) {
         let id = monitors[index].id
         if let channel = channels.removeValue(forKey: id) {
             channelCache[channel.key] = nil
         }
         fades.removeValue(forKey: id)?.cancel()
         fadeTargets[id] = nil
-        monitors[index].ddcEnabled = false
-        monitors[index].state = .disabled
-        switchToSoftwareDimming(index)
     }
 
     /// DDC/CI wieder gewählt: Kanal und Prüfung wie beim Refresh. Die Software-Dimmung
     /// bleibt bis zur Prüfung; danach gilt der gespeicherte DDC-Wert.
-    private func openChannel(at index: Int) {
+    /// - Returns: `false`, wenn es keinen Kanal gibt (abgewählt, ignoriert, Fabrik ohne).
+    @discardableResult
+    private func openChannel(at index: Int) -> Bool {
         let id = monitors[index].id
         guard let display = discovered[id], let key = channelKey(for: display),
               let channel = channelCache[key] ?? makeChannel(key, for: display)
-        else { return }
+        else { return false }
         channels[id] = channel
         channelCache[key] = channel
-        monitors[index].ddcEnabled = true
+        monitors[index].ddcEnabled = store.isDDCEnabled(for: display.storageKey)
         monitors[index].state = .probing
         let generation = generation
         Task { await probe(id, generation: generation) }
+        return true
+    }
+
+    /// Nimmt einen Monitor ganz aus der Dimmung, etwa einen Beamer: kein Kanal (kein
+    /// I2C-Verkehr), keine Software-Dimmung, kein Schwarzfenster; Licht, Leerlauf, Regler
+    /// und Tastenkürzel lassen ihn aus. Die Hintergrundbeleuchtung bleibt, wie sie steht.
+    /// Software-Verfahren und DDC-Wahl bleiben gespeichert für später.
+    private func ignore(at index: Int) {
+        let monitor = monitors[index]
+        guard !monitor.isIgnored else { return }
+        log.notice("Display \(monitor.id): ignoriert")
+        store.setIgnored(true, for: monitor.storageKey)
+        closeChannel(at: index)
+        interactiveStart[monitor.id] = nil
+        monitors[index].state = .ignored
+        monitors[index].usesSoftwareDimming = false
+        monitors[index].brightness = 100
+        syncSoftwareDimming()
+        syncBlanking()
+    }
+
+    /// Ignorieren aufgehoben: zuerst die Wahl speichern, dann wie beim Refresh. Mit Kanal
+    /// (DDC/CI gewählt) Prüfung und danach der gespeicherte DDC-Wert, sonst Software vom
+    /// ungedimmten Stand zum gespeicherten Software-Wert.
+    private func stopIgnoring(at index: Int, method: BrightnessMethod) {
+        let monitor = monitors[index]
+        guard method != .ddc || monitor.canUseDDC else { return }
+        log.notice("Display \(monitor.id): nicht mehr ignoriert, \(method.rawValue, privacy: .public)")
+        store.setIgnored(false, for: monitor.storageKey)
+        if let dimming = method.dimming {
+            store.setDimmingMethod(dimming, for: monitor.storageKey)
+            monitors[index].preferredDimming = dimming
+            if dimming == .gamma {
+                monitors[index].gammaUnavailable = false
+            }
+        }
+        if monitor.canUseDDC {
+            store.setDDCEnabled(method == .ddc, for: monitor.storageKey)
+            monitors[index].ddcEnabled = method == .ddc
+        }
+        if openChannel(at: index) {
+            syncBlanking()
+        } else {
+            monitors[index].state = discovered[monitor.id].map(initialState(for:)) ?? .noChannel
+            syncBlanking()
+            switchToSoftwareDimming(index)
+            // Ohne Prüfung gleich regelbar: Licht, das noch aussteht, gilt jetzt.
+            onMonitorReady?(monitor.id)
+        }
     }
 
     public func retry(_ id: CGDirectDisplayID) {
@@ -625,7 +701,7 @@ public final class DisplayManager {
     @discardableResult
     public func setAllBrightness(_ percent: Double, includingBuiltIn: Bool = true, interactive: Bool = false) -> Bool {
         var complete = true
-        for monitor in monitors where includingBuiltIn || !monitor.isBuiltIn {
+        for monitor in monitors where !monitor.isIgnored && (includingBuiltIn || !monitor.isBuiltIn) {
             if !setBrightness(percent, for: monitor.id, interactive: interactive) { complete = false }
         }
         return complete
@@ -678,8 +754,9 @@ public final class DisplayManager {
         syncBlanking()
     }
 
+    /// Ignorierte Monitore bleiben sichtbar, etwa der Beamer beim Vortrag.
     private func syncBlanking() {
-        blanker.blank(screensBlanked ? Set(monitors.map(\.id)) : [])
+        blanker.blank(screensBlanked ? Set(monitors.filter { !$0.isIgnored }.map(\.id)) : [])
     }
 
     // MARK: - Leerlauf
@@ -819,9 +896,10 @@ public final class DisplayManager {
                 guard let delay = probeDelay(after: error, round: round, isBuiltIn: monitor.isBuiltIn) else { break }
                 try? await Task.sleep(for: delay)
             }
-            guard generation == self.generation else { return }
+            // Neuer Refresh, oder der Kanal ist inzwischen weg (abgewählt, ignoriert).
+            guard generation == self.generation, channels[id] === channel else { return }
         }
-        guard generation == self.generation, let index = index(of: id) else { return }
+        guard generation == self.generation, channels[id] === channel, let index = index(of: id) else { return }
 
         if let reading {
             adopt(reading, for: id, channel: channel)

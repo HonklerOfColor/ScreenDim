@@ -54,23 +54,28 @@ struct MenuContentView: View {
     // MARK: - Helligkeit
 
     /// Eine Karte für alle Regler: bei mehreren Monitoren zuerst „Alle Monitore“, dann je
-    /// Monitor sein Name und sein Regler.
+    /// Monitor sein Name und sein Regler. Ignorierte Monitore fehlen; an ihnen gibt es
+    /// nichts zu regeln.
     private var brightnessCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let monitors = manager.monitors.filter { !$0.isIgnored }
+        return VStack(alignment: .leading, spacing: 12) {
             if manager.monitors.isEmpty {
                 Label("Kein Display gefunden", systemImage: "display.trianglebadge.exclamationmark")
                     .foregroundStyle(.secondary)
+            } else if monitors.isEmpty {
+                Label("Alle Monitore werden ignoriert", systemImage: "display")
+                    .foregroundStyle(.secondary)
             } else {
-                if manager.monitors.count > 1 {
+                if monitors.count > 1 {
                     BrightnessControl(
                         title: String(localized: "Alle Monitore"),
                         systemImage: "sun.max.fill",
                         value: Binding(get: { manager.masterBrightness }, set: { manager.setAllBrightness($0, interactive: true) }),
                         onEnded: { manager.endInteractiveBrightness() },
-                        isEnabled: manager.monitors.contains(where: \.isAdjustable)
+                        isEnabled: monitors.contains(where: \.isAdjustable)
                     )
                 }
-                ForEach(manager.monitors) { monitor in
+                ForEach(monitors) { monitor in
                     BrightnessControl(
                         title: monitor.name,
                         systemImage: monitor.isBuiltIn ? "laptopcomputer" : "display",
