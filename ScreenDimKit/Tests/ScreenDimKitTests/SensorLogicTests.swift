@@ -74,15 +74,15 @@ struct SimulatedSensorTests {
 @Suite("Freigabe der Abwesenheit")
 struct PresenceGateTests {
     @Test("Aus nur bei Abwesenheit, verbunden und ohne Eingabe")
-    func shouldBlank() {
+    func startsAbsence() {
         let idle = Duration.seconds(30)
-        #expect(PresenceGate.shouldBlank(presence: false, connected: true, sinceLastInput: idle))
-        #expect(!PresenceGate.shouldBlank(presence: true, connected: true, sinceLastInput: idle))
-        #expect(!PresenceGate.shouldBlank(presence: nil, connected: true, sinceLastInput: idle))
-        #expect(!PresenceGate.shouldBlank(presence: false, connected: false, sinceLastInput: idle))
+        #expect(PresenceGate.startsAbsence(presence: false, connected: true, sinceLastInput: idle))
+        #expect(!PresenceGate.startsAbsence(presence: true, connected: true, sinceLastInput: idle))
+        #expect(!PresenceGate.startsAbsence(presence: nil, connected: true, sinceLastInput: idle))
+        #expect(!PresenceGate.startsAbsence(presence: false, connected: false, sinceLastInput: idle))
         // Gerade getippt oder die Maus bewegt.
-        #expect(!PresenceGate.shouldBlank(presence: false, connected: true, sinceLastInput: .seconds(1)))
-        #expect(PresenceGate.shouldBlank(presence: false, connected: true, sinceLastInput: PresenceGate.inputGrace))
+        #expect(!PresenceGate.startsAbsence(presence: false, connected: true, sinceLastInput: .seconds(1)))
+        #expect(PresenceGate.startsAbsence(presence: false, connected: true, sinceLastInput: PresenceGate.inputGrace))
     }
 
     @Test("Veraltet nach 30 s Stille oder ohne Verbindung")

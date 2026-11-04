@@ -447,6 +447,23 @@ final class StubInput: InputActivityMonitoring {
     }
 }
 
+/// Zählt, wie oft die Displays schlafen sollten und geweckt wurden.
+@MainActor
+final class StubDisplaySleep: DisplaySleeping {
+    private(set) var sleeps = 0
+    private(set) var wakes = 0
+
+    nonisolated init() {}
+
+    func sleepDisplays() {
+        sleeps += 1
+    }
+
+    func wakeDisplays() {
+        wakes += 1
+    }
+}
+
 /// Merkt sich, welche Displays schwarz wären.
 @MainActor
 final class StubBlanker: ScreenBlanking {

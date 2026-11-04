@@ -49,7 +49,7 @@ struct SensorDebugView: View {
             "Schreibtisch-Sensor: \(sensor.status), Host \(sensor.pairedHostname ?? "-"), "
                 + "Anwesenheit \(sensor.presence.map(String.init) ?? "-"), Lux \(sensor.lux.map { String($0) } ?? "-")",
             "Zuletzt gesetzt: \(sensor.lightLevels.isEmpty ? "-" : levelsText(sensor.lightLevels)) "
-                + "(\(sensor.lightBrightnessOrigin?.rawValue ?? "-")), Bildschirme aus: \(sensor.screensBlanked)",
+                + "(\(sensor.lightBrightnessOrigin?.rawValue ?? "-")), Bildschirme: \(sensor.absenceStage.logName)",
             "",
         ]
         for entry in sensor.debugLog.reversed() {
@@ -59,6 +59,7 @@ struct SensorDebugView: View {
             case .event(let origin, let event): "\(origin.rawValue) \(event)"
             case .lightSourceSwitch(let from, let to): "Lichtquelle \(from?.rawValue ?? "-") → \(to?.rawValue ?? "-")"
             case .brightnessJob(let job): "Auftrag \(job.logDescription)"
+            case .absence(let stage): "Abwesenheit: Bildschirme \(stage.logName)"
             }
             lines.append("\(time) \(what)\(effect)")
         }
@@ -117,10 +118,10 @@ private struct ActiveSummary: View {
                 }
                 GridRow {
                     Text("Bildschirme").foregroundStyle(.secondary)
-                    if sensor.screensBlanked {
-                        Label("Aus (niemand da)", systemImage: "moon.fill").foregroundStyle(.orange)
-                    } else {
-                        Text("An")
+                    switch sensor.absenceStage {
+                    case .none: Text("An")
+                    case .dimmed: Label("Abgedunkelt (niemand da)", systemImage: "moon").foregroundStyle(.orange)
+                    case .off: Label("Aus (niemand da)", systemImage: "moon.fill").foregroundStyle(.orange)
                     }
                 }
             }
@@ -234,6 +235,12 @@ private struct EventLog: View {
                                         .foregroundStyle(.secondary)
                                 }
                                 Text(jobText(job))
+                            case .absence(let stage):
+                                Text("Abwesenheit")
+                                    .foregroundStyle(.orange)
+                                    .frame(width: 130, alignment: .leading)
+                                Text(stageText(stage))
+                                    .fontWeight(.semibold)
                             }
                             if let effect = entry.effect {
                                 Text(effectText(effect)).fontWeight(.semibold)
@@ -273,6 +280,8 @@ private struct EventLog: View {
         case .externalChange: "Fremde Änderung"
         case .idleDim: "Leerlauf"
         case .idleEnd: "Leerlauf beendet"
+        case .absenceDim: "Abwesenheit"
+        case .absenceEnd: "Abwesenheit beendet"
         }
     }
 
@@ -294,8 +303,17 @@ private struct EventLog: View {
     private func effectText(_ effect: SensorDebugEntry.Effect) -> LocalizedStringKey {
         switch effect {
         case .brightness(let levels): "→ \(levelsText(levels))"
-        case .screensOff: "→ Bildschirme aus"
-        case .screensOn: "→ Bildschirme an"
+        case .absence(.none): "→ Bildschirme an"
+        case .absence(.dimmed): "→ Bildschirme abgedunkelt"
+        case .absence(.off): "→ Bildschirme aus"
+        }
+    }
+
+    private func stageText(_ stage: SensorController.AbsenceStage) -> LocalizedStringKey {
+        switch stage {
+        case .none: "Bildschirme an"
+        case .dimmed: "Bildschirme abgedunkelt"
+        case .off: "Bildschirme aus"
         }
     }
 }

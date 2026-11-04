@@ -36,6 +36,16 @@
   (0–50 %), auch während ein Video läuft. Jede Eingabe, Regler und Tastenkürzel bringen
   sie sofort zurück. Gedeckelt wird nur die Ausgabe; eingestellte und gespeicherte Werte
   und die Lichtregelung bleiben.
+- Abwesenheit in zwei Stufen (Einstellungen → Sensor → „Wenn du weg bist“): Meldet der
+  Sensor niemanden, dunkeln die Bildschirme erst ab (0–50 %, Standard 5 %) und schlafen
+  nach der gewählten Zeit (Standard 5 min, auch „sofort“ oder „nie“) im Ruhezustand von
+  macOS, wie nach der Zeit aus den Systemeinstellungen. Kommt der Sensor zurück, weckt
+  die App die Displays; die Helligkeit kommt kurz danach zurück, und die Leerlauf-Dimmung
+  zählt die Rückkehr wie eine Eingabe. Vorher wurden die Bildschirme sofort schwarz
+  überdeckt, die Hintergrundbeleuchtung blieb an. Ist ein Monitor auf „Ignorieren“
+  gestellt, schlafen die Displays nicht; die übrigen werden schwarz wie bisher.
+  Ausgeschaltet wird nicht per DDC/CI (`0xD6`): Viele Monitore lassen sich danach nur
+  per Taste wieder einschalten.
 - Screenshots im README (`docs/screenshots/`).
 - Sensor-Firmware `Firmware/screendim-desk.yaml` (ESPHome 2026.10, ESP32-S3, Waveshare
   HMMD mmWave): Anwesenheit über OT2 an GPIO4 (ohne Radar „anwesend“), Kopplungscode

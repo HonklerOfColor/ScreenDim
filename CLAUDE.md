@@ -16,7 +16,9 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
   oder Overlay). Der Nutzer wählt je Monitor DDC/CI, Gamma, Overlay oder Ignorieren
   (`BrightnessMethod`); Gamma/Overlay statt DDC/CI heißt: kein Kanal, kein I2C-Verkehr.
   Ignorieren (`DDCState.ignored`, etwa für einen Beamer): kein Kanal, keine
-  Software-Dimmung, kein Licht, kein Leerlauf, kein Schwarzschalten.
+  Software-Dimmung, kein Licht, kein Leerlauf, kein Schwarzschalten. Ist ein Monitor
+  ignoriert, schlafen die Displays bei Abwesenheit nicht (der Ruhezustand träfe alle);
+  die übrigen werden schwarz.
 - Das eingebaute Display lässt sich per Software dimmen; seine Hintergrundbeleuchtung
   regelt macOS (Helligkeitstasten). Die frühere Steuerung über `DisplayServices` und der
   eingebaute Lichtsensor (IOHIDEventSystem) sind entfernt; ihr Code steht in der
@@ -40,9 +42,10 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
     `BrightnessStore` (DDC- und Software-Wert getrennt, Verfahren und DDC-Wahl je
     Monitor), `BrightnessMethod`, `SoftwareDimming` mit `GammaDimmer` und
     `OverlayDimmer`, `ScreenBlanker`, `DisplayDiagnostics`, `IdleDimmer` (Leerlauf-Dimmung,
-    Standard aus).
+    Standard aus), `DisplaySleep` (Display-Ruhezustand von macOS: `pmset displaysleepnow`,
+    Wecken per `IOPMAssertionDeclareUserActivity`; öffentliche API).
   - `Sensor/`: optionaler Schreibtisch-Sensor. `SensorController` (Einstellungen, Kopplung,
-    Quelle, Abwesenheit → `DisplayManager.setScreensBlanked`, Lux → Helligkeit),
+    Quelle, Abwesenheit in zwei Stufen, Lux → Helligkeit),
     `SensorSource` mit `SSESensorSource` (Digest, SSE, Backoff) und
     `SimulatedSensorSource` (Demo), `SensorBrowser` (NWBrowser), `SensorKeychain`,
     `PairingCode`, `SSEParser`/`ESPHomeEvents`, `PresenceGate`, `SensorDebug`
@@ -61,13 +64,22 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
     `log.info`, Kategorie `light`.
 - Leerlauf-Dimmung (`IdleDimmer`): Nach der gewählten Zeit ohne Eingabe (Zeit seit der
   letzten Eingabe laut `CGEventSource`, ein Schlaf bis zum Ablauf, kein Takt) deckelt
-  `DisplayManager.beginIdleDim` nur die Ausgabe; `brightness`, gespeicherte Werte und
+  `DisplayManager.beginDim(.idle, …)` nur die Ausgabe; `brightness`, gespeicherte Werte und
   Lichtregelung laufen weiter. DDC schreibt nur geänderte Ausgaben. Maus weckt sofort
   (Event-Monitor), Tasten über eine Prüfung je Sekunde, nur solange abgedunkelt ist (ohne
   Bedienungshilfen-Freigabe sieht kein Event-Monitor fremde Tasten). Schlafen die
   Bildschirme, ruht alles; nach ihrem Aufwachen kommt die Helligkeit 2 s später zurück.
   Es zählen nur Eingaben: Auch bei laufendem Video (Zusicherungen gegen den Display-Ruhezustand)
-  wird abgedunkelt.
+  wird abgedunkelt. Meldet der Sensor die Rückkehr, zählt das wie eine Eingabe
+  (`SensorController.onArrival` → `IdleDimmer.noteActivity`, verdrahtet in der App).
+- Abwesenheit (`SensorController`; Sensor meldet „weg“, seit 2 s keine Eingabe): Stufe 1
+  deckelt die Ausgabe (`beginDim(.absence, …)`; je Grund ein eigener Deckel, es gilt der
+  niedrigste). Stufe 2 nach `absenceOffDelay` (Standard 5 min, „nie“, „sofort“) schickt
+  alle Displays in den Ruhezustand von macOS, nicht per DDC `0xD6` (monitorabhängig, oft
+  nur per Taste wieder an, Dock-Hänger). Vorher prüft sie, ob es seit dem Abdunkeln eine
+  Eingabe gab (Tasten ohne Bedienungshilfen, Kürzel). Die Rückkehr weckt die Displays;
+  Helligkeit erst nach `screensDidWake` und 2 s, denn DDC an schlafende Monitore scheitert.
+  Schlafen sie schon (macOS), wird nichts gedimmt, die Rückkehr weckt sie trotzdem.
 - `ScreenDim/` (App): `App/` (Einstieg, Fabrik für DDC), `UI/` (Menü, Einstellungen,
   Sensor-Diagnose, DDC-Diagnose), `System/` (Tastenkürzel, Login-Item, `IOAVService`),
   `Resources/` (Asset-Katalog, String-Katalog, Privacy-Manifest).

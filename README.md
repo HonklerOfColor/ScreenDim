@@ -9,8 +9,8 @@ Monitor-Menü aus), dimmt die Software: Gamma-Kurve oder halbtransparentes Overl
 Verfahren ist pro Monitor wählbar; „Ignorieren“ nimmt einen Monitor wie einen Beamer ganz
 aus der Dimmung. Das eingebaute Display lässt sich per Software dimmen;
 seine Hintergrundbeleuchtung regelst du wie gewohnt mit den Helligkeitstasten. Optional
-regelt ein Schreibtisch-Sensor (ESP32) die Helligkeit nach dem Umgebungslicht und
-schaltet die Bildschirme bei Abwesenheit ab. Den Sensor baust du selbst aus einem
+regelt ein Schreibtisch-Sensor (ESP32) die Helligkeit nach dem Umgebungslicht; bist du
+weg, dunkelt er die Bildschirme ab und schaltet sie nach einer Weile aus. Den Sensor baust du selbst aus einem
 ESP32-S3-DevKitC-1, einem Waveshare HMMD mmWave Sensor (Anwesenheit) und einem
 VEML7700-Modul (Licht), neun Leitungen; Stückliste, Schaltplan und Firmware stehen in
 [`Firmware/`](Firmware/README.md), dort auch eine kleinere Variante mit dem Seeed Studio

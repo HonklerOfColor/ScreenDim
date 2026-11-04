@@ -546,7 +546,7 @@ struct DisplayManagerTests {
         manager.setAllBrightness(10)
         manager.stepAll(by: -10)
         #expect(await eventually { setup.gamma.levels == [4: 0] })
-        manager.beginIdleDim(to: 0)
+        manager.beginDim(.idle, to: 0)
         manager.setScreensBlanked(true)
         #expect(setup.blanker.blanked == [4])
         try? await Task.sleep(for: .milliseconds(100))

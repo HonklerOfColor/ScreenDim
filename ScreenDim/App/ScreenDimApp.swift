@@ -53,6 +53,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         manager.start()
+        // Kommt jemand an den Schreibtisch zurück, zählt das für den Leerlauf wie eine Eingabe.
+        sensor.onArrival = { [idle] in idle.noteActivity() }
         sensor.start()
         idle.start()
 

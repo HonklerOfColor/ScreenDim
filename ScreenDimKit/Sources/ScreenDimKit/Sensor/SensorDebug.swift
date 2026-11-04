@@ -19,13 +19,15 @@ public struct SensorDebugEntry: Identifiable, Equatable, Sendable {
         case lightSourceSwitch(from: SensorOrigin?, to: SensorOrigin?)
         /// Ein Helligkeitsauftrag an einen Monitor, mit Grund.
         case brightnessJob(BrightnessJob)
+        /// Neue Stufe der Abwesenheit ohne auslösendes Ereignis: Zeit um, Aufwachen, Eingabe.
+        case absence(SensorController.AbsenceStage)
     }
 
     public enum Effect: Equatable, Sendable {
         /// Neue Helligkeit aus dem Licht, je Monitor.
         case brightness([LightLevel])
-        case screensOff
-        case screensOn
+        /// Abgedunkelt, aus oder wieder an.
+        case absence(SensorController.AbsenceStage)
     }
 
     public let id: Int

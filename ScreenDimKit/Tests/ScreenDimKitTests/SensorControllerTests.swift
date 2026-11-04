@@ -16,6 +16,10 @@ struct SensorControllerTests {
     private let http = StubSensorHTTP()
     private let input = StubInput()
     private let blanker = StubBlanker()
+    private let gamma = StubDimmer()
+    private let displaySleep = StubDisplaySleep()
+    /// Warten bis zum Ausschalten und nach dem Aufwachen.
+    private let sleeper = ManualSleeper()
     private let source = StubSensorSource()
     private let clock = ManualNow()
     /// Was die Fabrik für „Helligkeit automatisch anpassen“ meldet.
@@ -28,7 +32,7 @@ struct SensorControllerTests {
             timing: .immediate,
             fadeDuration: .zero,
             systemFadeDuration: .zero,
-            gamma: StubDimmer(),
+            gamma: gamma,
             overlay: StubDimmer(),
             blanker: blanker,
             discover: { _ in
@@ -55,12 +59,15 @@ struct SensorControllerTests {
             try? credentials.save(Self.code, for: Self.host)
         }
         let source = source
+        let sleeper = sleeper
         return SensorController(
             manager: manager ?? self.manager,
             preferences: preferences,
             credentials: credentials,
             http: http,
             input: input,
+            displaySleep: displaySleep,
+            wait: { await sleeper.sleep($0) },
             demoAtLaunch: demo,
             makeLiveSource: { _, _ in source },
             makeSimulation: { SimulatedSensorSource(schedule: $0, seed: 1) },
@@ -121,38 +128,151 @@ struct SensorControllerTests {
         #expect(http.requests.isEmpty)
     }
 
-    @Test("Weg schaltet aus, da wieder an")
-    func blanksWhenAway() async {
+    @Test("Weg: erst abdunkeln, nach der Zeit schlafen die Displays; da weckt sie, Helligkeit nach dem Aufwachen")
+    func twoStageAbsence() async {
         let controller = makeController()
+        var arrivals = 0
+        controller.onArrival = { arrivals += 1 }
+        var started = sleeper.started.makeAsyncIterator()
         controller.start()
         source.send(.connection(.connected), .presence(true), .presence(false))
-        #expect(await eventually { manager.screensBlanked })
-        #expect(blanker.blanked == [7])
-        #expect(controller.status == .connected)
+        #expect(await eventually { controller.absenceStage == .dimmed })
+        #expect(manager.dimCauses == [.absence])
+        #expect(gamma.levels[7] == SensorController.defaultAbsenceLevel)
+        #expect(brightness == 100)
+        #expect(input.isObserving)
+        #expect(await started.next() == SensorController.defaultAbsenceOffDelay)
+        #expect(displaySleep.sleeps == 0)
+
+        sleeper.wake()
+        #expect(await eventually { controller.absenceStage == .off })
+        #expect(displaySleep.sleeps == 1)
+        #expect(blanker.blanked.isEmpty)
+        // Bis macOS den Schlaf meldet, holt die Maus sie zurück; danach weckt macOS selbst.
+        #expect(input.isObserving)
+        controller.screensDidSleep()
+        #expect(!input.isObserving)
 
         source.send(.presence(true))
-        #expect(await eventually { !manager.screensBlanked })
-        #expect(blanker.blanked.isEmpty)
+        #expect(await eventually { displaySleep.wakes == 1 })
+        #expect(arrivals == 1)
+        // Erst nach dem Aufwachen: Schlafende Monitore nehmen keine Helligkeit an.
+        #expect(controller.absenceStage == .off)
+        #expect(manager.dimCauses == [.absence])
+
+        controller.screensDidWake()
+        #expect(await started.next() == IdleDimmer.screenWakeSettle)
+        sleeper.wake()
+        #expect(await eventually { controller.absenceStage == .none })
+        #expect(manager.dimCauses.isEmpty)
+        #expect(gamma.levels[7] == 100)
     }
 
-    @Test("Eingabe gewinnt: kurz vorher getippt bleibt an, Maus weckt sofort")
+    @Test("Eingabe gewinnt: kurz vorher getippt bleibt an, Maus holt sofort zurück")
     func inputWins() async {
         let controller = makeController()
         controller.start()
         input.timeSinceLastInput = .seconds(1)
         source.send(.connection(.connected), .presence(false))
         #expect(await eventually { controller.presence == false })
-        #expect(!manager.screensBlanked)
+        #expect(controller.absenceStage == .none)
 
         input.timeSinceLastInput = .seconds(60)
         source.send(.presence(true), .presence(false))
-        #expect(await eventually { manager.screensBlanked })
+        #expect(await eventually { controller.absenceStage == .dimmed })
         input.fire()
-        #expect(!manager.screensBlanked)
-        // Weiter „weg“ ohne Wechsel schaltet nicht erneut aus.
+        #expect(controller.absenceStage == .none)
+        #expect(manager.dimCauses.isEmpty)
+        #expect(!input.isObserving)
+        // Weiter „weg“ ohne Wechsel dunkelt nicht erneut ab.
         source.send(.presence(false), .heartbeat)
         #expect(await eventually { controller.presence == false })
-        #expect(!manager.screensBlanked)
+        #expect(controller.absenceStage == .none)
+    }
+
+    @Test("Eingabe ohne Event-Monitor (Taste, Kürzel) seit dem Abdunkeln: nicht ausschalten")
+    func inputSinceDimKeepsScreensOn() async {
+        let controller = makeController()
+        var started = sleeper.started.makeAsyncIterator()
+        controller.start()
+        source.send(.connection(.connected), .presence(false))
+        #expect(await started.next() == SensorController.defaultAbsenceOffDelay)
+
+        clock.advance(by: .seconds(300))
+        input.timeSinceLastInput = .seconds(10)
+        sleeper.wake()
+        #expect(await eventually { controller.absenceStage == .none })
+        #expect(displaySleep.sleeps == 0)
+        #expect(manager.dimCauses.isEmpty)
+    }
+
+    @Test("Regler während der Abwesenheit: Abwesenheit endet, nichts geht mehr aus")
+    func manualEndsAbsence() async {
+        let controller = makeController()
+        controller.start()
+        source.send(.connection(.connected), .presence(false))
+        #expect(await eventually { controller.absenceStage == .dimmed })
+
+        manager.setBrightness(60, for: 7)
+        #expect(controller.absenceStage == .none)
+        #expect(manager.dimCauses.isEmpty)
+        #expect(gamma.levels[7] == 60)
+        sleeper.wake()
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(displaySleep.sleeps == 0)
+    }
+
+    @Test("„Nie“ bleibt abgedunkelt, „Sofort“ schaltet ohne Abdunkeln aus")
+    func offDelayChoices() async {
+        let controller = makeController()
+        controller.setAbsenceOffDelay(nil)
+        controller.start()
+        source.send(.connection(.connected), .presence(false))
+        #expect(await eventually { controller.absenceStage == .dimmed })
+        sleeper.wake()
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(controller.absenceStage == .dimmed)
+        #expect(displaySleep.sleeps == 0)
+
+        source.send(.presence(true))
+        #expect(await eventually { controller.absenceStage == .none })
+        controller.setAbsenceOffDelay(.zero)
+        source.send(.presence(false))
+        #expect(await eventually { controller.absenceStage == .off })
+        #expect(displaySleep.sleeps == 1)
+        #expect(manager.dimCauses.isEmpty)
+    }
+
+    @Test("macOS schaltet aus: nichts mehr dimmen oder warten, die Rückkehr weckt")
+    func macOSSleepsDisplays() async {
+        let controller = makeController()
+        var started = sleeper.started.makeAsyncIterator()
+        controller.start()
+        source.send(.connection(.connected), .presence(false))
+        #expect(await started.next() == SensorController.defaultAbsenceOffDelay)
+        #expect(controller.absenceStage == .dimmed)
+
+        // Während des Abdunkelns (Zeit aus den Systemeinstellungen kürzer).
+        controller.screensDidSleep()
+        #expect(controller.absenceStage == .off)
+        sleeper.wake()
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(displaySleep.sleeps == 0)
+        source.send(.presence(true))
+        #expect(await eventually { displaySleep.wakes == 1 })
+
+        // Schon vor der Abwesenheit aus: kein Deckel, nur wecken.
+        controller.screensDidWake()
+        #expect(await started.next() == IdleDimmer.screenWakeSettle)
+        sleeper.wake()
+        #expect(await eventually { controller.absenceStage == .none })
+        controller.screensDidSleep()
+        source.send(.presence(false))
+        #expect(await eventually { controller.absenceStage == .off })
+        #expect(manager.dimCauses.isEmpty)
+        #expect(displaySleep.sleeps == 0)
+        source.send(.presence(true))
+        #expect(await eventually { displaySleep.wakes == 2 })
     }
 
     @Test("Verbindung weg: Normalzustand, nichts mehr ausschalten")
@@ -160,12 +280,32 @@ struct SensorControllerTests {
         let controller = makeController()
         controller.start()
         source.send(.connection(.connected), .presence(false))
-        #expect(await eventually { manager.screensBlanked })
+        #expect(await eventually { controller.absenceStage == .dimmed })
 
         source.send(.connection(.searching))
         #expect(await eventually { controller.status == .searching })
-        #expect(!manager.screensBlanked)
+        #expect(controller.absenceStage == .none)
+        #expect(manager.dimCauses.isEmpty)
         #expect(controller.presence == nil)
+        sleeper.wake()
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(displaySleep.sleeps == 0)
+    }
+
+    @Test("Einstellungen der Abwesenheit bleiben erhalten; Helligkeit auf 0…50 begrenzt")
+    func absenceSettingsPersist() {
+        let controller = makeController()
+        #expect(controller.absenceLevel == SensorController.defaultAbsenceLevel)
+        #expect(controller.absenceOffDelay == SensorController.defaultAbsenceOffDelay)
+        controller.setAbsenceLevel(80)
+        #expect(controller.absenceLevel == 50)
+        controller.setAbsenceOffDelay(nil)
+        #expect(makeController().absenceOffDelay == nil)
+        controller.setAbsenceOffDelay(.seconds(600))
+        let reloaded = makeController()
+        #expect(reloaded.absenceOffDelay == .seconds(600))
+        #expect(reloaded.absenceOffMinutes == 10)
+        #expect(reloaded.absenceLevel == 50)
     }
 
     @Test("401 auf dem Strom: Kopplung nötig")
@@ -194,7 +334,7 @@ struct SensorControllerTests {
         #expect(brightness == 20)
     }
 
-    @Test("Ignorierter Monitor folgt keinem Licht und bleibt beim Schwarzschalten sichtbar")
+    @Test("Ignorierter Monitor folgt keinem Licht; mit ihm schlafen die Displays nicht, die übrigen werden schwarz")
     func ignoredMonitor() async {
         manager.setBrightnessMethod(.ignored, for: 7)
         let controller = makeController()
@@ -204,8 +344,13 @@ struct SensorControllerTests {
         #expect(brightness == 100)
         #expect(controller.lightLevels.isEmpty)
 
+        var started = sleeper.started.makeAsyncIterator()
         source.send(.presence(true), .presence(false))
+        #expect(await started.next() == SensorController.defaultAbsenceOffDelay)
+        sleeper.wake()
         #expect(await eventually { manager.screensBlanked })
+        #expect(controller.absenceStage == .off)
+        #expect(displaySleep.sleeps == 0)
         #expect(blanker.blanked.isEmpty)
 
         // Wieder Gamma: Schwarzschalten und Licht gelten wieder.
@@ -466,13 +611,14 @@ struct SensorControllerTests {
         let laptop = makeLaptopManager(builtInControl: control)
         let light = StubSensorSource()
         let controller = makeController(manager: laptop, builtInLight: light)
+        var started = sleeper.started.makeAsyncIterator()
         controller.setLightSource(.builtInOnly)
         controller.start()
         controller.setDebugMonitoring(true)
 
         source.send(.connection(.connected), .lux(1000), .presence(true), .presence(false))
         light.send(.connection(.connected), .lux(10))
-        #expect(await eventually { laptop.screensBlanked && controller.builtInLux == 10 })
+        #expect(await eventually { controller.absenceStage == .dimmed && controller.builtInLux == 10 })
         #expect(controller.activePresenceOrigin == .deskSensor)
         #expect(controller.activeLightOrigin == .builtIn)
         #expect(controller.lightLevels == Self.monitor7(20))
@@ -483,15 +629,25 @@ struct SensorControllerTests {
         #expect(controller.debugLog.contains {
             $0.job?.reason == .lux(raw: 10, filtered: 10, origin: .builtIn) && $0.job?.target == 20 && $0.job?.remembered == 100
         })
-        #expect(controller.debugLog.contains { $0.origin == .deskSensor && $0.effect == .screensOff })
+        #expect(controller.debugLog.contains { $0.origin == .deskSensor && $0.effect == .absence(.dimmed) })
+        #expect(controller.debugLog.contains { $0.job?.reason == .absenceDim })
+        // Zeit um: eigener Eintrag, kein Ereignis.
+        #expect(await started.next() == SensorController.defaultAbsenceOffDelay)
+        sleeper.wake()
+        #expect(await eventually { controller.debugLog.contains { $0.kind == .absence(.off) } })
         #expect(controller.debugLog.contains { $0.kind == .lightSourceSwitch(from: nil, to: .builtIn) })
         // Licht des Schreibtisch-Sensors steht im Protokoll, wirkt aber nicht.
         #expect(controller.debugLog.contains { $0.origin == .deskSensor && $0.event == .lux(1000) && $0.effect == nil })
 
         // Ohne offene Diagnose wird nichts protokolliert.
         controller.setDebugMonitoring(false)
+        controller.screensDidSleep()
         source.send(.presence(true))
-        #expect(await eventually { !laptop.screensBlanked })
+        #expect(await eventually { displaySleep.wakes == 1 })
+        controller.screensDidWake()
+        #expect(await started.next() == IdleDimmer.screenWakeSettle)
+        sleeper.wake()
+        #expect(await eventually { controller.absenceStage == .none })
         #expect(controller.debugLog.isEmpty)
     }
 

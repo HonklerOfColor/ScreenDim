@@ -1,8 +1,9 @@
 # Schreibtisch-Sensor (ESP32-S3 + Waveshare HMMD mmWave + VEML7700)
 
 ESPHome-Firmware für den optionalen Sensor von ScreenDim. Er meldet Anwesenheit am
-Schreibtisch und das Umgebungslicht in Lux; die App schaltet bei Abwesenheit die
-Bildschirme schwarz und regelt die Helligkeit nach dem Licht.
+Schreibtisch und das Umgebungslicht in Lux; die App dunkelt bei Abwesenheit die
+Bildschirme ab, schaltet sie nach einer Weile aus und regelt die Helligkeit nach dem
+Licht.
 
 ## Stückliste
 

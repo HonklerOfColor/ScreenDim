@@ -82,9 +82,12 @@ public final class DisplayManager {
     public var hotKeysAvailable = true
     /// Alle Bildschirme schwarz, weil der Schreibtisch-Sensor „weg“ meldet.
     public private(set) var screensBlanked = false
-    /// Wegen Leerlauf abgedunkelt (`IdleDimmer`). `brightness` behält dabei den
-    /// eingestellten Wert; nur die Ausgabe (DDC, Gamma, Overlay) ist gedeckelt.
-    public private(set) var isIdleDimmed = false
+    /// Wer die Ausgabe gerade deckelt: Leerlauf (`IdleDimmer`), Abwesenheit
+    /// (`SensorController`). `brightness` behält dabei den eingestellten Wert; nur die
+    /// Ausgabe (DDC, Gamma, Overlay) ist gedeckelt.
+    public private(set) var dimCauses: Set<DimCause> = []
+
+    public var isIdleDimmed: Bool { dimCauses.contains(.idle) }
 
     public let timing: DDCTiming
 
@@ -123,11 +126,8 @@ public final class DisplayManager {
     @ObservationIgnored private var fades: [CGDirectDisplayID: Task<Void, Never>] = [:]
     /// Ziel der laufenden Überblendung je Display.
     @ObservationIgnored private var fadeTargets: [CGDirectDisplayID: Double] = [:]
-    /// Deckel der Leerlauf-Dimmung: So hell gibt ein Monitor höchstens aus.
-    @ObservationIgnored private var idleLevel: Double = 100
-    /// Wie weit der Deckel greift: 0 gar nicht, 1 ganz; dazwischen beim Überblenden.
-    @ObservationIgnored private var idleFraction: Double = 0
-    @ObservationIgnored private var idleFade: Task<Void, Never>?
+    /// Deckel je Grund, auch beim Ausblenden nach `endDim`.
+    @ObservationIgnored private var caps: [DimCause: DimCap] = [:]
     /// Wert vor dem Ziehen am Regler je Display (`setBrightness(…, interactive: true)`).
     @ObservationIgnored private var interactiveStart: [CGDirectDisplayID: Double] = [:]
 
@@ -174,8 +174,10 @@ public final class DisplayManager {
         fades.values.forEach { $0.cancel() }
         fades = [:]
         fadeTargets = [:]
-        idleFade?.cancel()
-        idleFade = nil
+        for cause in caps.keys {
+            caps[cause]?.fade?.cancel()
+            caps[cause]?.fade = nil
+        }
         gamma.apply([:])
         overlay.apply([:])
         blanker.blank([])
@@ -500,7 +502,9 @@ public final class DisplayManager {
     ///   übernommen hat. Nach der Prüfung steht er auf seinem gespeicherten Wert.
     @discardableResult
     public func setBrightness(_ percent: Double, for id: CGDirectDisplayID, interactive: Bool = false) -> Bool {
-        endIdleDim()
+        for cause in dimCauses {
+            endDim(cause)
+        }
         fades.removeValue(forKey: id)?.cancel()
         fadeTargets[id] = nil
         guard let before = monitors.first(where: { $0.id == id }) else { return true }
@@ -567,9 +571,9 @@ public final class DisplayManager {
         fadeTargets[id] = target
         persist(target, at: index)
         let monitor = monitors[index]
-        // Unter dem Leerlauf-Deckel steht die Hardware nicht auf dem eingestellten Wert:
-        // nichts lesen, keinen bestätigten Write als Start nehmen.
-        let capped = idleFraction > 0
+        // Unter einem Deckel steht die Hardware nicht auf dem eingestellten Wert: nichts
+        // lesen, keinen bestätigten Write als Start nehmen.
+        let capped = isCapped
         if !monitor.usesSoftwareDimming, monitor.isBuiltIn, !capped, let channel = channels[id] {
             fades[id] = Task { [weak self] in
                 var actual: Double?
@@ -679,7 +683,7 @@ public final class DisplayManager {
     }
 
     /// Gibt einen Wert per DDC aus, nur wenn er sich vom zuletzt übergebenen unterscheidet:
-    /// Unter dem Leerlauf-Deckel ändert sich der eingestellte Wert, die Ausgabe nicht.
+    /// Unter einem Deckel ändert sich der eingestellte Wert, die Ausgabe nicht.
     private func submit(_ percent: Double, to channel: Channel) {
         let raw = Self.raw(fromPercent: percent, maximum: channel.maximum)
         guard raw != channel.submitted else { return }
@@ -719,9 +723,9 @@ public final class DisplayManager {
     }
 
     /// Übernimmt den aktuellen Wert des eingebauten Displays, sofern gerade kein eigener
-    /// Write aussteht und kein Leerlauf-Deckel die Hardware abweichen lässt.
+    /// Write aussteht und kein Deckel die Hardware abweichen lässt.
     public func syncBuiltInBrightness() async {
-        guard idleFraction == 0 else { return }
+        guard !isCapped else { return }
         for monitor in monitors where monitor.isBuiltIn && monitor.state == .ready {
             guard let channel = channels[monitor.id], channel.throttle.isIdle,
                   let reading = try? await channel.control.read(.brightness),
@@ -759,45 +763,59 @@ public final class DisplayManager {
         blanker.blank(screensBlanked ? Set(monitors.filter { !$0.isIgnored }.map(\.id)) : [])
     }
 
-    // MARK: - Leerlauf
+    // MARK: - Deckel (Leerlauf, Abwesenheit)
 
     /// Dunkelt alle Monitore vorübergehend auf höchstens `level` ab, überblendet wie beim
     /// Licht. Gespeichert wird nichts: `brightness` behält den eingestellten Wert, Licht und
     /// Regler wirken weiter darauf; nur die Ausgabe ist gedeckelt. Dunklere Monitore
-    /// bleiben, wie sie sind.
-    public func beginIdleDim(to level: Double) {
-        guard !isIdleDimmed else { return }
-        isIdleDimmed = true
-        idleLevel = Self.clamp(level)
-        lightLog.notice("Leerlauf: Ausgabe höchstens \(Int(self.idleLevel)) %")
-        fadeIdle(to: 1, reason: .idleDim, duration: fadeDuration)
+    /// bleiben, wie sie sind. Jeder Grund hat seinen eigenen Deckel; es gilt der niedrigste.
+    public func beginDim(_ cause: DimCause, to level: Double) {
+        guard !dimCauses.contains(cause) else { return }
+        dimCauses.insert(cause)
+        caps[cause, default: DimCap()].level = Self.clamp(level)
+        lightLog.notice("\(cause.logName, privacy: .public): Ausgabe höchstens \(Int(Self.clamp(level))) %")
+        fadeCap(cause, to: 1, duration: fadeDuration)
     }
 
-    /// Hebt den Deckel auf (kurze Überblendung): Jeder Monitor kehrt zu seinem eingestellten
-    /// Wert zurück, auch wenn ihn das Licht inzwischen verstellt hat.
-    public func endIdleDim() {
-        guard isIdleDimmed else { return }
-        isIdleDimmed = false
-        lightLog.notice("Leerlauf beendet")
-        fadeIdle(to: 0, reason: .idleEnd, duration: systemFadeDuration)
+    /// Hebt den Deckel dieses Grunds auf (kurze Überblendung): Jeder Monitor kehrt zu seinem
+    /// eingestellten Wert zurück, auch wenn ihn das Licht inzwischen verstellt hat, außer ein
+    /// anderer Deckel hält ihn unten.
+    public func endDim(_ cause: DimCause) {
+        guard dimCauses.contains(cause) else { return }
+        dimCauses.remove(cause)
+        lightLog.notice("\(cause.logName, privacy: .public) beendet")
+        fadeCap(cause, to: 0, duration: systemFadeDuration)
     }
 
-    /// Was ein Monitor mit dieser Helligkeit ausgibt: ohne Leerlauf der Wert selbst, sonst
-    /// höchstens `idleLevel`, beim Überblenden anteilig.
-    private func output(_ brightness: Double, fraction: Double? = nil) -> Double {
-        let fraction = fraction ?? idleFraction
-        guard fraction > 0, brightness > idleLevel else { return brightness }
-        return Self.clamp(brightness - fraction * (brightness - idleLevel))
+    /// Mindestens ein Deckel greift, auch beim Aus- oder Einblenden.
+    private var isCapped: Bool {
+        caps.values.contains { $0.fraction > 0 }
     }
 
-    /// Überblendet den Deckel. Je Monitor, dessen Ausgabe sich ändert, ein Auftrag.
-    private func fadeIdle(to fraction: Double, reason: BrightnessJob.Reason, duration: Duration) {
-        idleFade?.cancel()
-        idleFade = nil
-        let start = idleFraction
+    /// Was ein Monitor mit dieser Helligkeit ausgibt: ohne Deckel der Wert selbst, sonst
+    /// höchstens der Deckel, beim Überblenden anteilig. Mehrere Deckel wirken nacheinander.
+    /// - Parameter target: Anteil eines Deckels statt seines aktuellen, etwa das Ziel einer
+    ///   Überblendung.
+    private func output(_ brightness: Double, target: (cause: DimCause, fraction: Double)? = nil) -> Double {
+        var value = brightness
+        for cause in DimCause.allCases {
+            guard let cap = caps[cause] else { continue }
+            let fraction = target?.cause == cause ? target?.fraction ?? 0 : cap.fraction
+            guard fraction > 0, value > cap.level else { continue }
+            value = Self.clamp(value - fraction * (value - cap.level))
+        }
+        return value
+    }
+
+    /// Überblendet einen Deckel. Je Monitor, dessen Ausgabe sich ändert, ein Auftrag.
+    private func fadeCap(_ cause: DimCause, to fraction: Double, duration: Duration) {
+        caps[cause]?.fade?.cancel()
+        caps[cause]?.fade = nil
+        let start = caps[cause]?.fraction ?? 0
+        let reason = cause.reason(dimming: fraction > 0)
         for monitor in monitors where monitor.isAdjustable {
             let from = output(monitor.brightness)
-            let to = output(monitor.brightness, fraction: fraction)
+            let to = output(monitor.brightness, target: (cause, fraction))
             guard from != to else { continue }
             report(BrightnessJob(
                 storageKey: monitor.storageKey, name: monitor.name, reason: reason,
@@ -807,20 +825,20 @@ public final class DisplayManager {
         }
         let steps = Int(duration / Self.fadeStepInterval)
         guard steps > 1, start != fraction else {
-            idleFraction = fraction
+            caps[cause]?.fraction = fraction
             applyOutput()
             return
         }
         let interval = duration / steps
         let sleep = sleep
-        idleFade = Task { [weak self] in
+        caps[cause]?.fade = Task { [weak self] in
             for step in 1...steps {
                 await sleep(interval)
                 guard !Task.isCancelled, let self else { return }
-                self.idleFraction = step == steps ? fraction : start + (fraction - start) * Double(step) / Double(steps)
+                self.caps[cause]?.fraction = step == steps ? fraction : start + (fraction - start) * Double(step) / Double(steps)
                 self.applyOutput()
             }
-            self?.idleFade = nil
+            self?.caps[cause]?.fade = nil
         }
     }
 
@@ -927,8 +945,8 @@ public final class DisplayManager {
         monitors[index].usesSoftwareDimming = false
         monitors[index].brightness = current
         syncSoftwareDimming()
-        // Während der Leerlauf-Dimmung geprüft (etwa neu angesteckt): gleich deckeln.
-        if idleFraction > 0 {
+        // Unter einem Deckel geprüft (etwa neu angesteckt): gleich deckeln.
+        if isCapped {
             submit(output(current), to: channel)
         }
         if let saved, saved != current {
@@ -1105,6 +1123,36 @@ public final class DisplayManager {
     static func raw(fromPercent percent: Double, maximum: UInt16) -> UInt16 {
         UInt16((clamp(percent) / 100 * Double(maximum)).rounded())
     }
+}
+
+/// Wer die Ausgabe der Monitore deckelt. Jeder Grund hat seinen eigenen Deckel.
+public enum DimCause: Sendable, CaseIterable {
+    /// Eine Weile keine Eingabe (`IdleDimmer`).
+    case idle
+    /// Der Schreibtisch-Sensor meldet niemanden (`SensorController`).
+    case absence
+
+    func reason(dimming: Bool) -> BrightnessJob.Reason {
+        switch self {
+        case .idle: dimming ? .idleDim : .idleEnd
+        case .absence: dimming ? .absenceDim : .absenceEnd
+        }
+    }
+
+    var logName: String {
+        switch self {
+        case .idle: "Leerlauf"
+        case .absence: "Abwesenheit"
+        }
+    }
+}
+
+/// Ein Deckel der Ausgabe: So hell gibt ein Monitor höchstens aus.
+private struct DimCap {
+    var level: Double = 100
+    /// Wie weit der Deckel greift: 0 gar nicht, 1 ganz; dazwischen beim Überblenden.
+    var fraction: Double = 0
+    var fade: Task<Void, Never>?
 }
 
 /// Brücke vom C-Callback zurück in den MainActor.

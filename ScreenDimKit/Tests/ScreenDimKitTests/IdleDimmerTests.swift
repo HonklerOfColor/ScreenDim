@@ -20,6 +20,7 @@ struct IdleDimmerTests {
     }
 
     private let setup = Setup()
+    private let clock = ManualNow()
     private let timeout: Duration = .seconds(900)
 
     nonisolated static func display(_ id: CGDirectDisplayID, avService: UInt64? = nil) -> DiscoveredDisplay {
@@ -66,7 +67,8 @@ struct IdleDimmerTests {
             manager: manager,
             preferences: setup.preferences,
             input: setup.input,
-            sleep: { await sleeper.sleep($0) }
+            sleep: { await sleeper.sleep($0) },
+            now: { [clock] in clock.instant }
         )
         dimmer.setTimeout(timeout)
         dimmer.setLevel(5)
@@ -252,7 +254,72 @@ struct IdleDimmerTests {
         #expect(!manager.isIdleDimmed)
     }
 
+    // MARK: Rückkehr (Schreibtisch-Sensor)
+
+    @Test("Rückkehr zählt wie eine Eingabe: Helligkeit sofort zurück, dann die volle Zeit warten")
+    func arrivalCountsAsInput() async {
+        let manager = makeManager()
+        let sleeper = setup.sleeper
+        var started = sleeper.started.makeAsyncIterator()
+        let dimmer = startDimmed(manager)
+        #expect(await started.next() == IdleDimmer.inputCheckInterval)
+
+        dimmer.noteActivity()
+        #expect(!manager.isIdleDimmed)
+        #expect(setup.gamma.levels[2] == 70)
+        // Ohne Eingabe seitdem zählt die Rückkehr.
+        #expect(await started.next() == timeout)
+        clock.advance(by: .seconds(600))
+        sleeper.wake()
+        #expect(await started.next() == .seconds(300))
+        #expect(!manager.isIdleDimmed)
+    }
+
+    @Test("Rückkehr bei schlafenden Bildschirmen: Helligkeit erst nach dem Aufwachen, dann neu warten")
+    func arrivalWhileScreensAsleep() async {
+        let manager = makeManager()
+        let sleeper = setup.sleeper
+        var started = sleeper.started.makeAsyncIterator()
+        let dimmer = startDimmed(manager)
+        #expect(await started.next() == IdleDimmer.inputCheckInterval)
+
+        dimmer.screensDidSleep()
+        dimmer.noteActivity()
+        #expect(manager.isIdleDimmed)
+
+        dimmer.screensDidWake()
+        #expect(await started.next() == IdleDimmer.screenWakeSettle)
+        sleeper.wake()
+        // Keine Eingabe, aber die Rückkehr: nicht gleich wieder abdunkeln.
+        #expect(await started.next() == timeout)
+        #expect(!manager.isIdleDimmed)
+    }
+
     // MARK: Zusammenspiel mit dem Manager
+
+    @Test("Zwei Deckel: Es gilt der niedrigere; endet einer, gilt der andere; der Regler hebt beide auf")
+    func twoCaps() async {
+        let manager = makeManager()
+        var reasons: [BrightnessJob.Reason] = []
+        manager.onBrightnessJob = { reasons.append($0.reason) }
+        manager.beginDim(.idle, to: 20)
+        #expect(setup.gamma.levels[2] == 20)
+        manager.beginDim(.absence, to: 5)
+        #expect(setup.gamma.levels[2] == 5)
+        #expect(manager.dimCauses == [.idle, .absence])
+        manager.endDim(.absence)
+        #expect(setup.gamma.levels[2] == 20)
+        #expect(setup.gamma.levels[3] == 3)
+        manager.endDim(.idle)
+        #expect(setup.gamma.levels[2] == 70)
+        #expect(reasons == [.idleDim, .absenceDim, .absenceEnd, .idleEnd])
+
+        manager.beginDim(.idle, to: 20)
+        manager.beginDim(.absence, to: 5)
+        manager.setBrightness(60, for: 2)
+        #expect(manager.dimCauses.isEmpty)
+        #expect(setup.gamma.levels[2] == 60)
+    }
 
     @Test("Licht während der Dimmung: Wert folgt, Ausgabe bleibt gedeckelt; danach gilt der neue Wert")
     func lightWhileDimmed() async {
@@ -320,7 +387,7 @@ struct IdleDimmerTests {
         let fadeSleeper = ManualSleeper()
         let manager = makeManager(fade: .seconds(2), sleeper: fadeSleeper)
         var steps = fadeSleeper.started.makeAsyncIterator()
-        manager.beginIdleDim(to: 5)
+        manager.beginDim(.idle, to: 5)
         #expect(setup.gamma.levels[2] == 70)
 
         var seen: [Double] = []
@@ -337,7 +404,7 @@ struct IdleDimmerTests {
         #expect(setup.gamma.levels[3] == 3)
 
         // Zurück mit der kurzen Dauer (hier ohne Überblendung).
-        manager.endIdleDim()
+        manager.endDim(.idle)
         #expect(setup.gamma.levels[2] == 70)
     }
 

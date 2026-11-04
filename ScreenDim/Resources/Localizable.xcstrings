@@ -11,6 +11,56 @@
         }
       }
     },
+    "Abdunkeln auf" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dim to"
+          }
+        }
+      }
+    },
+    "Abgedunkelt (niemand da)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dimmed (nobody there)"
+          }
+        }
+      }
+    },
+    "Abwesenheit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Away"
+          }
+        }
+      }
+    },
+    "Abwesenheit beendet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Away ended"
+          }
+        }
+      }
+    },
+    "Ausschalten" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn off"
+          }
+        }
+      }
+    },
     "Bei Inaktivität" : {
       "localizations" : {
         "en" : {
@@ -27,6 +77,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dim displays when you're inactive"
+          }
+        }
+      }
+    },
+    "→ Bildschirme abgedunkelt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "→ screens dimmed"
+          }
+        }
+      }
+    },
+    "Bildschirme abgedunkelt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screens dimmed"
+          }
+        }
+      }
+    },
+    "Bildschirme an" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screens on"
+          }
+        }
+      }
+    },
+    "Bildschirme aus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screens off"
           }
         }
       }
@@ -57,6 +147,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Idle ended"
+          }
+        }
+      }
+    },
+    "Meldet der Sensor niemanden, dunkelt ScreenDim die Bildschirme ab und schaltet sie später aus, so wie macOS nach der Zeit aus den Systemeinstellungen. Kommst du zurück, gehen sie wieder an; Maus und Tastatur holen sie jederzeit zurück. Verlangt macOS danach ein Passwort, ist der Mac gesperrt. Ist ein Monitor auf „Ignorieren“ gestellt, bleiben die Displays an und die übrigen werden schwarz." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When the sensor reports nobody, ScreenDim dims the screens and later turns them off, just like macOS does after the time set in System Settings. When you come back, they turn on again; mouse and keyboard bring them back at any time. If macOS asks for a password afterwards, the Mac is locked. If a monitor is set to “Ignore”, the displays stay on and the others turn black."
           }
         }
       }
@@ -737,16 +837,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Copy Diagnostics"
-          }
-        }
-      }
-    },
-    "Die Bildschirme gehen nach 3 s aus. Maus oder Tastatur weckt sie sofort." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The screens turn off after 3 s. Mouse or keyboard wakes them immediately."
           }
         }
       }
@@ -1656,6 +1746,26 @@
         }
       }
     },
+    "Nach %lld min" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "After %lld min"
+          }
+        }
+      }
+    },
+    "Nach 3 s gilt „weg“, dann wirkt die Einstellung „Wenn du weg bist“. Maus oder Tastatur holt die Bildschirme sofort zurück." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "After 3 s it counts as “away”, then the “When you're away” setting applies. Mouse or keyboard brings the screens back immediately."
+          }
+        }
+      }
+    },
     "Nach der Prüfung" : {
       "localizations" : {
         "en" : {
@@ -1693,6 +1803,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Not paired"
+          }
+        }
+      }
+    },
+    "Nie" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Never"
           }
         }
       }
@@ -2092,6 +2212,16 @@
         }
       }
     },
+    "Sofort" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Immediately"
+          }
+        }
+      }
+    },
     "Software-Dimmung" : {
       "localizations" : {
         "en" : {
@@ -2200,6 +2330,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Test: Write 0x10 = current value"
+          }
+        }
+      }
+    },
+    "Wenn du weg bist" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you're away"
           }
         }
       }

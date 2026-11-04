@@ -54,7 +54,11 @@ Auf echter Hardware noch nicht geprüft. Die Tests decken nur die Logik ab.
       manuelle Eingabe; neuer Code (BOOT 10 s) → „Kopplung verloren – neu koppeln“.
 - [ ] SSE: IDs im echten Strom prüfen (`binary_sensor-presence` bzw. `binary_sensor/Presence`),
       Ping-Abstand (Annahme ≤ 10 s; Bildschirme gehen nach 30 s Stille wieder an).
-- [ ] Abwesenheit: Bildschirme schwarz, Mausbewegung weckt; Sensor ausstecken → wieder an.
+- [ ] Abwesenheit: erst abgedunkelt, nach der eingestellten Zeit schlafen alle Displays
+      (Monitore im Standby, je nach Einstellung Sperrbildschirm); Rückkehr weckt sie, die
+      Helligkeit kommt etwa 2 s später; Maus holt sie zurück; Sensor ausstecken → wieder
+      an; mit ignoriertem Monitor statt Ruhezustand schwarz. Gehen alle Monitore nach dem
+      Wecken wieder an (auch hinter dem Dock), und bleibt DDC danach nutzbar?
 - [ ] Lux → Helligkeit: Kurve 10 lx → 20 %, 1000 lx → 100 % am Schreibtisch prüfen.
 - [ ] Demo-Modus: Banner, Menüeintrag, Symbol; nach Neustart aus.
 

@@ -24,6 +24,9 @@ struct SettingsView: View {
             Tab("Sensor", systemImage: "sensor") {
                 SettingsPage(sensor: sensor) {
                     SensorSection(sensor: sensor)
+                    if sensor.isEnabled || sensor.isDemoActive {
+                        AbsenceSection(sensor: sensor)
+                    }
                     DemoSection(sensor: sensor)
                     DiagnosticsSection()
                     BuildYourOwnSection()
@@ -375,6 +378,53 @@ private struct SensorSection: View {
             if needed { browser.start() } else { browser.stop() }
         }
         .onDisappear { browser.stop() }
+    }
+}
+
+/// Was passiert, wenn der Sensor niemanden meldet: erst abdunkeln, nach einer Weile die
+/// Displays schlafen lassen.
+private struct AbsenceSection: View {
+    let sensor: SensorController
+
+    var body: some View {
+        Section("Wenn du weg bist") {
+            if sensor.absenceOffDelay != .zero {
+                LabeledContent("Abdunkeln auf") {
+                    HStack(spacing: 8) {
+                        Slider(
+                            value: Binding(get: { sensor.absenceLevel }, set: { sensor.setAbsenceLevel($0) }),
+                            in: SensorController.absenceLevelRange
+                        ) {
+                            Text("Abdunkeln auf")
+                        }
+                        .labelsHidden()
+                        Text("\(Int(sensor.absenceLevel)) %")
+                            .monospacedDigit()
+                            .frame(width: 44, alignment: .trailing)
+                    }
+                }
+            }
+            Picker("Ausschalten", selection: Binding(
+                get: { sensor.absenceOffMinutes },
+                set: { sensor.setAbsenceOffDelay($0.map { .seconds($0 * 60) }) }
+            )) {
+                ForEach(SensorController.absenceOffChoices, id: \.self) { minutes in
+                    Text(offChoiceName(minutes)).tag(minutes)
+                }
+            }
+            Text("Meldet der Sensor niemanden, dunkelt ScreenDim die Bildschirme ab und schaltet sie später aus, so wie macOS nach der Zeit aus den Systemeinstellungen. Kommst du zurück, gehen sie wieder an; Maus und Tastatur holen sie jederzeit zurück. Verlangt macOS danach ein Passwort, ist der Mac gesperrt. Ist ein Monitor auf „Ignorieren“ gestellt, bleiben die Displays an und die übrigen werden schwarz.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func offChoiceName(_ minutes: Int?) -> LocalizedStringKey {
+        switch minutes {
+        case nil: "Nie"
+        case 0?: "Sofort"
+        case let minutes?: "Nach \(minutes) min"
+        }
     }
 }
 
@@ -879,7 +929,7 @@ private struct DemoSection: View {
                     Button("Simulieren: weg") { sensor.simulateAway() }
                     Button("Simulieren: zurück") { sensor.simulateBack() }
                 }
-                Text("Die Bildschirme gehen nach 3 s aus. Maus oder Tastatur weckt sie sofort.")
+                Text("Nach 3 s gilt „weg“, dann wirkt die Einstellung „Wenn du weg bist“. Maus oder Tastatur holt die Bildschirme sofort zurück.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Toggle("Licht von Hand", isOn: Binding(

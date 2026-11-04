@@ -14,7 +14,8 @@ let idleLog = Logger(subsystem: "com.andreastrabi.ScreenDim", category: "idle")
 /// Mausbewegung sofort (Event-Monitor). Tasten in anderen Apps sieht ein Event-Monitor nur
 /// mit Bedienungshilfen-Freigabe; deshalb prüft er, solange abgedunkelt ist, jede Sekunde
 /// die Zeit seit der letzten Eingabe. Schlafen die Bildschirme, ruht beides, und ihr
-/// Aufwachen hebt die Dimmung auf.
+/// Aufwachen hebt die Dimmung auf. Meldet der Schreibtisch-Sensor, dass jemand zurück ist
+/// (`noteActivity`), zählt das wie eine Eingabe.
 @MainActor
 @Observable
 public final class IdleDimmer {
@@ -50,12 +51,15 @@ public final class IdleDimmer {
     @ObservationIgnored private let preferences: any PreferenceStorage
     @ObservationIgnored private let input: any InputActivityMonitoring
     @ObservationIgnored private let sleep: @Sendable (Duration) async -> Void
+    @ObservationIgnored private let now: @MainActor () -> ContinuousClock.Instant
     @ObservationIgnored private let notificationCenter: NotificationCenter
     @ObservationIgnored private var observers: [any NSObjectProtocol] = []
     /// Warten auf den Ablauf, abgedunkelt das Prüfen auf Tasten oder das Warten nach dem
     /// Aufwachen der Bildschirme. Es läuft immer nur eines.
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var screensAsleep = false
+    /// Zuletzt gemeldete Rückkehr (`noteActivity`); zählt wie eine Eingabe.
+    @ObservationIgnored private var activityAt: ContinuousClock.Instant?
 
     public convenience init(manager: DisplayManager) {
         self.init(
@@ -71,12 +75,14 @@ public final class IdleDimmer {
         preferences: any PreferenceStorage,
         input: any InputActivityMonitoring,
         sleep: @escaping @Sendable (Duration) async -> Void = { try? await Task.sleep(for: $0) },
+        now: @escaping @MainActor () -> ContinuousClock.Instant = { .now },
         notificationCenter: NotificationCenter = NotificationCenter()
     ) {
         self.manager = manager
         self.preferences = preferences
         self.input = input
         self.sleep = sleep
+        self.now = now
         self.notificationCenter = notificationCenter
         isEnabled = preferences.object(forKey: Keys.enabled) as? Bool ?? false
         timeout = (preferences.object(forKey: Keys.timeout) as? Double).map { .seconds(max($0, 1)) } ?? Self.defaultTimeout
@@ -106,7 +112,7 @@ public final class IdleDimmer {
         task = nil
         input.stopObserving()
         isDimmed = false
-        manager.endIdleDim()
+        manager.endDim(.idle)
     }
 
     // MARK: - Einstellungen
@@ -137,6 +143,24 @@ public final class IdleDimmer {
         min(max(level.rounded(), levelRange.lowerBound), levelRange.upperBound)
     }
 
+    // MARK: - Anwesenheit
+
+    /// Jemand ist an den Schreibtisch zurückgekehrt (Sensor), ohne etwas anzufassen: zählt
+    /// wie eine Eingabe. Abgedunkelt kommt die Helligkeit zurück; schlafen die Bildschirme,
+    /// erst nach ihrem Aufwachen.
+    public func noteActivity() {
+        activityAt = now()
+        guard !screensAsleep else { return }
+        if isDimmed { restore() } else { arm() }
+    }
+
+    /// Zeit seit der letzten Eingabe oder gemeldeten Rückkehr.
+    private var idleTime: Duration {
+        let sinceInput = input.timeSinceLastInput
+        guard let activityAt else { return sinceInput }
+        return min(sinceInput, now() - activityAt)
+    }
+
     // MARK: - Ablauf
 
     /// Wartet, bis seit der letzten Eingabe `timeout` vergangen ist, und dunkelt dann ab.
@@ -155,7 +179,7 @@ public final class IdleDimmer {
 
     /// Prüft, ob die Zeit um ist; dann abdunkeln. Sonst die Zeit bis zur nächsten Prüfung.
     private func nextCheck() -> Duration? {
-        let idle = input.timeSinceLastInput
+        let idle = idleTime
         guard idle >= timeout else { return timeout - idle }
         dim()
         return nil
@@ -163,8 +187,8 @@ public final class IdleDimmer {
 
     private func dim() {
         isDimmed = true
-        idleLog.notice("Seit \(Int(self.input.timeSinceLastInput.components.seconds)) s keine Eingabe: abdunkeln auf \(Int(self.level)) %")
-        manager.beginIdleDim(to: level)
+        idleLog.notice("Seit \(Int(self.idleTime.components.seconds)) s keine Eingabe: abdunkeln auf \(Int(self.level)) %")
+        manager.beginDim(.idle, to: level)
         watchForInput()
     }
 
@@ -178,7 +202,7 @@ public final class IdleDimmer {
             while !Task.isCancelled {
                 await sleep(Self.inputCheckInterval)
                 guard !Task.isCancelled, let self else { return }
-                if self.input.timeSinceLastInput < self.timeout {
+                if self.idleTime < self.timeout {
                     self.restore()
                     return
                 }
@@ -194,7 +218,7 @@ public final class IdleDimmer {
         if isDimmed {
             isDimmed = false
             idleLog.notice("Eingabe: Helligkeit zurück")
-            manager.endIdleDim()
+            manager.endDim(.idle)
         }
         arm()
     }

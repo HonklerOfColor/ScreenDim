@@ -30,6 +30,11 @@ public struct BrightnessJob: Equatable, Sendable {
         case idleDim
         /// Eingabe nach dem Abdunkeln: zurück zum eingestellten Wert.
         case idleEnd
+        /// Der Schreibtisch-Sensor meldet niemanden: Die Ausgabe wird gedeckelt, der Wert
+        /// bleibt.
+        case absenceDim
+        /// Jemand ist zurück (Sensor, Eingabe): zum eingestellten Wert.
+        case absenceEnd
     }
 
     public let storageKey: String
@@ -85,6 +90,8 @@ extension BrightnessJob.Reason {
         case .externalChange: "externalChange"
         case .idleDim: "idleDim"
         case .idleEnd: "idleEnd"
+        case .absenceDim: "absenceDim"
+        case .absenceEnd: "absenceEnd"
         }
     }
 }
