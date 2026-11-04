@@ -49,7 +49,7 @@ struct IdleDimmerTests {
             gamma: setup.gamma,
             overlay: setup.overlay,
             blanker: StubBlanker(),
-            discover: { setup.displays },
+            discover: { _ in setup.displays },
             makeExternalControl: { avServiceID, _, _ in setup.makeControl(avServiceID) }
         )
         manager.refresh(force: true)

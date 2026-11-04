@@ -100,9 +100,18 @@ public enum ESPHomeEvents {
         return nil
     }
 
+    private static let presenceObjectID = objectID(forPath: SensorProtocol.presencePath)
+    private static let luxObjectID = objectID(forPath: SensorProtocol.luxPath)
+
     /// `binary_sensor/Presence` passt auf sich selbst und auf `binary_sensor-presence`.
     static func matches(_ id: String, path: String) -> Bool {
-        id == path || id == objectID(forPath: path)
+        if id == path { return true }
+        let objectID = switch path {
+        case SensorProtocol.presencePath: presenceObjectID
+        case SensorProtocol.luxPath: luxObjectID
+        default: objectID(forPath: path)
+        }
+        return id == objectID
     }
 
     /// `sensor/Ambient Light` → `sensor-ambient_light` (ESPHome-Object-ID).

@@ -9,6 +9,8 @@ struct DisplayManagerTests {
     /// Was die Discovery gerade „findet“.
     private final class Setup {
         var displays: [DiscoveredDisplay] = []
+        /// Je Discovery-Aufruf, ob die IORegistry durchlaufen wurde.
+        var scans: [Bool] = []
         var created: [UInt64] = []
         var makeControl: (UInt64) -> any DDCControlling = { _ in StubControl() }
         let gamma = StubDimmer()
@@ -34,12 +36,37 @@ struct DisplayManagerTests {
             gamma: setup.gamma,
             overlay: setup.overlay,
             blanker: setup.blanker,
-            discover: { setup.displays },
+            discover: { scanRegistry in
+                setup.scans.append(scanRegistry)
+                return setup.displays
+            },
             makeExternalControl: { avServiceID, _, _ in
                 setup.created.append(avServiceID)
                 return setup.makeControl(avServiceID)
             }
         )
+    }
+
+    @Test("IORegistry nur bei neuer Display-Menge oder force; der Verfahrenswechsel scannt nicht")
+    func registryScanOnlyWhenNeeded() async {
+        setup.displays = [Self.external(2, avService: 0x100)]
+        let manager = makeManager()
+        manager.refresh(force: true)
+        #expect(setup.scans == [false, true])
+
+        // Umkonfiguration ohne neue Displays (Auflösung): nur die billige Runde.
+        manager.refresh(force: false, resetDimming: false, reconfigured: [2])
+        #expect(setup.scans == [false, true, false])
+
+        #expect(await eventually { state(manager, 2) == .ready })
+        manager.setBrightnessMethod(.gamma, for: 2)
+        manager.setBrightnessMethod(.ddc, for: 2)
+        #expect(setup.scans == [false, true, false])
+
+        // Neuer Monitor: voller Lauf.
+        setup.displays.append(Self.external(3, avService: 0x200))
+        manager.refresh(force: false)
+        #expect(setup.scans == [false, true, false, false, true])
     }
 
     private static func external(
@@ -469,7 +496,7 @@ struct DisplayManagerTests {
             timing: .immediate,
             gamma: setup.gamma,
             overlay: setup.overlay,
-            discover: { [setup] in setup.displays },
+            discover: { [setup] _ in setup.displays },
             makeExternalControl: { [setup] avServiceID, _, _ in
                 setup.created.append(avServiceID)
                 return StubControl()
@@ -559,7 +586,7 @@ struct DisplayManagerTests {
             timing: .immediate,
             gamma: setup.gamma,
             overlay: setup.overlay,
-            discover: { [setup] in setup.displays }
+            discover: { [setup] _ in setup.displays }
         )
     }
 
@@ -605,7 +632,7 @@ struct DisplayManagerTests {
             timing: .immediate,
             gamma: setup.gamma,
             overlay: setup.overlay,
-            discover: { [setup] in setup.displays },
+            discover: { [setup] _ in setup.displays },
             makeBuiltInControl: { _ in StubControl(read: .failure(.timeout)) }
         )
         manager.refresh(force: true)
@@ -778,7 +805,7 @@ struct DisplayManagerTests {
             sleep: { await sleeper.sleep($0) },
             gamma: setup.gamma,
             overlay: setup.overlay,
-            discover: { [Self.builtIn] },
+            discover: { _ in [Self.builtIn] },
             makeBuiltInControl: { _ in gate }
         )
         var jobs: [BrightnessJob] = []
@@ -812,7 +839,7 @@ struct DisplayManagerTests {
             timing: .immediate,
             gamma: setup.gamma,
             overlay: setup.overlay,
-            discover: { [Self.builtIn] },
+            discover: { _ in [Self.builtIn] },
             makeBuiltInControl: { _ in control }
         )
         var jobs: [BrightnessJob] = []
@@ -838,7 +865,7 @@ struct DisplayManagerTests {
             systemFadeDuration: .zero,
             gamma: setup.gamma,
             overlay: setup.overlay,
-            discover: { [Self.builtIn] },
+            discover: { _ in [Self.builtIn] },
             makeBuiltInControl: { _ in control }
         )
         var jobs: [BrightnessJob] = []

@@ -37,7 +37,10 @@ public struct BrightnessStore {
         defaults.object(forKey: key(storageKey, mode)) as? Double
     }
 
+    /// Schreibt nur, was sich ändert: Jeder Write ist ein Aufruf an cfprefsd, und die
+    /// Lichtregelung speichert jedes Überblendungsziel.
     public func setBrightness(_ value: Double, for storageKey: String, mode: Mode) {
+        guard brightness(for: storageKey, mode: mode) != value else { return }
         defaults.set(value, forKey: key(storageKey, mode))
     }
 
@@ -47,6 +50,7 @@ public struct BrightnessStore {
     }
 
     public func setDimmingMethod(_ method: DimmingMethod, for storageKey: String) {
+        guard dimmingMethod(for: storageKey) != method else { return }
         defaults.set(method.rawValue, forKey: "dimmingMethod.\(storageKey)")
     }
 
@@ -57,6 +61,7 @@ public struct BrightnessStore {
     }
 
     public func setDDCEnabled(_ enabled: Bool, for storageKey: String) {
+        guard isDDCEnabled(for: storageKey) != enabled else { return }
         defaults.set(enabled, forKey: "ddcEnabled.\(storageKey)")
     }
 

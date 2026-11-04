@@ -7,7 +7,6 @@ import SwiftUI
 struct MenuContentView: View {
     let manager: DisplayManager
     let sensor: SensorController
-    let loginItem: LoginItem
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
@@ -47,7 +46,7 @@ struct MenuContentView: View {
         .padding(6)
         .frame(width: 300)
         .onAppear {
-            loginItem.reload()
+            // Kein Login-Status hier (synchroner XPC-Aufruf): Das Menü zeigt ihn nicht.
             Task { await manager.syncBuiltInBrightness() }
         }
     }

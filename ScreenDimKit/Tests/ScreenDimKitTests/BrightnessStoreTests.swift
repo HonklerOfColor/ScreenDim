@@ -17,6 +17,23 @@ struct BrightnessStoreTests {
         #expect(store.brightness(for: "1-2-3", mode: .software) == 70)
     }
 
+    @Test("Gleicher Wert, gleiches Verfahren, gleiche DDC-Wahl: kein Write")
+    func unchangedValuesAreNotWritten() {
+        let store = BrightnessStore(storage: defaults)
+        store.setBrightness(30, for: "1-2-3", mode: .ddc)
+        store.setDimmingMethod(.overlay, for: "1-2-3")
+        store.setDDCEnabled(false, for: "1-2-3")
+        let writes = defaults.writes
+
+        store.setBrightness(30, for: "1-2-3", mode: .ddc)
+        store.setDimmingMethod(.overlay, for: "1-2-3")
+        store.setDDCEnabled(false, for: "1-2-3")
+        #expect(defaults.writes == writes)
+
+        store.setBrightness(31, for: "1-2-3", mode: .ddc)
+        #expect(defaults.writes == writes + 1)
+    }
+
     @Test("Wert aus Version 1 gilt als DDC-Wert, nicht als Gamma")
     func legacyKeyIsDDC() {
         defaults.set(40.0, forKey: "brightness.1-2-3")

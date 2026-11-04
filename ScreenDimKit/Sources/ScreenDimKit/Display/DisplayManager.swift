@@ -57,7 +57,8 @@ public final class DisplayManager {
         case avService(UInt64)
     }
 
-    public typealias Discover = @MainActor () -> [DiscoveredDisplay]
+    /// `scanRegistry == false`: nur CoreGraphics (Identitäten), ohne IORegistry.
+    public typealias Discover = @MainActor (_ scanRegistry: Bool) -> [DiscoveredDisplay]
     public typealias MakeExternalControl = @MainActor (_ avServiceID: UInt64, _ label: String, _ timing: DDCTiming) -> (any DDCControlling)?
     public typealias MakeBuiltInControl = @MainActor (_ displayID: CGDirectDisplayID) -> (any DDCControlling)?
 
@@ -140,7 +141,7 @@ public final class DisplayManager {
         gamma: any SoftwareDimming = GammaDimmer(),
         overlay: any SoftwareDimming = OverlayDimmer(),
         blanker: any ScreenBlanking = ScreenBlanker(),
-        discover: @escaping Discover = { DisplayDiscovery.displays() },
+        discover: @escaping Discover = { DisplayDiscovery.displays(scanRegistry: $0) },
         makeExternalControl: @escaping MakeExternalControl = { _, _, _ in nil },
         makeBuiltInControl: @escaping MakeBuiltInControl = { _ in nil }
     ) {
@@ -201,8 +202,10 @@ public final class DisplayManager {
     ///   - resetDimming: Kurven komplett neu aufsetzen (nach dem Aufwachen).
     ///   - reconfigured: Displays, die macOS umkonfiguriert hat (Auflösung, Anordnung).
     func refresh(force: Bool, resetDimming: Bool, reconfigured: Set<CGDirectDisplayID>) {
-        let displays = discover()
-        let identities = Dictionary(uniqueKeysWithValues: displays.map { ($0.id, $0.identity) })
+        // Erst die billige Runde über CoreGraphics: Hat sich die Display-Menge nicht
+        // geändert (Auflösung, Anordnung), bleibt der Lauf durch die ganze IORegistry
+        // (rund 13 ms auf dem Hauptthread) aus.
+        let identities = Dictionary(uniqueKeysWithValues: discover(false).map { ($0.id, $0.identity) })
         let changed = identities != knownIdentities
 
         if changed || resetDimming {
@@ -216,6 +219,7 @@ public final class DisplayManager {
             overlay.refresh(reconfigured)
         }
         guard force || changed else { return }
+        let displays = discover(true)
 
         // Neue Monitorliste: Überblendungen enden, gespeichert ist schon ihr Zielwert. Was
         // per Software gedimmt war, blendet von seinem sichtbaren Stand aus weiter.
@@ -314,7 +318,8 @@ public final class DisplayManager {
     /// DDC/CI: neuer Kanal und Prüfung, danach gilt wieder der gespeicherte DDC-Wert.
     /// Gamma oder Overlay bei bisher DDC/CI: Der Kanal wird verworfen (keine weiteren
     /// I2C-Aufrufe), der Monitor dimmt ab jetzt per Software vom ungedimmten Stand aus;
-    /// die Hintergrundbeleuchtung bleibt, wie sie steht.
+    /// die Hintergrundbeleuchtung bleibt, wie sie steht. Betrifft nur diesen Monitor: Ein
+    /// Refresh würde die IORegistry durchlaufen und alle Monitore neu prüfen.
     public func setBrightnessMethod(_ method: BrightnessMethod, for id: CGDirectDisplayID) {
         guard let index = index(of: id) else { return }
         let monitor = monitors[index]
@@ -323,12 +328,42 @@ public final class DisplayManager {
             guard monitor.canUseDDC, monitor.ddcEnabled else { return }
             log.notice("Display \(id): DDC/CI aus, \(dimming.rawValue, privacy: .public)")
             store.setDDCEnabled(false, for: monitor.storageKey)
+            dropChannel(at: index)
         } else {
             guard monitor.canUseDDC, !monitor.ddcEnabled else { return }
             log.notice("Display \(id): DDC/CI an")
             store.setDDCEnabled(true, for: monitor.storageKey)
+            openChannel(at: index)
         }
-        refresh(force: true)
+    }
+
+    /// DDC/CI abgewählt: Kanal weg (auch aus dem Cache, damit kein Refresh ihn wiederholt),
+    /// ab jetzt Software vom ungedimmten Stand aus.
+    private func dropChannel(at index: Int) {
+        let id = monitors[index].id
+        if let channel = channels.removeValue(forKey: id) {
+            channelCache[channel.key] = nil
+        }
+        fades.removeValue(forKey: id)?.cancel()
+        fadeTargets[id] = nil
+        monitors[index].ddcEnabled = false
+        monitors[index].state = .disabled
+        switchToSoftwareDimming(index)
+    }
+
+    /// DDC/CI wieder gewählt: Kanal und Prüfung wie beim Refresh. Die Software-Dimmung
+    /// bleibt bis zur Prüfung; danach gilt der gespeicherte DDC-Wert.
+    private func openChannel(at index: Int) {
+        let id = monitors[index].id
+        guard let display = discovered[id], let key = channelKey(for: display),
+              let channel = channelCache[key] ?? makeChannel(key, for: display)
+        else { return }
+        channels[id] = channel
+        channelCache[key] = channel
+        monitors[index].ddcEnabled = true
+        monitors[index].state = .probing
+        let generation = generation
+        Task { await probe(id, generation: generation) }
     }
 
     public func retry(_ id: CGDirectDisplayID) {

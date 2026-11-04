@@ -112,21 +112,29 @@ public final class URLSessionSensorHTTP: SensorHTTP {
     }
 }
 
-/// Wartezeit vor dem nächsten Verbindungsversuch: 1 s, 2 s, 4 s … höchstens 30 s.
+/// Wartezeit vor dem nächsten Verbindungsversuch: 1 s, 2 s, 4 s … höchstens 30 s. Bleibt
+/// der Sensor weg (ausgeschaltet, anderes WLAN), steigt der Deckel nach `slowAfter`
+/// Versuchen auf `slowMaximum`: Jeder Versuch kostet eine mDNS-Auflösung im Netz.
 public struct ReconnectBackoff: Sendable {
     public static let initial: Duration = .seconds(1)
     public static let maximum: Duration = .seconds(30)
+    public static let slowAfter = 10
+    public static let slowMaximum: Duration = .seconds(120)
     private var current = initial
+    private var attempts = 0
 
     public init() {}
 
     public mutating func next() -> Duration {
-        defer { current = min(current * 2, Self.maximum) }
-        return current
+        attempts += 1
+        let cap = attempts >= Self.slowAfter ? Self.slowMaximum : Self.maximum
+        defer { current = min(current * 2, cap) }
+        return min(current, cap)
     }
 
     public mutating func reset() {
         current = Self.initial
+        attempts = 0
     }
 }
 

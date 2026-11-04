@@ -11,11 +11,22 @@ struct DiagnosticsView: View {
     @State private var testResults: [CGDirectDisplayID: String] = [:]
     @State private var running: Set<CGDirectDisplayID> = []
     @State private var copied = false
+    /// Stand einmal pro Sekunde. Läse der Body `manager.diagnostics()` direkt, rendert das
+    /// Fenster bei jedem Überblendungsschritt (20 Hz), weil `monitors` beobachtet wird.
+    @State private var displays: [DisplayDiagnostics] = []
 
     var body: some View {
         // Die I2C-Ergebnisse liegen außerhalb von @Observable; einmal pro Sekunde neu lesen.
-        TimelineView(.periodic(from: .now, by: 1)) { _ in
-            let displays = manager.diagnostics()
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            content
+                .onChange(of: context.date, initial: true) { _, _ in
+                    displays = manager.diagnostics()
+                }
+        }
+        .frame(minWidth: 620, minHeight: 440)
+    }
+
+    private var content: some View {
             VStack(spacing: 0) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
@@ -45,8 +56,6 @@ struct DiagnosticsView: View {
                 }
                 .padding(12)
             }
-        }
-        .frame(minWidth: 620, minHeight: 440)
     }
 
     private func section(_ display: DisplayDiagnostics) -> some View {

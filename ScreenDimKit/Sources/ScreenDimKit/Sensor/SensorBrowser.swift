@@ -53,7 +53,9 @@ public final class SensorBrowser {
         let browser = NWBrowser(for: .bonjourWithTXTRecord(type: SensorProtocol.serviceType, domain: nil), using: parameters)
         browser.browseResultsChangedHandler = { [weak self] results, _ in
             let found = results.compactMap(Self.sensor(from:)).sorted { $0.name < $1.name }
-            MainActor.assumeIsolated { self?.sensors = found }
+            MainActor.assumeIsolated {
+                if self?.sensors != found { self?.sensors = found }
+            }
         }
         browser.stateUpdateHandler = { [weak self] state in
             let (searching, denied): (Bool, Bool) = switch state {
@@ -62,8 +64,8 @@ public final class SensorBrowser {
             default: (false, false)
             }
             MainActor.assumeIsolated {
-                self?.isSearching = searching
-                self?.isLocalNetworkDenied = denied
+                if self?.isSearching != searching { self?.isSearching = searching }
+                if self?.isLocalNetworkDenied != denied { self?.isLocalNetworkDenied = denied }
             }
         }
         self.browser = browser

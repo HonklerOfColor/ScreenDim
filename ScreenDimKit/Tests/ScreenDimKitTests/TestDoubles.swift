@@ -229,6 +229,7 @@ final class StubOverlayWindow: OverlayWindow {
 /// `removePersistentDomain` legt `cfprefsd` die Plist asynchron in ~/Library/Preferences an.
 final class MemoryPreferences: PreferenceStorage {
     private var values: [String: Any] = [:]
+    private(set) var writes = 0
 
     func object(forKey defaultName: String) -> Any? {
         values[defaultName]
@@ -239,6 +240,7 @@ final class MemoryPreferences: PreferenceStorage {
     }
 
     func set(_ value: Any?, forKey defaultName: String) {
+        writes += 1
         values[defaultName] = value
     }
 }

@@ -31,7 +31,7 @@ struct SensorControllerTests {
             gamma: StubDimmer(),
             overlay: StubDimmer(),
             blanker: blanker,
-            discover: {
+            discover: { _ in
                 [DiscoveredDisplay(
                     id: 7,
                     identity: DisplayIdentity(vendor: 1, model: 2, serial: 3),
@@ -87,7 +87,7 @@ struct SensorControllerTests {
             gamma: StubDimmer(),
             overlay: StubDimmer(),
             blanker: blanker,
-            discover: {
+            discover: { _ in
                 [
                     DiscoveredDisplay(
                         id: 1, identity: DisplayIdentity(vendor: 1552, model: 1, serial: 1), name: "MacBook", kind: .builtIn
@@ -341,7 +341,7 @@ struct SensorControllerTests {
             gamma: StubDimmer(),
             overlay: StubDimmer(),
             blanker: blanker,
-            discover: {
+            discover: { _ in
                 [
                     DiscoveredDisplay(
                         id: 1, identity: DisplayIdentity(vendor: 1552, model: 1, serial: 1), name: "MacBook", kind: .builtIn

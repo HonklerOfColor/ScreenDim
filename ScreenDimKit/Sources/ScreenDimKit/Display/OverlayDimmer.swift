@@ -97,10 +97,11 @@ final class DimmingPanel: OverlayWindow {
         panel.animationBehavior = .none
     }
 
+    /// Je Überblendungsschritt (20 Hz) ändert sich nur die Deckkraft; Lage und Reihenfolge
+    /// nur, wenn sie nicht stimmen.
     func show(alpha: Double) {
         panel.alphaValue = alpha
         updateFrame()
-        panel.orderFrontRegardless()
     }
 
     func updateFrame() {
@@ -109,7 +110,9 @@ final class DimmingPanel: OverlayWindow {
             panel.orderOut(nil)
             return
         }
-        panel.setFrame(screen.frame, display: true)
+        if panel.frame != screen.frame {
+            panel.setFrame(screen.frame, display: true)
+        }
         if !panel.isVisible {
             panel.orderFrontRegardless()
         }

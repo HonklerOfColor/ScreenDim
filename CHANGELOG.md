@@ -17,6 +17,14 @@
   und die App-Review-Notizen sind weg.
 
 ### Neu
+- Weniger Arbeit im Hintergrund: Die IORegistry wird nur noch durchlaufen, wenn sich die
+  Display-Menge geändert hat oder neu gesucht wird (vorher bei jeder Umkonfiguration, rund
+  13 ms auf dem Hauptthread). Der Wechsel des Verfahrens eines Monitors betrifft nur noch
+  diesen Monitor statt alle neu zu prüfen. Das Overlay ändert je Überblendungsschritt nur
+  die Deckkraft. Gespeicherte Werte werden nur geschrieben, wenn sie sich ändern. Tab
+  „Licht“ und Diagnose-Fenster rendern nicht mehr bei jedem Überblendungsschritt; das Menü
+  fragt beim Öffnen nicht mehr den Login-Status ab. Bleibt der Sensor weg, versucht die App
+  nach zehn Fehlversuchen nur noch alle zwei Minuten eine Verbindung.
 - Abdunkeln bei Inaktivität (Einstellungen → Allgemein, Standard: aus): Nach 1–120 min
   ohne Maus und Tastatur gehen alle Monitore auf höchstens die gewählte Helligkeit
   (0–50 %), auch während ein Video läuft. Jede Eingabe, Regler und Tastenkürzel bringen

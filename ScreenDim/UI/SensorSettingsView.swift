@@ -461,7 +461,7 @@ struct LightCurveSection: View {
                         }
                     }
                 }
-                LightProfileEditor(sensor: sensor, monitor: monitor)
+                LightProfileEditor(sensor: sensor, manager: manager, monitor: LightMonitor(monitor))
             } else {
                 Text("Kein Monitor gefunden.").foregroundStyle(.secondary)
             }
@@ -476,11 +476,30 @@ struct LightCurveSection: View {
     }
 }
 
+/// Was der Editor über den Monitor braucht, ohne die Helligkeit: `monitors` ist als Ganzes
+/// beobachtet, und jeder Überblendungsschritt (20 Hz) ändert die Helligkeit. Mit gleichen
+/// Werten überspringt SwiftUI den Body samt Chart; die Helligkeit lesen nur zwei kleine
+/// Unter-Views.
+private struct LightMonitor: Equatable {
+    let id: CGDirectDisplayID
+    let storageKey: String
+    let isBuiltIn: Bool
+    let usesSoftwareDimming: Bool
+
+    init(_ monitor: DisplayManager.Monitor) {
+        id = monitor.id
+        storageKey = monitor.storageKey
+        isBuiltIn = monitor.isBuiltIn
+        usesSoftwareDimming = monitor.usesSoftwareDimming
+    }
+}
+
 private struct LightProfileEditor: View {
     let sensor: SensorController
-    let monitor: DisplayManager.Monitor
+    let manager: DisplayManager
+    let monitor: LightMonitor
 
-    private var profile: LightProfile { sensor.lightProfile(for: monitor) }
+    private var profile: LightProfile { sensor.lightProfile(forKey: monitor.storageKey, isBuiltIn: monitor.isBuiltIn) }
 
     /// macOS regelt dieses Display: ScreenDim lässt es dann aus, damit nur einer schreibt.
     /// Unbekannt zählt wie bei der Regelung als „nein“; dann entscheidet das Profil.
@@ -502,7 +521,7 @@ private struct LightProfileEditor: View {
             }
         }
         if profile.followsLight {
-            LightCurveChart(curve: profile.curve, lux: sensor.activeLux, current: monitor.brightness)
+            LightCurveChart(curve: profile.curve, lux: sensor.activeLux, manager: manager, id: monitor.id)
                 .frame(height: 150)
                 .padding(.vertical, 4)
             ForEach(Array(profile.curve.points.enumerated()), id: \.offset) { index, point in
@@ -518,13 +537,10 @@ private struct LightProfileEditor: View {
                     if let point = profile.curve.suggestedPoint() { update { $0.curve.insert(point) } }
                 }
                 .disabled(profile.curve.suggestedPoint() == nil)
-                if let lux = sensor.activeLux, monitor.isAdjustable {
-                    Button("Aktuelle Helligkeit merken") {
-                        update { $0.curve.insert(LightCurve.Point(lux: lux, percent: monitor.brightness)) }
+                if let lux = sensor.activeLux {
+                    RememberBrightnessButton(manager: manager, id: monitor.id, lux: lux, curve: profile.curve) { point in
+                        update { $0.curve.insert(point) }
                     }
-                    .help("Legt einen Punkt an: \(Int(lux.rounded())) lx → \(Int(monitor.brightness)) %")
-                    .disabled(profile.curve.points.count >= LightCurve.maxPoints
-                        && !profile.curve.points.contains { $0.lux == lux.rounded() })
                 }
                 Spacer()
                 Button("Standard") { update { $0.curve = .standard } }
@@ -537,7 +553,7 @@ private struct LightProfileEditor: View {
     private func update(_ change: (inout LightProfile) -> Void) {
         var profile = profile
         change(&profile)
-        sensor.setLightProfile(profile, for: monitor)
+        sensor.setLightProfile(profile, forKey: monitor.storageKey, isBuiltIn: monitor.isBuiltIn)
     }
 
     private func caption(_ text: LocalizedStringKey) -> some View {
@@ -545,6 +561,40 @@ private struct LightProfileEditor: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Liest die Helligkeit des Monitors für die Beschriftung; nur diese View rendert bei
+/// jedem Überblendungsschritt neu, nicht der Chart.
+private struct BrightnessAnnotation: View {
+    let manager: DisplayManager
+    let id: CGDirectDisplayID
+    let lux: Double
+
+    var body: some View {
+        let current = manager.monitors.first { $0.id == id }?.brightness ?? 0
+        Text("\(Int(lux.rounded())) lx · \(Int(current)) %")
+            .font(.caption2.monospacedDigit())
+            .foregroundStyle(.orange)
+    }
+}
+
+/// „Aktuelle Helligkeit merken“: braucht die Helligkeit, deshalb eigene View.
+private struct RememberBrightnessButton: View {
+    let manager: DisplayManager
+    let id: CGDirectDisplayID
+    let lux: Double
+    let curve: LightCurve
+    let onInsert: (LightCurve.Point) -> Void
+
+    var body: some View {
+        if let monitor = manager.monitors.first(where: { $0.id == id }), monitor.isAdjustable {
+            Button("Aktuelle Helligkeit merken") {
+                onInsert(LightCurve.Point(lux: lux, percent: monitor.brightness))
+            }
+            .help("Legt einen Punkt an: \(Int(lux.rounded())) lx → \(Int(monitor.brightness)) %")
+            .disabled(curve.points.count >= LightCurve.maxPoints && !curve.points.contains { $0.lux == lux.rounded() })
+        }
     }
 }
 
@@ -588,13 +638,20 @@ private struct PointRow: View {
 private struct LightCurveChart: View {
     let curve: LightCurve
     let lux: Double?
-    let current: Double
+    let manager: DisplayManager
+    let id: CGDirectDisplayID
+    /// 20 Werte je Zehnerpotenz; hängt nur von der Kurve ab, deshalb einmal berechnet
+    /// statt bei jedem Body.
+    private let samples: [(lux: Double, percent: Double)]
 
     private static let luxRange: ClosedRange<Double> = 1...LightCurve.maxLux
 
-    /// 20 Werte je Zehnerpotenz.
-    private var samples: [(lux: Double, percent: Double)] {
-        stride(from: 0.0, through: 5, by: 0.05).map { exponent in
+    init(curve: LightCurve, lux: Double?, manager: DisplayManager, id: CGDirectDisplayID) {
+        self.curve = curve
+        self.lux = lux
+        self.manager = manager
+        self.id = id
+        samples = stride(from: 0.0, through: 5, by: 0.05).map { exponent in
             let lux = pow(10, exponent)
             return (lux, curve.percent(forLux: lux))
         }
@@ -622,9 +679,7 @@ private struct LightCurveChart: View {
                     .foregroundStyle(.orange)
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
                     .annotation(position: .top, alignment: .center, spacing: 2) {
-                        Text("\(Int(lux.rounded())) lx · \(Int(current)) %")
-                            .font(.caption2.monospacedDigit())
-                            .foregroundStyle(.orange)
+                        BrightnessAnnotation(manager: manager, id: id, lux: lux)
                     }
             }
         }

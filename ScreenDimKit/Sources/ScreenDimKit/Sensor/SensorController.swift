@@ -142,6 +142,9 @@ public final class SensorController {
     public private(set) var lightBrightnessOrigin: SensorOrigin?
     /// Geänderte Lichtprofile dieser Sitzung; die übrigen liegen in `profileStore`.
     private var lightProfiles: [String: LightProfile] = [:]
+    /// Aus dem Speicher gelesene Profile, damit nicht jeder Zugriff dekodiert. Nicht
+    /// beobachtet: Das Füllen beim Lesen darf kein Neurendern auslösen.
+    @ObservationIgnored private var loadedProfiles: [String: LightProfile] = [:]
     /// Sensor-Diagnose offen: Ereignisse werden protokolliert, und der eingebaute
     /// Lichtsensor liest mit, auch wenn er nicht die Lichtquelle ist.
     public private(set) var isDebugMonitoring = false
@@ -444,13 +447,15 @@ public final class SensorController {
         }
         switch event {
         case .connection(let connection):
-            self.connection = connection
+            if self.connection != connection { self.connection = connection }
             if !isDemoActive {
-                status = switch connection {
+                let new: Status = switch connection {
                 case .searching: .searching
                 case .connected: .connected
                 case .pairingRequired: .pairingRequired
                 }
+                // Jeder Verbindungsversuch meldet „suchen“; ohne Änderung kein Neurendern.
+                if status != new { status = new }
             }
             guard connection == .connected else {
                 // Getrennt: Normalzustand, nichts mehr ausschalten.
@@ -517,14 +522,13 @@ public final class SensorController {
         var applied: [LightLevel] = []
         for monitor in manager.monitors {
             let key = monitor.storageKey
-            guard only == nil || only == key, lightProfile(for: monitor).followsLight,
-                  !macOSRegulates(monitor)
-            else { continue }
+            let profile = lightProfile(for: monitor)
+            guard only == nil || only == key, profile.followsLight, !macOSRegulates(monitor) else { continue }
             if let hold = holds[key] {
                 if hold.isActive(at: at, lux: value) { continue }
                 holds[key] = nil
             }
-            let target = lightProfile(for: monitor).curve.percent(forLux: value)
+            let target = profile.curve.percent(forLux: value)
             let reference = manager.brightnessTarget(for: monitor.id) ?? monitor.brightness
             if abs(reference - target) < Self.lightHysteresis, !ignoresHysteresis, !pendingLight.contains(key) {
                 continue
@@ -622,20 +626,36 @@ public final class SensorController {
     /// Lichtprofil eines Monitors; ohne eigenes das Standardprofil. Das eingebaute Display
     /// folgt dem Licht standardmäßig nicht: Es regelt meist macOS.
     public func lightProfile(for monitor: DisplayManager.Monitor) -> LightProfile {
-        lightProfiles[monitor.storageKey] ?? profileStore.profile(for: monitor.storageKey) ?? Self.defaultProfile(for: monitor)
+        lightProfile(forKey: monitor.storageKey, isBuiltIn: monitor.isBuiltIn)
+    }
+
+    /// Gespeicherte Profile werden beim ersten Lesen dekodiert und gemerkt: Die Oberfläche
+    /// und jedes Lux-Ereignis fragen je Monitor mehrfach.
+    public func lightProfile(forKey key: String, isBuiltIn: Bool) -> LightProfile {
+        if let profile = lightProfiles[key] ?? loadedProfiles[key] { return profile }
+        let profile = profileStore.profile(for: key) ?? Self.defaultProfile(isBuiltIn: isBuiltIn)
+        loadedProfiles[key] = profile
+        return profile
     }
 
     static func defaultProfile(for monitor: DisplayManager.Monitor) -> LightProfile {
-        monitor.isBuiltIn ? LightProfile(followsLight: false, curve: .standard) : .standard
+        defaultProfile(isBuiltIn: monitor.isBuiltIn)
+    }
+
+    static func defaultProfile(isBuiltIn: Bool) -> LightProfile {
+        isBuiltIn ? LightProfile(followsLight: false, curve: .standard) : .standard
     }
 
     /// Speichert das Profil und wendet es sofort mit dem aktuellen Licht an, ohne Hysterese.
     /// Eine Pause dieses Monitors endet.
     public func setLightProfile(_ profile: LightProfile, for monitor: DisplayManager.Monitor) {
-        let key = monitor.storageKey
-        guard profile != lightProfile(for: monitor) else { return }
+        setLightProfile(profile, forKey: monitor.storageKey, isBuiltIn: monitor.isBuiltIn)
+    }
+
+    public func setLightProfile(_ profile: LightProfile, forKey key: String, isBuiltIn: Bool) {
+        guard profile != lightProfile(forKey: key, isBuiltIn: isBuiltIn) else { return }
         lightProfiles[key] = profile
-        profileStore.setProfile(profile == Self.defaultProfile(for: monitor) ? nil : profile, for: key)
+        profileStore.setProfile(profile == Self.defaultProfile(isBuiltIn: isBuiltIn) ? nil : profile, for: key)
         holds[key] = nil
         if let origin = activeLightOrigin, let lux = currentLux(of: origin) {
             applyAmbientLight(lux, from: origin, reason: .profileChange, only: key, ignoresHysteresis: true)
@@ -650,15 +670,18 @@ public final class SensorController {
     ///   Aufrufer ihren Wert; sonst gilt der letzte Wert der neuen Quelle sofort.
     func updateActiveLight(trigger: SensorOrigin? = nil) {
         let at = now()
-        isDeskSensorLightAvailable = LightSourceSelector.isDeskSensorAvailable(
+        let deskAvailable = LightSourceSelector.isDeskSensorAvailable(
             connected: status == .connected,
             eventAge: lux == nil ? nil : lastEventAt.map { at - $0 }
         )
-        isBuiltInLightAvailable = LightSourceSelector.isBuiltInAvailable(
+        let builtInAvailable = LightSourceSelector.isBuiltInAvailable(
             present: hasBuiltInLightSensor,
             covered: isBuiltInLightSensorCovered,
             luxAge: builtInLuxAt.map { at - $0 }
         )
+        // Läuft nach jedem Ereignis (auch Pings); beobachtete Werte nur bei Änderung setzen.
+        if isDeskSensorLightAvailable != deskAvailable { isDeskSensorLightAvailable = deskAvailable }
+        if isBuiltInLightAvailable != builtInAvailable { isBuiltInLightAvailable = builtInAvailable }
         func select(current: SensorOrigin?, sinceLastSwitch: Duration?) -> SensorOrigin? {
             LightSourceSelector.select(
                 choice: effectiveLightSource,

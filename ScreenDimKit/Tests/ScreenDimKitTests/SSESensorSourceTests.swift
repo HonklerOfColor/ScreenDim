@@ -46,6 +46,18 @@ private final class SleepLog: Sendable {
     var all: [Duration] { durations.withLock { $0 } }
 }
 
+@Suite("Backoff")
+struct ReconnectBackoffTests {
+    @Test("1, 2, 4 … 30 s; nach zehn Versuchen bis 120 s; Reset fängt vorn an")
+    func sequence() {
+        var backoff = ReconnectBackoff()
+        let seconds = (0..<13).map { _ in backoff.next().components.seconds }
+        #expect(seconds == [1, 2, 4, 8, 16, 30, 30, 30, 30, 30, 60, 120, 120])
+        backoff.reset()
+        #expect(backoff.next() == .seconds(1))
+    }
+}
+
 @Suite("SSE-Quelle: Verbindung und Backoff", .serialized)
 struct SSESensorSourceTests {
     private static let ping = "event: ping\ndata: \n\n"

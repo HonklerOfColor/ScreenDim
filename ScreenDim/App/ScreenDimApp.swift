@@ -13,7 +13,7 @@ struct ScreenDimApp: App {
             "ScreenDim",
             systemImage: appDelegate.sensor.isDemoActive ? "sun.max.trianglebadge.exclamationmark" : "sun.max"
         ) {
-            MenuContentView(manager: appDelegate.manager, sensor: appDelegate.sensor, loginItem: appDelegate.loginItem)
+            MenuContentView(manager: appDelegate.manager, sensor: appDelegate.sensor)
         }
         .menuBarExtraStyle(.window)
 
