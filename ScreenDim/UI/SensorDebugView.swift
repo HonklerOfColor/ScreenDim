@@ -2,9 +2,9 @@ import AppKit
 import ScreenDimKit
 import SwiftUI
 
-/// Fenster „Sensor-Diagnose“: aktuelle Messung jeder Quelle, welche gerade Anwesenheit
-/// und Licht liefert (und ob als Rückfall), und ein Protokoll der Ereignisse und
-/// Quellwechsel mit ihrer Wirkung.
+/// Fenster „Sensor-Diagnose“: aktuelle Messung des Sensors (oder der Demo), ob er gerade
+/// Anwesenheit und Licht liefert, und ein Protokoll der Ereignisse und Quellwechsel mit
+/// ihrer Wirkung.
 struct SensorDebugView: View {
     static let windowID = "sensor-debug"
 
@@ -42,10 +42,9 @@ struct SensorDebugView: View {
     private func copy() {
         var lines = [
             "ScreenDim Sensor-Diagnose, \(Date().formatted(date: .numeric, time: .standard))",
-            "Lichtquelle (Einstellung): \(sensor.lightSource.rawValue), wirkt als \(sensor.effectiveLightSource.rawValue)",
-            "Licht aktiv: \(sensor.activeLightOrigin?.rawValue ?? "-"), Rückfall \(sensor.isLightFallback)",
-            "Verfügbar: Schreibtisch \(sensor.isDeskSensorLightAvailable), eingebaut \(sensor.isBuiltInLightAvailable)",
-            "Anwesenheit aktiv: \(sensor.activePresenceOrigin?.rawValue ?? "-")",
+            "Lichtquelle (Einstellung): \(sensor.lightSource.rawValue)",
+            "Licht aktiv: \(sensor.activeLightOrigin?.rawValue ?? "-"), Schreibtisch verfügbar \(sensor.isDeskSensorLightAvailable)",
+            "Anwesenheit aktiv: \(sensor.activePresenceOrigin?.rawValue ?? "-"), reagieren \(sensor.reactsToAbsence)",
             "Schreibtisch-Sensor: \(sensor.status), Host \(sensor.pairedHostname ?? "-"), "
                 + "Anwesenheit \(sensor.presence.map(String.init) ?? "-"), Lux \(sensor.lux.map { String($0) } ?? "-")",
             "Zuletzt gesetzt: \(sensor.lightLevels.isEmpty ? "-" : levelsText(sensor.lightLevels)) "
@@ -88,16 +87,11 @@ private struct ActiveSummary: View {
                 }
                 GridRow {
                     Text("Licht").foregroundStyle(.secondary)
-                    HStack(spacing: 6) {
-                        OriginLabel(origin: sensor.activeLightOrigin)
-                        if sensor.isLightFallback {
-                            Text("Rückfall").font(.caption).foregroundStyle(.orange)
-                        }
-                    }
+                    OriginLabel(origin: sensor.activeLightOrigin)
                 }
                 GridRow {
                     Text("Lichtquelle (Einstellung)").foregroundStyle(.secondary)
-                    Text(lightSourceName(sensor.effectiveLightSource, hasBuiltIn: sensor.hasBuiltInLightSensor))
+                    Text(lightSourceName(sensor.lightSource))
                 }
                 GridRow {
                     Text("Verfügbar").foregroundStyle(.secondary)
@@ -131,7 +125,7 @@ private struct ActiveSummary: View {
     }
 }
 
-/// Ob eine Quelle gerade Licht liefern kann (verbunden bzw. Deckel offen, Wert frisch).
+/// Ob eine Quelle gerade Licht liefern kann (verbunden, Wert frisch).
 private struct AvailabilityLabel: View {
     let title: LocalizedStringKey
     let available: Bool
@@ -390,7 +384,6 @@ private func originName(_ origin: SensorOrigin) -> LocalizedStringKey {
     switch origin {
     case .deskSensor: "Schreibtisch-Sensor"
     case .demo: "Demo-Modus"
-    case .builtIn: "Eingebauter Lichtsensor"
     }
 }
 

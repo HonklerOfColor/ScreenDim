@@ -25,7 +25,7 @@ struct SettingsView: View {
                 SettingsPage(sensor: sensor) {
                     SensorSection(sensor: sensor)
                     if sensor.isEnabled || sensor.isDemoActive {
-                        AbsenceSection(sensor: sensor)
+                        AbsenceSection(sensor: sensor, manager: manager)
                     }
                     DemoSection(sensor: sensor)
                     DiagnosticsSection()
@@ -50,7 +50,7 @@ struct SettingsView: View {
 
     /// Kurven nur, wenn überhaupt Licht kommen kann.
     private var showsLightCurves: Bool {
-        sensor.effectiveLightSource != .off && (sensor.isEnabled || sensor.isDemoActive)
+        sensor.lightSource != .off && (sensor.isEnabled || sensor.isDemoActive)
     }
 }
 
@@ -305,11 +305,14 @@ private struct DiagnosticsSection: View {
     }
 }
 
+/// Link zur Bauanleitung, sobald es eine gibt (`SensorLinks.flashPage`).
 private struct BuildYourOwnSection: View {
     var body: some View {
         Section {
             VStack(alignment: .leading, spacing: 4) {
-                Link("Bau dir deinen eigenen Sensor (ca. 30 €, 15 min)", destination: SensorLinks.flashPage)
+                if let url = SensorLinks.flashPage {
+                    Link("Bau dir deinen eigenen Sensor (ca. 30 €, 15 min)", destination: url)
+                }
                 Text("Der Sensor ist optional; ScreenDim funktioniert vollständig ohne ihn.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -382,13 +385,17 @@ private struct SensorSection: View {
 }
 
 /// Was passiert, wenn der Sensor niemanden meldet: erst abdunkeln, nach einer Weile die
-/// Displays schlafen lassen.
+/// Displays schlafen lassen. Ganz abschaltbar.
 private struct AbsenceSection: View {
     let sensor: SensorController
+    let manager: DisplayManager
 
     var body: some View {
         Section("Wenn du weg bist") {
-            if sensor.absenceOffDelay != .zero {
+            Toggle("Bei Abwesenheit reagieren", isOn: Binding(
+                get: { sensor.reactsToAbsence }, set: { sensor.setReactsToAbsence($0) }
+            ))
+            if sensor.reactsToAbsence {
                 LabeledContent("Abdunkeln auf") {
                     HStack(spacing: 8) {
                         Slider(
@@ -403,33 +410,68 @@ private struct AbsenceSection: View {
                             .frame(width: 44, alignment: .trailing)
                     }
                 }
-            }
-            Picker("Ausschalten", selection: Binding(
-                get: { sensor.absenceOffMinutes },
-                set: { sensor.setAbsenceOffDelay($0.map { .seconds($0 * 60) }) }
-            )) {
-                ForEach(SensorController.absenceOffChoices, id: \.self) { minutes in
-                    Text(offChoiceName(minutes)).tag(minutes)
+                Picker("Displays aus", selection: Binding(
+                    get: { sensor.absenceOffSeconds },
+                    set: { sensor.setAbsenceOffDelay($0.map { .seconds($0) }) }
+                )) {
+                    ForEach(SensorController.absenceOffChoices, id: \.self) { seconds in
+                        Text(offChoiceName(seconds)).tag(seconds)
+                    }
                 }
+                if sensor.absenceOffDelay != nil {
+                    DisplaysOffHint(hasIgnoredMonitor: manager.monitors.contains(where: \.isIgnored))
+                }
+                caption("Meldet der Sensor niemanden, dunkelt ScreenDim die Bildschirme ab und schaltet sie nach der gewählten Zeit aus. Kommst du zurück, gehen sie wieder an; Maus und Tastatur holen sie jederzeit zurück.")
+            } else {
+                caption("Der Sensor zeigt Anwesenheit weiter an, ScreenDim dunkelt aber nichts ab, schaltet nichts aus und weckt nichts.")
             }
-            Text("Meldet der Sensor niemanden, dunkelt ScreenDim die Bildschirme ab und schaltet sie später aus, so wie macOS nach der Zeit aus den Systemeinstellungen. Kommst du zurück, gehen sie wieder an; Maus und Tastatur holen sie jederzeit zurück. Verlangt macOS danach ein Passwort, ist der Mac gesperrt. Ist ein Monitor auf „Ignorieren“ gestellt, bleiben die Displays an und die übrigen werden schwarz.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private func offChoiceName(_ minutes: Int?) -> LocalizedStringKey {
-        switch minutes {
+    private func offChoiceName(_ seconds: Int?) -> LocalizedStringKey {
+        switch seconds {
         case nil: "Nie"
-        case 0?: "Sofort"
-        case let minutes?: "Nach \(minutes) min"
+        case let seconds? where seconds < 60: "Nach \(seconds) s"
+        case let seconds?: "Nach \(seconds / 60) min"
+        }
+    }
+
+    private func caption(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Was „Displays aus“ bedeutet: Ruhezustand aller Displays, Sperre nach Einstellung von
+/// macOS; mit einem ignorierten Monitor nur Schwarz per Software.
+private struct DisplaysOffHint: View {
+    let hasIgnoredMonitor: Bool
+
+    var body: some View {
+        if hasIgnoredMonitor {
+            Label("Ein Monitor wird ignoriert und muss an bleiben. Deshalb schlafen die Displays nicht; die übrigen schaltet ScreenDim nur per Software schwarz. Gesperrt wird der Mac dabei nicht.", systemImage: "info.circle")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            HStack(alignment: .firstTextBaseline) {
+                Label("Alle Displays gehen in den Ruhezustand, auch ein eingebautes. Ob macOS den Mac dabei sperrt, hängt von der Einstellung unter „Sperrbildschirm“ ab.", systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer()
+                Button("Sperrbildschirm …") {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Lock-Screen-Settings.extension")!)
+                }
+            }
         }
     }
 }
 
-/// Ob das Umgebungslicht die Helligkeit regelt. Ohne eingebauten Lichtsensor gibt es nur
-/// den Schreibtisch-Sensor, darum ein Schalter statt einer Quellenwahl.
+/// Ob das Umgebungslicht die Helligkeit regelt. Es gibt nur den Schreibtisch-Sensor (oder
+/// die Demo), darum ein Schalter statt einer Quellenwahl.
 private struct LightSection: View {
     let sensor: SensorController
 
@@ -438,13 +480,13 @@ private struct LightSection: View {
     var body: some View {
         Section("Umgebungslicht") {
             Toggle("Helligkeit dem Umgebungslicht anpassen", isOn: Binding(
-                get: { sensor.effectiveLightSource != .off },
+                get: { sensor.lightSource != .off },
                 set: { sensor.setLightSource($0 ? .deskSensorOnly : .off) }
             ))
             .disabled(!hasLight)
             if !hasLight {
                 caption("Schalte dafür im Tab „Sensor“ den Schreibtisch-Sensor oder den Demo-Modus ein.")
-            } else if sensor.effectiveLightSource != .off {
+            } else if sensor.lightSource != .off {
                 activeStatus
             }
         }
@@ -456,7 +498,6 @@ private struct LightSection: View {
         LabeledContent("Lichtquelle") {
             switch sensor.activeLightOrigin {
             case .deskSensor?: Text("Schreibtisch-Sensor")
-            case .builtIn?: Text("Eingebauter Lichtsensor")
             case .demo?: Text("Demo-Modus (simuliert)")
             case nil: Text(deskSensorReason).foregroundStyle(.orange)
             }
@@ -481,14 +522,10 @@ private struct LightSection: View {
     }
 }
 
-/// Name einer Lichtquellen-Wahl. Ohne eingebauten Sensor gibt es keinen Rückfall, dann
-/// heißt „nur Schreibtisch-Sensor“ schlicht so.
-func lightSourceName(_ source: SensorController.LightSource, hasBuiltIn: Bool) -> LocalizedStringKey {
+/// Name einer Lichtquellen-Wahl.
+func lightSourceName(_ source: SensorController.LightSource) -> LocalizedStringKey {
     switch source {
-    case .deskSensorFirst: "Schreibtisch-Sensor, sonst eingebauter"
-    case .builtInFirst: "Eingebauter Sensor, sonst Schreibtisch-Sensor"
-    case .deskSensorOnly: hasBuiltIn ? "Nur Schreibtisch-Sensor" : "Schreibtisch-Sensor"
-    case .builtInOnly: "Nur eingebauter Lichtsensor"
+    case .deskSensorOnly: "Schreibtisch-Sensor"
     case .off: "Aus"
     }
 }

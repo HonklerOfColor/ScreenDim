@@ -156,6 +156,10 @@ sitzt (Standard 120 cm). Gehst du weiter weg, meldet der Sensor nach 5 s
 (`presence_off_delay`) „abwesend“, statt erst, wenn du den Raum verlassen hast. Schweigt
 der UART, gilt wie früher der Ausgang OT2 allein.
 
+Die Grenze hat eine Hysterese von 20 cm (`presence_distance_hysteresis`): „Abwesend“
+zählt erst ab Max Distance + 20 cm, „anwesend“ wieder ab Max Distance. Wer genau an der
+Grenze sitzt oder sich zurücklehnt, flackert so nicht zwischen beiden hin und her.
+
 Einstellen in der Weboberfläche des Sensors (`http://screendim-desk-xxxxxx.local`, Login
 `screendim`, Passwort der Kopplungscode ohne Bindestrich):
 

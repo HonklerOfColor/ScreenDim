@@ -23,8 +23,10 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
   regelt macOS (Helligkeitstasten). Die frühere Steuerung über `DisplayServices` und der
   eingebaute Lichtsensor (IOHIDEventSystem) sind entfernt; ihr Code steht in der
   Git-Historie (bis Commit `b3ca76a`), `docs/EingebauterLichtsensor.md` bleibt als
-  Messprotokoll. Die Fabriken (`makeBuiltInControl`, `makeBuiltInLightSensor`,
-  `isAutoBrightnessEnabled`) gibt es noch; die App reicht nichts herein.
+  Messprotokoll. Die Fabriken `makeBuiltInControl` und `isAutoBrightnessEnabled` gibt es
+  noch; die App reicht nichts herein. Die Reste des Lichtsensors in `SensorController`,
+  `LightSourceSelector` und der Sensor-Diagnose sind entfernt; gespeicherte Altwerte von
+  `LightSource` werden zu `deskSensorOnly`.
 - Private API nur in der App (`ScreenDim/System/IOAVServiceTransport.swift`, geladen per
   `dlsym`). `ScreenDimKit` enthält keine private API und keine Namen wie `IOAVService`
   als Zeichenkette; die Kanäle kommen über die Fabrik `makeExternalControl` herein, damit
@@ -51,17 +53,18 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
     `PairingCode`, `SSEParser`/`ESPHomeEvents`, `PresenceGate`, `SensorDebug`
     (Protokoll für das Fenster „Sensor-Diagnose“, läuft nur, solange es offen ist).
     Jeder Monitor folgt seinem Lichtprofil (`LightCurve`: Lux-Stützpunkte, je Monitor
-    abschaltbar); Licht und Anwesenheit kommen vom ESP32 (oder der Demo). Ohne
-    eingebauten Sensor wirkt jede `LightSource` außer „aus“ wie „nur Schreibtisch“.
+    abschaltbar); Licht und Anwesenheit kommen vom ESP32 (oder der Demo). `LightSource`
+    ist nur noch `deskSensorOnly` oder `off`.
 - Lichtregelung:
   - Alle automatischen Wege laufen über `DisplayManager.fadeBrightness` (Licht 2 s,
     Prüfung/Rückfall/Aufwachen 0,5 s), Start beim echten Wert (DDC: zuletzt bestätigter
     Write, kein Read). Nur `setBrightness` (Regler, Tasten) setzt sofort und pausiert die
     Lichtregelung des Monitors.
-  - Lux des ESP32 durchgereicht, Hysterese 3 Punkte gegen das laufende Ziel.
+  - Lux des ESP32 durchgereicht, Hysterese 3 Punkte gegen das laufende Ziel. Werte
+    außerhalb 0…200 000 lx verwirft `SensorController` (Log `notice`).
     Schreibtisch-Sensor frisch durch jedes Ereignis (45 s).
   - Je Auftrag ein `BrightnessJob` mit Grund: Protokoll der Sensor-Diagnose und
-    `log.info`, Kategorie `light`.
+    Log `notice` (auch Licht-Aufträge), Kategorie `light`. Codes und Passwörter nie loggen.
 - Leerlauf-Dimmung (`IdleDimmer`): Nach der gewählten Zeit ohne Eingabe (Zeit seit der
   letzten Eingabe laut `CGEventSource`, ein Schlaf bis zum Ablauf, kein Takt) deckelt
   `DisplayManager.beginDim(.idle, …)` nur die Ausgabe; `brightness`, gespeicherte Werte und
@@ -74,7 +77,8 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
   (`SensorController.onArrival` → `IdleDimmer.noteActivity`, verdrahtet in der App).
 - Abwesenheit (`SensorController`; Sensor meldet „weg“, seit 2 s keine Eingabe): Stufe 1
   deckelt die Ausgabe (`beginDim(.absence, …)`; je Grund ein eigener Deckel, es gilt der
-  niedrigste). Stufe 2 nach `absenceOffDelay` (Standard 5 min, „nie“, „sofort“) schickt
+  niedrigste). Stufe 2 nach `absenceOffDelay` (Standard 5 min, „nie“, mindestens 30 s;
+  ein gespeichertes „sofort“ wird 30 s) schickt
   alle Displays in den Ruhezustand von macOS, nicht per DDC `0xD6` (monitorabhängig, oft
   nur per Taste wieder an, Dock-Hänger). Vorher prüft sie, ob es seit dem Abdunkeln eine
   Eingabe gab (Tasten ohne Bedienungshilfen, Kürzel). Die Rückkehr weckt die Displays;
@@ -82,6 +86,11 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
   Schlafen sie schon (macOS), wird nichts gedimmt, die Rückkehr weckt sie trotzdem. Jeder
   Wechsel von „abwesend“ zu „anwesend“ weckt schlafende Displays, auch ohne Abwesenheit
   von ScreenDim (etwa nach „Eingabe gewinnt“); die erste Meldung nach dem Verbinden nicht.
+  Wachen die Displays während einer Abwesenheit auf (etwa durch eine Mitteilung) und
+  meldet der verbundene Sensor danach weiter „abwesend“, beginnt die Abwesenheit von vorn,
+  außer eine Eingabe kurz vor oder nach dem Aufwachen (`PresenceGate.inputGrace`) hat sie
+  geweckt. Schalter „Bei Abwesenheit reagieren“ (`reactsToAbsence`, Standard an): aus,
+  schaltet die Anwesenheit nichts (kein Abdunkeln, Ausschalten, Wecken, `onArrival`).
 - `ScreenDim/` (App): `App/` (Einstieg, Fabrik für DDC), `UI/` (Menü, Einstellungen,
   Sensor-Diagnose, DDC-Diagnose), `System/` (Tastenkürzel, Login-Item, `IOAVService`),
   `Resources/` (Asset-Katalog, String-Katalog, Privacy-Manifest).
@@ -93,7 +102,9 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
   `led_pairing`/`led_new_code` (per `!remove`), Schaltplan `schaltplan-xiao.svg`.
   Muss zu `SensorProtocol` passen (Entitätsnamen, mDNS-TXT, Nutzer `screendim`).
   Anwesenheit: Textzeilen des Radars (UART-Debugger als Empfänger, `ON`/`OFF`,
-  `Range <cm>`) bis „Max Distance“ (Template-Number, Standard 120 cm); schweigt der UART,
+  `Range <cm>`) bis „Max Distance“ (Template-Number, Standard 120 cm), mit Hysterese:
+  „abwesend“ erst ab Max Distance + 20 cm (`presence_distance_hysteresis`, Zustand in der
+  global `distance_within`), „anwesend“ wieder ab Max Distance; schweigt der UART,
   gilt OT2. YAML
   prüfen: `esphome config` für beide Dateien. ESPHome im venv
   `~/.venvs/esphome`, Build immer mit `ESPHOME_DATA_DIR=/tmp/screendim-esphome` (nicht in

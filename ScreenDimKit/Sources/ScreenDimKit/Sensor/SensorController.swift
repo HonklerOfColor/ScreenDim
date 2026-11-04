@@ -5,13 +5,8 @@ import Observation
 
 /// Verbindet den optionalen Schreibtisch-Sensor (oder die Simulation) mit dem
 /// `DisplayManager`: Abwesenheit dunkelt die Bildschirme ab und schaltet sie nach einer
-/// Weile aus (`AbsenceStage`), Umgebungslicht regelt die Helligkeit. Ohne Sensor passiert
-/// nichts; Standard ist „aus“.
-///
-/// Das Licht kann außer vom Schreibtisch-Sensor auch vom eingebauten Lichtsensor des Macs
-/// kommen (MacBook, iMac; Quelle per Fabrik, derzeit reicht die App keine herein). Welche Quelle gilt,
-/// entscheidet `LightSourceSelector` nach Wahl
-/// (`LightSource`) und Verfügbarkeit; die andere springt bei Ausfall ein.
+/// Weile aus (`AbsenceStage`, abschaltbar mit `reactsToAbsence`), Umgebungslicht regelt
+/// die Helligkeit (`LightSource`). Ohne Sensor passiert nichts; Standard ist „aus“.
 ///
 /// Gekoppelt ist höchstens ein Sensor. Sein Hostname steht in UserDefaults, der Code nur
 /// im Schlüsselbund.
@@ -32,15 +27,12 @@ public final class SensorController {
         case keychainUnavailable(OSStatus)
     }
 
-    /// Woher das Umgebungslicht für die Helligkeit kommt, mit Vorrang. Die Fälle mit dem
-    /// eingebauten Lichtsensor sind nur wählbar, wenn es ihn gibt.
+    /// Ob das Umgebungslicht die Helligkeit regelt. Es kommt vom Schreibtisch-Sensor oder,
+    /// im Demo-Modus, aus der Simulation. Ältere gespeicherte Wahlen mit dem früheren
+    /// eingebauten Lichtsensor werden zu `deskSensorOnly` (`init(storedValue:)`).
     public enum LightSource: String, CaseIterable, Sendable {
-        /// Schreibtisch-Sensor; fällt er aus, der eingebaute Sensor. Standard.
-        case deskSensorFirst
-        /// Eingebauter Sensor; fällt er aus (Deckel zu), der Schreibtisch-Sensor.
-        case builtInFirst
+        /// Standard.
         case deskSensorOnly
-        case builtInOnly
         case off
     }
 
@@ -104,6 +96,8 @@ public final class SensorController {
         /// Alt (Schalter „Helligkeit ans Umgebungslicht anpassen“); nur noch gelesen, um
         /// die Einstellung in `lightSource` zu übernehmen.
         static let adjustsBrightness = "sensorAdjustsBrightness"
+        /// „Bei Abwesenheit reagieren“; fehlt der Eintrag, gilt an.
+        static let reactsToAbsence = "sensorReactsToAbsence"
         static let absenceLevel = "sensorAbsenceLevel"
         /// Sekunden bis zum Ausschalten; negativ: nie.
         static let absenceOffDelay = "sensorAbsenceOffDelay"
@@ -126,13 +120,17 @@ public final class SensorController {
     /// So lange gilt der gelesene Zustand der Auto-Helligkeit; danach liest der nächste
     /// Lichtwert neu. Wird die App aktiv (etwa die Einstellungen geöffnet), liest sie sofort.
     public static let autoBrightnessMaxAge: Duration = .seconds(10)
-    /// Faktor für die Lux des eingebauten Sensors vor der Kurve. Er sitzt hinter dem
-    /// Displayglas; kalibriert ist der Wert noch nicht.
-    public static let builtInLuxFactor: Double = 1.0
+    /// Gültige Lux-Werte. Direkte Sonne bringt etwa 100 000 lx; alles außerhalb ist ein
+    /// Messfehler und wird verworfen.
+    nonisolated public static let luxRange: ClosedRange<Double> = 0...200_000
     /// So viele Einträge behält das Protokoll der Sensor-Diagnose.
     public static let debugLogLimit = 200
-    /// Wählbare Zeiten bis zum Ausschalten in Minuten: `nil` nie, 0 sofort (ohne Abdunkeln).
-    public static let absenceOffChoices: [Int?] = [nil, 0, 1, 2, 3, 5, 10, 15, 20, 30, 45, 60]
+    /// Wählbare Zeiten bis zum Ausschalten in Sekunden; `nil`: nie.
+    public static let absenceOffChoices: [Int?] = [nil, 30, 60, 120, 180, 300, 600, 900, 1200, 1800, 2700, 3600]
+    /// Kürzeste Zeit bis zum Ausschalten. Ein „sofort“ gibt es nicht mehr: Eine einzelne
+    /// Fehlmeldung des Radars schickte sonst alle Displays schlafen. Ältere gespeicherte
+    /// Werte darunter (0: „sofort“) werden darauf angehoben.
+    public static let minimumAbsenceOffDelay: Duration = .seconds(30)
     public static let defaultAbsenceOffDelay: Duration? = .seconds(5 * 60)
     public static let absenceLevelRange: ClosedRange<Double> = 0...50
     public static let defaultAbsenceLevel: Double = 5
@@ -149,22 +147,13 @@ public final class SensorController {
     /// Letztes Lux, roh und geglättet (`LuxFilter`); geglättet geht es in die Kurven.
     public private(set) var lux: Double?
     public private(set) var filteredLux: Double?
-    /// Gespeicherte Wahl. Sie bleibt erhalten, auch wenn dieser Mac sie nicht kann; was
-    /// wirkt, steht in `effectiveLightSource`.
     public private(set) var lightSource: LightSource
     /// Quelle, deren Licht gerade die Helligkeit regelt; `nil`, wenn keine.
     public private(set) var activeLightOrigin: SensorOrigin?
     /// Verfügbarkeit nach `LightSourceSelector`, Stand der letzten Prüfung.
     public private(set) var isDeskSensorLightAvailable = false
-    public private(set) var isBuiltInLightAvailable = false
-    /// Letzter Wert des eingebauten Lichtsensors; `nil`, solange er nicht läuft (weder
-    /// Lichtquelle noch Sensor-Diagnose offen) oder der Deckel zu ist.
-    public private(set) var builtInLux: Double?
-    public private(set) var builtInFilteredLux: Double?
-    /// Zeit des letzten Ereignisses vom Schreibtisch-Sensor bzw. der Demo und vom
-    /// eingebauten Lichtsensor.
+    /// Zeit des letzten Ereignisses vom Schreibtisch-Sensor bzw. der Demo.
     public private(set) var lastEventDate: Date?
-    public private(set) var builtInLastEventDate: Date?
     /// Letzte Helligkeit aus dem Licht je angeschlossenem Monitor und woher das Licht kam.
     public private(set) var lightLevels: [LightLevel] = []
     public private(set) var lightBrightnessOrigin: SensorOrigin?
@@ -173,62 +162,34 @@ public final class SensorController {
     /// Aus dem Speicher gelesene Profile, damit nicht jeder Zugriff dekodiert. Nicht
     /// beobachtet: Das Füllen beim Lesen darf kein Neurendern auslösen.
     @ObservationIgnored private var loadedProfiles: [String: LightProfile] = [:]
-    /// Sensor-Diagnose offen: Ereignisse werden protokolliert, und der eingebaute
-    /// Lichtsensor liest mit, auch wenn er nicht die Lichtquelle ist.
+    /// Sensor-Diagnose offen: Ereignisse werden protokolliert.
     public private(set) var isDebugMonitoring = false
     public private(set) var debugLog: [SensorDebugEntry] = []
     public private(set) var absenceStage: AbsenceStage = .none
+    /// „Bei Abwesenheit reagieren“: Aus, schaltet die Anwesenheit nichts, weder abdunkeln
+    /// und ausschalten noch wecken. Licht und Anzeige laufen weiter. Standard an.
+    public private(set) var reactsToAbsence: Bool
     /// Höchste Helligkeit in Prozent, solange niemand da ist.
     public private(set) var absenceLevel: Double
-    /// Wie lange abgedunkelt bleibt, bevor die Displays schlafen; `nil`: nie, `.zero`: sofort.
+    /// Wie lange abgedunkelt bleibt, bevor die Displays schlafen; `nil`: nie, sonst
+    /// mindestens `minimumAbsenceOffDelay`.
     public private(set) var absenceOffDelay: Duration?
 
     /// Für die Auswahl in den Einstellungen; `nil`: nie.
-    public var absenceOffMinutes: Int? {
-        absenceOffDelay.map { Int($0.components.seconds / 60) }
+    public var absenceOffSeconds: Int? {
+        absenceOffDelay.map { Int($0.components.seconds) }
     }
 
     /// Der Sensor meldet wieder jemanden, nachdem er „weg“ gemeldet hatte. Die App gibt das
     /// an die Leerlauf-Dimmung weiter (`IdleDimmer.noteActivity`).
     @ObservationIgnored public var onArrival: (@MainActor () -> Void)?
 
-    /// Dieser Mac hat einen Lichtsensor, und die Variante darf ihn lesen.
-    public var hasBuiltInLightSensor: Bool { builtInLightSensor != nil }
-
-    /// Deckel zu: Das eingebaute Display ist nicht online, der Sensor liegt im Dunkeln und
-    /// seine Werte zählen nicht.
-    public var isBuiltInLightSensorCovered: Bool {
-        !manager.monitors.contains(where: \.isBuiltIn)
-    }
-
-    /// Was diese Wahl hier bewirkt: Ohne eingebauten Sensor wirkt jede Wahl außer „aus“
-    /// wie „nur Schreibtisch-Sensor“.
-    public var effectiveLightSource: LightSource {
-        LightSourceSelector.effectiveChoice(lightSource, builtInPresent: hasBuiltInLightSensor)
-    }
-
-    /// Wählbare Lichtquellen: ohne eingebauten Sensor nur Schreibtisch-Sensor oder aus.
-    public var availableLightSources: [LightSource] {
-        hasBuiltInLightSensor ? LightSource.allCases : [.deskSensorOnly, .off]
-    }
-
-    /// Die aktive Quelle ist nicht die bevorzugte, sondern springt für sie ein.
-    public var isLightFallback: Bool {
-        guard let activeLightOrigin, activeLightOrigin != .demo else { return false }
-        return activeLightOrigin != effectiveLightSource.order.first
-    }
-
-    /// Quelle, deren Anwesenheit gerade die Bildschirme schaltet; `nil`, wenn keine.
+    /// Quelle, deren Anwesenheit gerade die Bildschirme schaltet; `nil`, wenn keine (auch
+    /// wenn „Bei Abwesenheit reagieren“ aus ist).
     public var activePresenceOrigin: SensorOrigin? {
+        guard reactsToAbsence else { return nil }
         if isDemoActive { return .demo }
         return status == .connected ? .deskSensor : nil
-    }
-
-    /// Der eingebaute Lichtsensor soll lesen: Er kann aktiv oder Rückfall sein (nicht in der
-    /// Demo), oder die Sensor-Diagnose ist offen.
-    private var readsBuiltInLight: Bool {
-        guard hasBuiltInLightSensor else { return false }
-        return isDebugMonitoring || (!isDemoActive && effectiveLightSource.order.contains(.builtIn))
     }
 
     @ObservationIgnored private let manager: DisplayManager
@@ -239,7 +200,6 @@ public final class SensorController {
     @ObservationIgnored private let input: any InputActivityMonitoring
     @ObservationIgnored private let makeLiveSource: @MainActor (SensorEndpoint, PairingCode) -> any SensorSource
     @ObservationIgnored private let makeSimulation: @MainActor (SimulationSchedule) -> SimulatedSensorSource
-    @ObservationIgnored private let builtInLightSensor: (any SensorSource)?
     @ObservationIgnored private let readAutoBrightness: @MainActor () -> Bool?
     @ObservationIgnored private var autoBrightnessReadAt: ContinuousClock.Instant?
     @ObservationIgnored private var activationObserver: (any NSObjectProtocol)?
@@ -252,7 +212,6 @@ public final class SensorController {
 
     @ObservationIgnored private var simulation: SimulatedSensorSource?
     @ObservationIgnored private var sourceTask: Task<Void, Never>?
-    @ObservationIgnored private var builtInLightTask: Task<Void, Never>?
     @ObservationIgnored private var pairingTask: Task<Void, Never>?
     @ObservationIgnored private var watchdog: Task<Void, Never>?
     /// Warten bis zum Ausschalten oder, nach dem Aufwachen, bis die Helligkeit zurückkommt.
@@ -260,36 +219,29 @@ public final class SensorController {
     @ObservationIgnored private var absentSince: ContinuousClock.Instant?
     /// Laut `NSWorkspace`; dann keine DDC-Writes, die Helligkeit kommt nach dem Aufwachen.
     @ObservationIgnored private var displaysAsleep = false
+    /// Wann die Displays zuletzt aufgewacht sind; für die Schonfrist danach.
+    @ObservationIgnored private var displaysWokeAt: ContinuousClock.Instant?
     /// Ein Ereignis wird gerade verarbeitet: Ändert es die Stufe, steht das als Wirkung an
     /// seinem Eintrag im Protokoll, nicht als eigener Eintrag.
     @ObservationIgnored private var handlingEvent = false
     @ObservationIgnored private var connection: SensorConnection?
     @ObservationIgnored private var lastEventAt: ContinuousClock.Instant?
     @ObservationIgnored private var deskFilter = LuxFilter(.deskSensor)
-    @ObservationIgnored private var builtInFilter = LuxFilter(.builtIn)
     /// Pausen der Lichtregelung je Monitor (`storageKey`).
     @ObservationIgnored private var holds: [String: LightHold] = [:]
     /// Monitore, die beim letzten Setzen noch in der DDC-Prüfung waren und den Wert nicht
     /// übernommen haben; der nächste Lux-Wert holt ihn nach, auch innerhalb der Hysterese.
     @ObservationIgnored private var pendingLight: Set<String> = []
-    /// Letzter Wert des eingebauten Sensors. Beim Schreibtisch-Sensor zählt jedes
-    /// Ereignis (`lastEventAt`).
-    @ObservationIgnored private var builtInLuxAt: ContinuousClock.Instant?
-    @ObservationIgnored private var lightSwitchedAt: ContinuousClock.Instant?
-    /// Ein einzelner Schlaf bis zum nächsten Zeitpunkt, an dem eine Quelle abläuft oder die
-    /// Wechselsperre endet.
+    /// Ein einzelner Schlaf bis zu dem Zeitpunkt, an dem der Schreibtisch-Sensor als
+    /// Lichtquelle abläuft.
     @ObservationIgnored private var lightExpiry: Task<Void, Never>?
     @ObservationIgnored private(set) var lightExpiryDeadline: ContinuousClock.Instant?
     @ObservationIgnored private var nextDebugID = 0
 
-    /// - Parameters:
-    ///   - makeBuiltInLightSensor: eingebauter Lichtsensor; `nil` ohne Sensor (Mac mini,
-    ///     Mac Studio) oder ohne Fabrik (die App reicht derzeit keine herein).
-    ///   - isAutoBrightnessEnabled: ob macOS das eingebaute Display selbst regelt
-    ///     („Helligkeit automatisch anpassen“); `nil`, wenn unbekannt (keine Fabrik).
+    /// - Parameter isAutoBrightnessEnabled: ob macOS das eingebaute Display selbst regelt
+    ///   („Helligkeit automatisch anpassen“); `nil`, wenn unbekannt (keine Fabrik).
     public convenience init(
         manager: DisplayManager,
-        makeBuiltInLightSensor: @MainActor () -> (any SensorSource)? = { nil },
         isAutoBrightnessEnabled: @escaping @MainActor () -> Bool? = { nil }
     ) {
         self.init(
@@ -303,7 +255,6 @@ public final class SensorController {
             demoAtLaunch: UserDefaults.standard.bool(forKey: Keys.demo),
             makeLiveSource: { SSESensorSource(endpoint: $0, code: $1) },
             makeSimulation: { SimulatedSensorSource(schedule: $0) },
-            makeBuiltInLightSensor: makeBuiltInLightSensor,
             isAutoBrightnessEnabled: isAutoBrightnessEnabled
         )
     }
@@ -320,7 +271,6 @@ public final class SensorController {
         demoAtLaunch: Bool,
         makeLiveSource: @escaping @MainActor (SensorEndpoint, PairingCode) -> any SensorSource,
         makeSimulation: @escaping @MainActor (SimulationSchedule) -> SimulatedSensorSource,
-        makeBuiltInLightSensor: @MainActor () -> (any SensorSource)? = { nil },
         isAutoBrightnessEnabled: @escaping @MainActor () -> Bool? = { nil },
         now: @escaping @MainActor () -> ContinuousClock.Instant = { .now }
     ) {
@@ -336,18 +286,29 @@ public final class SensorController {
         self.displaySleep = displaySleep
         self.notificationCenter = notificationCenter
         self.wait = wait
-        builtInLightSensor = makeBuiltInLightSensor()
         readAutoBrightness = isAutoBrightnessEnabled
         isEnabled = preferences.object(forKey: Keys.enabled) as? Bool ?? false
-        // Ohne Lichtsensor wirkt „eingebaut“ wie der Schreibtisch-Sensor (`effectiveLightSource`);
-        // gespeichert bleibt die Wahl trotzdem.
-        lightSource = preferences.string(forKey: Keys.lightSource).flatMap(LightSource.init(storedValue:))
-            ?? ((preferences.object(forKey: Keys.adjustsBrightness) as? Bool ?? true) ? .deskSensorFirst : .off)
+        let storedLightSource = preferences.string(forKey: Keys.lightSource)
+        if let storedLightSource, let source = LightSource(storedValue: storedLightSource) {
+            lightSource = source
+            // Ältere Wahl mit dem eingebauten Lichtsensor: einmal umschreiben.
+            if source.rawValue != storedLightSource { preferences.set(source.rawValue, forKey: Keys.lightSource) }
+        } else {
+            lightSource = (preferences.object(forKey: Keys.adjustsBrightness) as? Bool ?? true) ? .deskSensorOnly : .off
+        }
         pairedHostname = preferences.string(forKey: Keys.hostname)
+        reactsToAbsence = preferences.object(forKey: Keys.reactsToAbsence) as? Bool ?? true
         absenceLevel = (preferences.object(forKey: Keys.absenceLevel) as? Double).map(Self.clampAbsenceLevel)
             ?? Self.defaultAbsenceLevel
         if let seconds = preferences.object(forKey: Keys.absenceOffDelay) as? Double {
-            absenceOffDelay = seconds < 0 ? nil : .seconds(seconds)
+            if seconds < 0 {
+                absenceOffDelay = nil
+            } else {
+                let delay = Self.clampAbsenceOffDelay(.seconds(seconds))
+                absenceOffDelay = delay
+                // Altwert „sofort“ (0) oder kürzer als erlaubt: angehoben speichern.
+                if delay != .seconds(seconds) { preferences.set(Double(delay.components.seconds), forKey: Keys.absenceOffDelay) }
+            }
         } else {
             absenceOffDelay = Self.defaultAbsenceOffDelay
         }
@@ -377,7 +338,6 @@ public final class SensorController {
             },
         ]
         restartSource()
-        restartBuiltInLight()
     }
 
     public func stop() {
@@ -388,8 +348,6 @@ public final class SensorController {
         pairingTask?.cancel()
         sourceTask?.cancel()
         sourceTask = nil
-        builtInLightTask?.cancel()
-        builtInLightTask = nil
         lightExpiry?.cancel()
         lightExpiry = nil
         lightExpiryDeadline = nil
@@ -413,7 +371,16 @@ public final class SensorController {
         isDemoActive = active
         if active { cancelPairing() }
         restartSource()
-        restartBuiltInLight()
+    }
+
+    /// Aus: Eine laufende Abwesenheit endet, und die Anwesenheit schaltet nichts mehr.
+    /// Wieder an, gilt erst die nächste Meldung „abwesend“.
+    public func setReactsToAbsence(_ reacts: Bool) {
+        guard reacts != reactsToAbsence else { return }
+        reactsToAbsence = reacts
+        preferences.set(reacts, forKey: Keys.reactsToAbsence)
+        sensorLog.notice("Bei Abwesenheit reagieren: \(reacts ? "an" : "aus", privacy: .public)")
+        if !reacts { returnFromAbsence(wake: false) }
     }
 
     /// Gilt ab der nächsten Abwesenheit.
@@ -424,9 +391,10 @@ public final class SensorController {
         preferences.set(level, forKey: Keys.absenceLevel)
     }
 
-    /// `nil`: nie ausschalten. Während abgedunkelt ist, zählt die neue Zeit ab dem Beginn
-    /// der Abwesenheit.
+    /// `nil`: nie ausschalten; sonst mindestens `minimumAbsenceOffDelay`. Während
+    /// abgedunkelt ist, zählt die neue Zeit ab dem Beginn der Abwesenheit.
     public func setAbsenceOffDelay(_ delay: Duration?) {
+        let delay = delay.map(Self.clampAbsenceOffDelay)
         guard delay != absenceOffDelay else { return }
         absenceOffDelay = delay
         // Ausdrücklich `Double`: Im Kontext `Any?` würde aus `-1` sonst ein `Int`.
@@ -439,28 +407,22 @@ public final class SensorController {
         min(max(level.rounded(), absenceLevelRange.lowerBound), absenceLevelRange.upperBound)
     }
 
+    private static func clampAbsenceOffDelay(_ delay: Duration) -> Duration {
+        max(delay, minimumAbsenceOffDelay)
+    }
+
     public func setLightSource(_ source: LightSource) {
-        guard source != lightSource, availableLightSources.contains(source) else { return }
+        guard source != lightSource else { return }
         lightSource = source
         preferences.set(source.rawValue, forKey: Keys.lightSource)
-        // Der eingebaute Sensor startet oder stoppt nur, wenn er dazukommt oder wegfällt;
-        // sonst bleibt sein letzter Wert gültig.
-        if (builtInLightTask != nil) != readsBuiltInLight {
-            restartBuiltInLight()
-        } else {
-            updateActiveLight()
-        }
+        updateActiveLight()
     }
 
     /// Sensor-Diagnose geöffnet bzw. geschlossen. Beim Schließen wird das Protokoll gelöscht.
     public func setDebugMonitoring(_ monitoring: Bool) {
         guard monitoring != isDebugMonitoring else { return }
-        let wasReading = builtInLightTask != nil
         isDebugMonitoring = monitoring
         if !monitoring { debugLog.removeAll() }
-        if wasReading != readsBuiltInLight {
-            restartBuiltInLight()
-        }
     }
 
     public func clearDebugLog() {
@@ -501,10 +463,8 @@ public final class SensorController {
         deskFilter.reset()
         lastEventAt = nil
         lastEventDate = nil
-        if lightBrightnessOrigin != .builtIn {
-            lightLevels = []
-            lightBrightnessOrigin = nil
-        }
+        lightLevels = []
+        lightBrightnessOrigin = nil
         returnFromAbsence(wake: false)
 
         let source: any SensorSource
@@ -543,6 +503,12 @@ public final class SensorController {
     }
 
     func handle(_ event: SensorEvent) {
+        if case .lux(let value) = event, !Self.luxRange.contains(value) {
+            // Auch NaN landet hier. Kein Lebenszeichen: Ein kaputter Messwert hält den
+            // Sensor nicht als Lichtquelle am Leben.
+            sensorLog.notice("Lux \(value, privacy: .public) außerhalb 0…200000 lx, verworfen")
+            return
+        }
         let origin: SensorOrigin = isDemoActive ? .demo : .deskSensor
         let stageBefore = absenceStage
         var applied: [LightLevel] = []
@@ -581,6 +547,8 @@ public final class SensorController {
             lastEventAt = now()
             let previous = presence
             presence = present
+            // Abgeschaltet: anzeigen, sonst nichts.
+            guard reactsToAbsence else { break }
             if present {
                 // Annäherung weckt schlafende Displays immer, auch ohne Abwesenheit von
                 // ScreenDim (etwa nach „Eingabe gewinnt“, oder macOS hat ausgeschaltet).
@@ -636,7 +604,6 @@ public final class SensorController {
         // Niemand da: Die Ausgabe ist gedeckelt oder die Displays schlafen. Zurück gilt der
         // nächste Wert.
         guard absenceStage == .none else { return [] }
-        let value = origin == .builtIn ? lux * Self.builtInLuxFactor : lux
         let at = now()
         var applied: [LightLevel] = []
         for monitor in manager.monitors {
@@ -644,10 +611,10 @@ public final class SensorController {
             let profile = lightProfile(for: monitor)
             guard only == nil || only == key, !monitor.isIgnored, profile.followsLight, !macOSRegulates(monitor) else { continue }
             if let hold = holds[key] {
-                if hold.isActive(at: at, lux: value) { continue }
+                if hold.isActive(at: at, lux: lux) { continue }
                 holds[key] = nil
             }
-            let target = profile.curve.percent(forLux: value)
+            let target = profile.curve.percent(forLux: lux)
             let reference = manager.brightnessTarget(for: monitor.id) ?? monitor.brightness
             if abs(reference - target) < Self.lightHysteresis, !ignoresHysteresis, !pendingLight.contains(key) {
                 continue
@@ -713,7 +680,7 @@ public final class SensorController {
     /// Nach der Prüfung: Licht, das währenddessen kam, gilt jetzt.
     private func monitorReady(_ id: CGDirectDisplayID) {
         guard let monitor = manager.monitors.first(where: { $0.id == id }), pendingLight.contains(monitor.storageKey),
-              let origin = activeLightOrigin, let lux = currentLux(of: origin)
+              let origin = activeLightOrigin, let lux = activeLux
         else { return }
         applyAmbientLight(lux, from: origin, reason: .pendingAfterProbe, only: monitor.storageKey, ignoresHysteresis: true)
     }
@@ -721,10 +688,9 @@ public final class SensorController {
     // MARK: - Lichtprofile
 
     /// Geglättetes Lux der aktiven Lichtquelle, so wie es in die Kurven eingeht; `nil` ohne
-    /// Quelle.
+    /// Quelle. Schreibtisch-Sensor und Demo teilen sich den Wert.
     public var activeLux: Double? {
-        guard let origin = activeLightOrigin, let lux = currentLux(of: origin) else { return nil }
-        return origin == .builtIn ? lux * Self.builtInLuxFactor : lux
+        activeLightOrigin == nil ? nil : filteredLux
     }
 
     /// Ob macOS das eingebaute Display selbst regelt, Stand des letzten Lesens; `nil`, wenn
@@ -778,50 +744,33 @@ public final class SensorController {
         lightProfiles[key] = profile
         profileStore.setProfile(profile == Self.defaultProfile(isBuiltIn: isBuiltIn) ? nil : profile, for: key)
         holds[key] = nil
-        if let origin = activeLightOrigin, let lux = currentLux(of: origin) {
+        if let origin = activeLightOrigin, let lux = activeLux {
             applyAmbientLight(lux, from: origin, reason: .profileChange, only: key, ignoresHysteresis: true)
         }
     }
 
     // MARK: - Auswahl der Lichtquelle
 
-    /// Prüft, welche Lichtquelle gilt, und wechselt bei Bedarf. Läuft nach jedem Ereignis,
-    /// jeder Einstellung und einmal, wenn eine Quelle abläuft oder die Wechselsperre endet.
+    /// Prüft, ob Licht kommt, und wechselt bei Bedarf. Läuft nach jedem Ereignis, jeder
+    /// Einstellung und einmal, wenn der Schreibtisch-Sensor als Quelle abläuft.
     /// - Parameter trigger: Quelle, deren Lux gerade ankommt. Wird sie aktiv, setzt der
-    ///   Aufrufer ihren Wert; sonst gilt der letzte Wert der neuen Quelle sofort.
+    ///   Aufrufer ihren Wert; sonst gilt der letzte Wert sofort.
     func updateActiveLight(trigger: SensorOrigin? = nil) {
         let at = now()
         let deskAvailable = LightSourceSelector.isDeskSensorAvailable(
             connected: status == .connected,
             eventAge: lux == nil ? nil : lastEventAt.map { at - $0 }
         )
-        let builtInAvailable = LightSourceSelector.isBuiltInAvailable(
-            present: hasBuiltInLightSensor,
-            covered: isBuiltInLightSensorCovered,
-            luxAge: builtInLuxAt.map { at - $0 }
-        )
         // Läuft nach jedem Ereignis (auch Pings); beobachtete Werte nur bei Änderung setzen.
         if isDeskSensorLightAvailable != deskAvailable { isDeskSensorLightAvailable = deskAvailable }
-        if isBuiltInLightAvailable != builtInAvailable { isBuiltInLightAvailable = builtInAvailable }
-        func select(current: SensorOrigin?, sinceLastSwitch: Duration?) -> SensorOrigin? {
-            LightSourceSelector.select(
-                choice: effectiveLightSource,
-                demo: isDemoActive,
-                deskAvailable: isDeskSensorLightAvailable,
-                builtInAvailable: isBuiltInLightAvailable,
-                current: current,
-                sinceLastSwitch: sinceLastSwitch
-            )
-        }
-        let selected = select(current: activeLightOrigin, sinceLastSwitch: lightSwitchedAt.map { at - $0 })
+        let selected = LightSourceSelector.select(choice: lightSource, demo: isDemoActive, deskAvailable: deskAvailable)
         if selected != activeLightOrigin {
             let previous = activeLightOrigin
             activeLightOrigin = selected
-            lightSwitchedAt = at
-            // Die Hysterese bleibt: Die neue Quelle blendet mit ihrem geglätteten Wert vom
-            // aktuellen Stand aus über, nur wenn er deutlich abweicht.
+            // Die Hysterese bleibt: Der letzte geglättete Wert blendet vom aktuellen Stand
+            // aus über, nur wenn er deutlich abweicht.
             var applied: [LightLevel] = []
-            if let selected, selected != trigger, let value = currentLux(of: selected) {
+            if let selected, selected != trigger, let value = filteredLux {
                 applied = applyAmbientLight(value, from: selected, reason: .sourceSwitch(from: previous, to: selected))
             }
             sensorLog.notice(
@@ -829,42 +778,22 @@ public final class SensorController {
             )
             appendDebug(.lightSourceSwitch(from: previous, to: selected), effect: applied.isEmpty ? nil : .brightness(applied))
         }
-        // Hält die Sperre gerade einen Wechsel zurück?
-        let held = select(current: nil, sinceLastSwitch: nil) != activeLightOrigin
-        scheduleLightExpiry(at: at, held: held)
+        scheduleLightExpiry(at: at)
     }
 
-    /// Geglättetes Lux einer Quelle.
-    private func currentLux(of origin: SensorOrigin) -> Double? {
-        switch origin {
-        case .deskSensor, .demo: filteredLux
-        case .builtIn: builtInFilteredLux
-        }
-    }
-
-    /// Weckt einmal, wenn sich ohne neues Ereignis etwas ändern kann: Eine verfügbare Quelle
-    /// läuft ab, oder die Wechselsperre gibt einen zurückgehaltenen Wechsel frei. Ein
-    /// früherer, noch ausstehender Termin bleibt stehen; wacht er zu früh auf, prüft er nur
-    /// und plant neu.
-    private func scheduleLightExpiry(at: ContinuousClock.Instant, held: Bool) {
+    /// Weckt einmal, wenn der Schreibtisch-Sensor ohne neues Ereignis abläuft. Ein früherer,
+    /// noch ausstehender Termin bleibt stehen; wacht er zu früh auf, prüft er nur und plant
+    /// neu.
+    private func scheduleLightExpiry(at: ContinuousClock.Instant) {
         // Knapp nach der Grenze, denn genau auf ihr gilt die Quelle noch.
         let margin: Duration = .milliseconds(10)
-        var deadlines: [ContinuousClock.Instant] = []
-        if isDeskSensorLightAvailable, let lastEventAt {
-            deadlines.append(lastEventAt + LightSourceSelector.deskSensorMaxAge + margin)
-        }
-        if isBuiltInLightAvailable, let builtInLuxAt {
-            deadlines.append(builtInLuxAt + LightSourceSelector.builtInMaxAge + margin)
-        }
-        if held, let lightSwitchedAt {
-            deadlines.append(lightSwitchedAt + LightSourceSelector.minimumHold)
-        }
-        guard let next = deadlines.min() else {
+        guard isDeskSensorLightAvailable, let lastEventAt else {
             lightExpiry?.cancel()
             lightExpiry = nil
             lightExpiryDeadline = nil
             return
         }
+        let next = lastEventAt + LightSourceSelector.deskSensorMaxAge + margin
         if lightExpiry != nil, let lightExpiryDeadline, lightExpiryDeadline > at, lightExpiryDeadline <= next { return }
         lightExpiry?.cancel()
         lightExpiryDeadline = next
@@ -908,65 +837,14 @@ public final class SensorController {
         }
     }
 
-    // MARK: - Eingebauter Lichtsensor
-
-    /// Läuft, solange er aktiv oder Rückfall sein kann (ohne Demo) oder die Sensor-Diagnose
-    /// offen ist. Ein eigenes Abfragen gibt es nicht; die Werte kommen im Takt des Sensors.
-    private func restartBuiltInLight() {
-        defer { updateActiveLight() }
-        builtInLightTask?.cancel()
-        builtInLightTask = nil
-        builtInLux = nil
-        builtInFilteredLux = nil
-        builtInFilter.reset()
-        builtInLuxAt = nil
-        builtInLastEventDate = nil
-        if lightBrightnessOrigin == .builtIn {
-            lightLevels = []
-            lightBrightnessOrigin = nil
-        }
-        guard readsBuiltInLight, let sensor = builtInLightSensor else { return }
-        builtInLightTask = Task { [weak self] in
-            for await event in sensor.events() {
-                guard !Task.isCancelled, let self else { return }
-                self.handleBuiltInLight(event)
-            }
-        }
-    }
-
-    func handleBuiltInLight(_ event: SensorEvent) {
-        var applied: [LightLevel] = []
-        defer { record(.builtIn, event, stageBefore: absenceStage, applied: applied) }
-        builtInLastEventDate = Date()
-        guard case .lux(let value) = event else { return }
-        // Bei zugeklapptem Deckel meldet der Sensor Dunkelheit und würde die Monitore
-        // abdunkeln. Ist er wieder offen, gilt der nächste Wert.
-        guard !isBuiltInLightSensorCovered else {
-            builtInLux = nil
-            builtInFilteredLux = nil
-            builtInFilter.reset()
-            builtInLuxAt = nil
-            updateActiveLight()
-            return
-        }
-        builtInLux = value
-        builtInLuxAt = now()
-        // Auch in Bereitschaft filtern: Springt der Sensor ein, ist sein Mittel schon da.
-        let filtered = builtInFilter.add(value, at: now())
-        builtInFilteredLux = filtered
-        updateActiveLight(trigger: .builtIn)
-        // Sonst nur Diagnose oder Rückfall in Bereitschaft: anzeigen, nicht regeln.
-        if activeLightOrigin == .builtIn {
-            applied = applyAmbientLight(filtered, from: .builtIn, reason: .lux(raw: value, filtered: filtered, origin: .builtIn))
-        }
-    }
-
     // MARK: - Abwesenheit
 
     /// Der Sensor meldet niemanden: abdunkeln, nach `absenceOffDelay` ausschalten. Eingabe
     /// gewinnt immer; ein veralteter Sensor holt die Bildschirme zurück.
-    private func beginAbsence() {
-        guard absenceStage == .none else { return }
+    /// - Parameter restart: Die Displays sind nach einer Abwesenheit wieder aufgewacht, und
+    ///   noch immer ist niemand da: von vorn, ohne die Helligkeit dazwischen zurückzuholen.
+    private func beginAbsence(restart: Bool = false) {
+        guard absenceStage == .none || restart else { return }
         absentSince = now()
         startWatchdog()
         guard !displaysAsleep else {
@@ -976,13 +854,11 @@ public final class SensorController {
         }
         // Bis die Displays schlafen; danach weckt macOS sie selbst bei einer Eingabe.
         input.startObserving { [weak self] in self?.returnFromAbsence(wake: false) }
-        if absenceOffDelay == .zero {
-            turnScreensOff()
-        } else {
-            setAbsenceStage(.dimmed)
-            manager.beginDim(.absence, to: absenceLevel)
-            scheduleOff()
-        }
+        // Nach dem Aufwachen: Schwarz (ignorierter Monitor) wird wieder zum Deckel.
+        manager.setScreensBlanked(false)
+        setAbsenceStage(.dimmed)
+        manager.beginDim(.absence, to: absenceLevel)
+        scheduleOff()
     }
 
     /// Wartet die Zeit bis zum Ausschalten ab, gezählt ab dem Beginn der Abwesenheit.
@@ -1090,10 +966,12 @@ public final class SensorController {
         setAbsenceStage(.off)
     }
 
-    /// Bildschirme wieder an (Rückkehr, Eingabe): Helligkeit kurz danach zurück, wie beim
-    /// Leerlauf.
+    /// Bildschirme wieder an (Rückkehr, Eingabe, Mitteilung): Helligkeit kurz danach zurück,
+    /// wie beim Leerlauf. Meldet der Sensor dann weiter niemanden und hat keine Eingabe sie
+    /// geweckt, beginnt die Abwesenheit von vorn.
     func screensDidWake() {
         displaysAsleep = false
+        displaysWokeAt = now()
         guard absenceStage != .none else { return }
         absenceTask?.cancel()
         let wait = wait
@@ -1101,8 +979,28 @@ public final class SensorController {
             await wait(IdleDimmer.screenWakeSettle)
             guard !Task.isCancelled, let self else { return }
             self.absenceTask = nil
-            self.endAbsence()
+            if self.isStillAwayAfterWake {
+                sensorLog.notice("Abwesenheit: nach dem Aufwachen weiter niemand da, beginnt neu")
+                self.beginAbsence(restart: true)
+            } else {
+                self.endAbsence()
+            }
         }
+    }
+
+    /// Nach dem Aufwachen weiter niemand da, etwa weil eine Mitteilung die Displays geweckt
+    /// hat: Der Sensor ist verbunden, frisch und meldet „abwesend“, und seit kurz vor dem
+    /// Aufwachen gab es keine Eingabe (`PresenceGate.restartsAbsenceAfterWake`).
+    private var isStillAwayAfterWake: Bool {
+        guard reactsToAbsence, let displaysWokeAt else { return false }
+        let connected = connection == .connected
+        guard !PresenceGate.isStale(connected: connected, lastEventAge: lastEventAge) else { return false }
+        return PresenceGate.restartsAbsenceAfterWake(
+            presence: presence,
+            connected: connected,
+            sinceLastInput: input.timeSinceLastInput,
+            sinceWake: now() - displaysWokeAt
+        )
     }
 
     private func setAbsenceStage(_ stage: AbsenceStage) {

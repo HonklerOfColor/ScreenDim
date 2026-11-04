@@ -34,9 +34,10 @@ public protocol SensorHTTP: Sendable {
     func get(_ url: URL, password: String?) async -> SensorResponse
 }
 
-/// Beantwortet die Digest-Abfrage des Sensors mit dem Kopplungscode. Ohne Code oder nach
-/// einem abgelehnten Versuch übernimmt das System, das ohne gespeicherte Zugangsdaten die
-/// 401-Antwort durchreicht.
+/// Beantwortet die Digest-Abfrage des Sensors mit dem Kopplungscode. Basic lehnt sie ab:
+/// Der Code ginge dabei im Klartext übers WLAN, und die Firmware verlangt immer Digest;
+/// wer Basic verlangt, ist nicht der Sensor. Ohne Code oder nach einem abgelehnten Versuch
+/// übernimmt das System, das ohne gespeicherte Zugangsdaten die 401-Antwort durchreicht.
 final class DigestDelegate: NSObject, URLSessionTaskDelegate, Sendable {
     private let password: String?
 
@@ -50,8 +51,13 @@ final class DigestDelegate: NSObject, URLSessionTaskDelegate, Sendable {
         didReceive challenge: URLAuthenticationChallenge,
         completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
-        let method = challenge.protectionSpace.authenticationMethod
-        guard method == NSURLAuthenticationMethodHTTPDigest || method == NSURLAuthenticationMethodHTTPBasic,
+        let space = challenge.protectionSpace
+        if space.authenticationMethod == NSURLAuthenticationMethodHTTPBasic {
+            sensorLog.notice("Sensor \(space.host, privacy: .public) verlangt Basic-Login, abgelehnt")
+            completionHandler(.cancelAuthenticationChallenge, nil)
+            return
+        }
+        guard space.authenticationMethod == NSURLAuthenticationMethodHTTPDigest,
               let password, challenge.previousFailureCount == 0
         else {
             completionHandler(.performDefaultHandling, nil)

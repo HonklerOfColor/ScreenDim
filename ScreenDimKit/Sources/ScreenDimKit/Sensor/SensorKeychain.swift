@@ -40,12 +40,22 @@ public struct SensorKeychain: SensorCredentialStore {
         }
     }
 
-    public func save(_ code: PairingCode, for hostname: String) throws(Failure) {
-        let data = Data(code.raw.utf8)
-        let update: [String: Any] = [
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+    /// Lesbar nach der ersten Entsperrung (die App startet beim Login) und nur auf diesem
+    /// Mac: Der Code wandert in kein Backup und auf kein anderes Gerät.
+    static var accessibility: CFString { kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly }
+
+    /// Was beim Speichern geschrieben wird, Code und Zugänglichkeit. Weil auch ein
+    /// bestehender Eintrag beides bekommt, wandern ältere Einträge
+    /// (`…AfterFirstUnlock`) beim nächsten Speichern still um; geloggt wird nichts.
+    static func attributes(for code: PairingCode) -> [String: Any] {
+        [
+            kSecValueData as String: Data(code.raw.utf8),
+            kSecAttrAccessible as String: accessibility,
         ]
+    }
+
+    public func save(_ code: PairingCode, for hostname: String) throws(Failure) {
+        let update = Self.attributes(for: code)
         var status = SecItemUpdate(baseQuery(hostname) as CFDictionary, update as CFDictionary)
         if status == errSecItemNotFound {
             var item = baseQuery(hostname)

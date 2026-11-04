@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import Testing
 @testable import ScreenDimKit
 
@@ -124,11 +125,80 @@ struct ServerSentEventsTests {
     }
 }
 
+@Suite("Login am Sensor: nur Digest")
+struct DigestDelegateTests {
+    /// Was der Delegate geantwortet hat; die Antwort kommt synchron.
+    private final class Answer: @unchecked Sendable {
+        var disposition: URLSession.AuthChallengeDisposition?
+        var credential: URLCredential?
+    }
+
+    private final class Sender: NSObject, URLAuthenticationChallengeSender {
+        func use(_ credential: URLCredential, for challenge: URLAuthenticationChallenge) {}
+        func continueWithoutCredential(for challenge: URLAuthenticationChallenge) {}
+        func cancel(_ challenge: URLAuthenticationChallenge) {}
+    }
+
+    /// Eine Abfrage des Sensors mit diesem Verfahren; der Task startet nie, kein Netz.
+    private func answer(_ method: String, password: String?, failures: Int = 0) -> Answer {
+        let space = URLProtectionSpace(
+            host: "screendim-desk-a1b2c3.local", port: 80, protocol: NSURLProtectionSpaceHTTP,
+            realm: "screendim", authenticationMethod: method
+        )
+        let challenge = URLAuthenticationChallenge(
+            protectionSpace: space, proposedCredential: nil, previousFailureCount: failures,
+            failureResponse: nil, error: nil, sender: Sender()
+        )
+        let task = URLSession.shared.dataTask(with: SensorEndpoint(hostname: "screendim-desk-a1b2c3.local").url(SensorProtocol.eventsPath))
+        let answer = Answer()
+        DigestDelegate(password: password).urlSession(.shared, task: task, didReceive: challenge) { disposition, credential in
+            answer.disposition = disposition
+            answer.credential = credential
+        }
+        return answer
+    }
+
+    @Test("Basic wird abgebrochen, mit und ohne Code; der Code geht nie hinaus", arguments: ["ABCDEFGH", nil] as [String?])
+    func rejectsBasic(password: String?) {
+        let answer = answer(NSURLAuthenticationMethodHTTPBasic, password: password)
+        #expect(answer.disposition == .cancelAuthenticationChallenge)
+        #expect(answer.credential == nil)
+    }
+
+    @Test("Digest bekommt Nutzer und Code, nur beim ersten Versuch und nicht gespeichert")
+    func answersDigest() {
+        let first = answer(NSURLAuthenticationMethodHTTPDigest, password: "ABCDEFGH")
+        #expect(first.disposition == .useCredential)
+        #expect(first.credential?.user == SensorProtocol.user)
+        #expect(first.credential?.password == "ABCDEFGH")
+        #expect(first.credential?.persistence == URLCredential.Persistence.none)
+        // Abgelehnt oder ohne Code: Das System reicht die 401-Antwort durch.
+        #expect(answer(NSURLAuthenticationMethodHTTPDigest, password: "ABCDEFGH", failures: 1).disposition == .performDefaultHandling)
+        #expect(answer(NSURLAuthenticationMethodHTTPDigest, password: nil).disposition == .performDefaultHandling)
+    }
+
+    @Test("Andere Verfahren bekommen den Code nicht")
+    func othersGetNoCode() {
+        let ntlm = answer(NSURLAuthenticationMethodNTLM, password: "ABCDEFGH")
+        #expect(ntlm.disposition == .performDefaultHandling)
+        #expect(ntlm.credential == nil)
+    }
+}
+
 @Suite("Schlüsselbund", .serialized)
 struct SensorKeychainTests {
     /// Eigener Service je Lauf; der Test räumt hinterher auf.
     private let keychain = SensorKeychain(service: "com.andreastrabi.ScreenDim.tests.\(UUID().uuidString)")
     private let host = "screendim-desk-test01.local"
+
+    @Test("Speichern schreibt Code und Zugänglichkeit „nur dieses Gerät, nach erster Entsperrung“, auch beim Überschreiben")
+    func attributes() throws {
+        let code = try #require(PairingCode(normalizing: "ABCD-EFGH"))
+        let attributes = SensorKeychain.attributes(for: code)
+        #expect(attributes[kSecAttrAccessible as String] as? String == kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String)
+        #expect(attributes[kSecValueData as String] as? Data == Data("ABCDEFGH".utf8))
+        #expect(attributes.count == 2)
+    }
 
     @Test("Speichern, lesen, überschreiben, löschen")
     func roundTrip() throws {

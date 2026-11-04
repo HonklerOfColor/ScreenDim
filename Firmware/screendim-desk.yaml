@@ -8,7 +8,8 @@
 #   `GET /events` (SSE, Ping alle 10 s), `GET /binary_sensor/Presence`,
 #   `GET /sensor/Ambient Light`, `GET /text_sensor/Pairing Code`.
 #   Dazu für die Weboberfläche: `sensor/Distance` (Entfernung laut Radar) und
-#   `number/Max Distance` (bis dahin zählt jemand als anwesend).
+#   `number/Max Distance` (bis dahin zählt jemand als anwesend; „abwesend“ erst ab
+#   20 cm darüber).
 # - BOOT kurz drücken: Kopplungsfenster (2 min, LED pulsiert blau): Der Code ist ohne
 #   Login abrufbar; alles andere bleibt hinter dem Login.
 #   BOOT 10 s halten: neuer Code, alte Kopplung ungültig, danach Kopplungsfenster.
@@ -32,6 +33,10 @@ substitutions:
   # Anwesend nur bis zu dieser Entfernung (cm); änderbar in der Weboberfläche
   # („Max Distance“), gemerkt über Neustarts.
   presence_max_distance: "120"
+  # Hysterese der Entfernung (cm): „abwesend“ erst ab Max Distance + diesem Wert,
+  # „anwesend“ wieder ab Max Distance. Sonst flackert die Anwesenheit, wenn jemand
+  # genau an der Grenze sitzt oder sich anlehnt.
+  presence_distance_hysteresis: "20"
   pairing_window: 2min
 
 esphome:
@@ -92,6 +97,11 @@ globals:
   - id: radar_distance_at
     type: uint32_t
     initial_value: "0"
+  # Entfernung innerhalb der Grenze, mit Hysterese (siehe `presence_distance_hysteresis`).
+  # Ändert sich nur bei frischer Entfernung; am Anfang „innerhalb“ (im Zweifel anwesend).
+  - id: distance_within
+    type: bool
+    initial_value: "true"
 
 wifi:
   # Ohne gespeichertes WLAN: Zugangspunkt `screendim-desk-xxxxxx` mit Captive Portal,
@@ -247,8 +257,10 @@ binary_sensor:
         input: true
         pullup: true
 
-  # Anwesend: Das Radar meldet „ON“, und die Entfernung liegt bis „Max Distance“. Kommt
-  # keine Entfernung, gilt „ON“ allein; schweigt der UART (über 1 s), gilt OT2.
+  # Anwesend: Das Radar meldet „ON“, und die Entfernung liegt innerhalb der Grenze:
+  # „abwesend“ erst ab Max Distance + Hysterese, „anwesend“ wieder ab Max Distance
+  # (Zustand in `distance_within`). Kommt keine Entfernung, gilt „ON“ allein; schweigt
+  # der UART (über 1 s), gilt OT2.
   - platform: template
     id: presence
     name: Presence
@@ -263,7 +275,14 @@ binary_sensor:
       bool distance_fresh = id(radar_distance_at) != 0 && now - id(radar_distance_at) <= 1000;
       if (!distance_fresh)
         return true;
-      return id(radar_distance) <= id(max_distance).state;
+      float limit = id(max_distance).state;
+      if (id(distance_within)) {
+        if (id(radar_distance) >= limit + ${presence_distance_hysteresis})
+          id(distance_within) = false;
+      } else if (id(radar_distance) <= limit) {
+        id(distance_within) = true;
+      }
+      return id(distance_within);
     filters:
       - delayed_on: 100ms
       - delayed_off: ${presence_off_delay}

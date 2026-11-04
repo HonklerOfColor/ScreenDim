@@ -651,14 +651,10 @@ public final class DisplayManager {
         }
     }
 
-    /// Licht-Aufträge kommen oft und bleiben auf `info`; alle anderen (Rückfall, Prüfung,
-    /// fremde Änderung, …) als `notice`, damit `log show` sie ohne `--info` behält.
+    /// Jeder Auftrag als `notice`, auch die aus dem Licht: `log show` behält sie ohne
+    /// `--info`. Licht-Aufträge sind durch die Hysterese selten genug.
     private func report(_ job: BrightnessJob) {
-        if case .lux = job.reason {
-            lightLog.info("\(job.logDescription, privacy: .public)")
-        } else {
-            lightLog.notice("\(job.logDescription, privacy: .public)")
-        }
+        lightLog.notice("\(job.logDescription, privacy: .public)")
         onBrightnessJob?(job)
     }
 

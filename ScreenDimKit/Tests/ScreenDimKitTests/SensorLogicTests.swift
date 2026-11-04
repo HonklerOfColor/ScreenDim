@@ -85,6 +85,27 @@ struct PresenceGateTests {
         #expect(PresenceGate.startsAbsence(presence: false, connected: true, sinceLastInput: PresenceGate.inputGrace))
     }
 
+    @Test("Nach dem Aufwachen: von vorn nur ohne Eingabe kurz vor oder nach dem Aufwachen")
+    func restartsAfterWake() {
+        let settle = Duration.seconds(2)
+        func restarts(presence: Bool? = false, connected: Bool = true, sinceLastInput: Duration) -> Bool {
+            PresenceGate.restartsAbsenceAfterWake(
+                presence: presence, connected: connected, sinceLastInput: sinceLastInput, sinceWake: settle
+            )
+        }
+        // Eine Mitteilung hat geweckt: letzte Eingabe vor zehn Minuten.
+        #expect(restarts(sinceLastInput: .seconds(600)))
+        // Die Maus hat geweckt (kurz davor), oder jemand tippt danach.
+        #expect(!restarts(sinceLastInput: settle + .milliseconds(100)))
+        #expect(!restarts(sinceLastInput: .seconds(1)))
+        // Schonfrist vor dem Aufwachen genau abgelaufen.
+        #expect(restarts(sinceLastInput: settle + PresenceGate.inputGrace))
+        // Jemand da, unbekannt oder getrennt.
+        #expect(!restarts(presence: true, sinceLastInput: .seconds(600)))
+        #expect(!restarts(presence: nil, sinceLastInput: .seconds(600)))
+        #expect(!restarts(connected: false, sinceLastInput: .seconds(600)))
+    }
+
     @Test("Veraltet nach 30 s Stille oder ohne Verbindung")
     func stale() {
         #expect(!PresenceGate.isStale(connected: true, lastEventAge: .seconds(29)))

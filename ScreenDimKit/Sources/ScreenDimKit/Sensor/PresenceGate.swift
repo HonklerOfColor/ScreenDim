@@ -18,6 +18,20 @@ public enum PresenceGate {
         presence == false && connected && sinceLastInput >= inputGrace
     }
 
+    /// Nach dem Aufwachen der Displays die Abwesenheit von vorn beginnen? Wie
+    /// `startsAbsence`, nur zählt die Schonfrist bis zum Aufwachen: Eine Eingabe kurz davor
+    /// oder danach hat sie geweckt, dann ist jemand da. Ohne Eingabe (eine Mitteilung hat
+    /// sie geweckt) bleibt es bei „niemand da“.
+    /// - Parameter sinceWake: Zeit seit dem Aufwachen.
+    public static func restartsAbsenceAfterWake(
+        presence: Bool?,
+        connected: Bool,
+        sinceLastInput: Duration,
+        sinceWake: Duration
+    ) -> Bool {
+        startsAbsence(presence: presence, connected: connected, sinceLastInput: sinceLastInput - sinceWake)
+    }
+
     /// Bildschirme wieder an, weil der Sensor nichts mehr meldet?
     public static func isStale(connected: Bool, lastEventAge: Duration?) -> Bool {
         guard connected, let lastEventAge else { return true }

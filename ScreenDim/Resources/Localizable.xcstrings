@@ -71,6 +71,16 @@
         }
       }
     },
+    "Alle Displays gehen in den Ruhezustand, auch ein eingebautes. Ob macOS den Mac dabei sperrt, hängt von der Einstellung unter „Sperrbildschirm“ ab." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All displays go to sleep, including a built-in one. Whether macOS locks the Mac depends on your Lock Screen settings."
+          }
+        }
+      }
+    },
     "Anwesend: %lld s" : {
       "localizations" : {
         "en" : {
@@ -81,12 +91,12 @@
         }
       }
     },
-    "Ausschalten" : {
+    "Bei Abwesenheit reagieren" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Turn off"
+            "value" : "React when you're away"
           }
         }
       }
@@ -107,6 +117,66 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dim displays when you're inactive"
+          }
+        }
+      }
+    },
+    "Der Sensor zeigt Anwesenheit weiter an, ScreenDim dunkelt aber nichts ab, schaltet nichts aus und weckt nichts." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The sensor still shows presence, but ScreenDim doesn't dim, turn off or wake anything."
+          }
+        }
+      }
+    },
+    "Displays aus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Displays off"
+          }
+        }
+      }
+    },
+    "Ein Monitor wird ignoriert und muss an bleiben. Deshalb schlafen die Displays nicht; die übrigen schaltet ScreenDim nur per Software schwarz. Gesperrt wird der Mac dabei nicht." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A monitor is ignored and has to stay on, so the displays don't sleep; ScreenDim only blacks out the others in software. The Mac isn't locked."
+          }
+        }
+      }
+    },
+    "Meldet der Sensor niemanden, dunkelt ScreenDim die Bildschirme ab und schaltet sie nach der gewählten Zeit aus. Kommst du zurück, gehen sie wieder an; Maus und Tastatur holen sie jederzeit zurück." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When the sensor reports nobody, ScreenDim dims the screens and turns them off after the selected time. When you come back, they turn on again; mouse and keyboard bring them back at any time."
+          }
+        }
+      }
+    },
+    "Nach %lld s" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "After %lld s"
+          }
+        }
+      }
+    },
+    "Sperrbildschirm …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock Screen…"
           }
         }
       }
@@ -177,16 +247,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Idle ended"
-          }
-        }
-      }
-    },
-    "Meldet der Sensor niemanden, dunkelt ScreenDim die Bildschirme ab und schaltet sie später aus, so wie macOS nach der Zeit aus den Systemeinstellungen. Kommst du zurück, gehen sie wieder an; Maus und Tastatur holen sie jederzeit zurück. Verlangt macOS danach ein Passwort, ist der Mac gesperrt. Ist ein Monitor auf „Ignorieren“ gestellt, bleiben die Displays an und die übrigen werden schwarz." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "When the sensor reports nobody, ScreenDim dims the screens and later turns them off, just like macOS does after the time set in System Settings. When you come back, they turn on again; mouse and keyboard bring them back at any time. If macOS asks for a password afterwards, the Mac is locked. If a monitor is set to “Ignore”, the displays stay on and the others turn black."
           }
         }
       }
@@ -898,26 +958,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "EDID"
-          }
-        }
-      }
-    },
-    "Eingebauter Lichtsensor" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Built-in light sensor"
-          }
-        }
-      }
-    },
-    "Eingebauter Sensor, sonst Schreibtisch-Sensor" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Built-in sensor, else desk sensor"
           }
         }
       }
@@ -1858,26 +1898,6 @@
         }
       }
     },
-    "Nur eingebauter Lichtsensor" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Built-in light sensor only"
-          }
-        }
-      }
-    },
-    "Nur Schreibtisch-Sensor" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Desk sensor only"
-          }
-        }
-      }
-    },
     "Overlay" : {
       "localizations" : {
         "en" : {
@@ -2010,16 +2030,6 @@
         }
       }
     },
-    "Rückfall" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fallback"
-          }
-        }
-      }
-    },
     "Schalte dafür im Tab „Sensor“ den Schreibtisch-Sensor oder den Demo-Modus ein." : {
       "localizations" : {
         "en" : {
@@ -2096,16 +2106,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Use desk sensor"
-          }
-        }
-      }
-    },
-    "Schreibtisch-Sensor, sonst eingebauter" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Desk sensor, else built-in"
           }
         }
       }
@@ -2218,16 +2218,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Simulates presence and ambient light without any hardware. Turns off again at the next launch."
-          }
-        }
-      }
-    },
-    "Sofort" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Immediately"
           }
         }
       }

@@ -24,9 +24,7 @@ public enum SensorEvent: Equatable, Sendable {
     case heartbeat
 }
 
-/// Quelle für Sensorereignisse: der echte Sensor (SSE), die Simulation oder (per Fabrik,
-/// derzeit ungenutzt) der eingebaute Lichtsensor des Macs, der nur `.connection(.connected)`
-/// und `.lux` meldet.
+/// Quelle für Sensorereignisse: der echte Sensor (SSE) oder die Simulation.
 public protocol SensorSource: AnyObject, Sendable {
     /// Jeder Aufruf startet einen eigenen Strom. Beenden des Konsumenten beendet die Quelle.
     func events() -> AsyncStream<SensorEvent>
@@ -44,6 +42,7 @@ public enum SensorProtocol {
 
 /// Links rund um den Sensor.
 public enum SensorLinks {
-    // TODO: Platzhalter. Vor der Veröffentlichung durch die echte Bauanleitung ersetzen.
-    public static let flashPage = URL(string: "https://screendim.example.com/sensor/")!
+    /// Bauanleitung für den Sensor. `nil`, solange keine veröffentlicht ist; dann zeigen
+    /// die Einstellungen keinen Link.
+    public static let flashPage: URL? = nil
 }
