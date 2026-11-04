@@ -243,6 +243,36 @@ struct SensorControllerTests {
         #expect(manager.dimCauses.isEmpty)
     }
 
+    @Test("Annäherung weckt schlafende Displays immer, auch ohne Abwesenheit; nicht die erste Meldung nach dem Verbinden")
+    func arrivalAlwaysWakes() async {
+        let controller = makeController()
+        var arrivals = 0
+        controller.onArrival = { arrivals += 1 }
+        controller.start()
+        // Displays schlafen schon, der Sensor meldet beim Verbinden jemanden: kein Wecken.
+        controller.screensDidSleep()
+        source.send(.connection(.connected), .presence(true))
+        #expect(await eventually { controller.presence == true })
+        #expect(displaySleep.wakes == 0)
+        #expect(arrivals == 0)
+
+        // Gerade getippt: Die Abwesenheit beginnt nicht. Später zurück: trotzdem wecken.
+        input.timeSinceLastInput = .seconds(1)
+        source.send(.presence(false))
+        #expect(await eventually { controller.presence == false })
+        #expect(controller.absenceStage == .none)
+        source.send(.presence(true))
+        #expect(await eventually { displaySleep.wakes == 1 })
+        #expect(controller.absenceStage == .none)
+        #expect(arrivals == 1)
+
+        // Wach: nichts zu wecken.
+        controller.screensDidWake()
+        source.send(.presence(false), .presence(true))
+        #expect(await eventually { arrivals == 2 })
+        #expect(displaySleep.wakes == 1)
+    }
+
     @Test("macOS schaltet aus: nichts mehr dimmen oder warten, die Rückkehr weckt")
     func macOSSleepsDisplays() async {
         let controller = makeController()

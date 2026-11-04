@@ -582,7 +582,13 @@ public final class SensorController {
             let previous = presence
             presence = present
             if present {
+                // Annäherung weckt schlafende Displays immer, auch ohne Abwesenheit von
+                // ScreenDim (etwa nach „Eingabe gewinnt“, oder macOS hat ausgeschaltet).
+                // Nur beim Wechsel von „abwesend“, nicht bei der ersten Meldung nach dem
+                // Verbinden.
+                let wakesWithoutAbsence = previous == false && displaysAsleep && absenceStage == .none
                 returnFromAbsence(wake: true)
+                if wakesWithoutAbsence { displaySleep.wakeDisplays() }
                 if previous == false { onArrival?() }
             } else if previous != present, PresenceGate.startsAbsence(
                 presence: present,

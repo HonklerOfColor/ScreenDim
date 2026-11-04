@@ -79,7 +79,9 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
   nur per Taste wieder an, Dock-Hänger). Vorher prüft sie, ob es seit dem Abdunkeln eine
   Eingabe gab (Tasten ohne Bedienungshilfen, Kürzel). Die Rückkehr weckt die Displays;
   Helligkeit erst nach `screensDidWake` und 2 s, denn DDC an schlafende Monitore scheitert.
-  Schlafen sie schon (macOS), wird nichts gedimmt, die Rückkehr weckt sie trotzdem.
+  Schlafen sie schon (macOS), wird nichts gedimmt, die Rückkehr weckt sie trotzdem. Jeder
+  Wechsel von „abwesend“ zu „anwesend“ weckt schlafende Displays, auch ohne Abwesenheit
+  von ScreenDim (etwa nach „Eingabe gewinnt“); die erste Meldung nach dem Verbinden nicht.
 - `ScreenDim/` (App): `App/` (Einstieg, Fabrik für DDC), `UI/` (Menü, Einstellungen,
   Sensor-Diagnose, DDC-Diagnose), `System/` (Tastenkürzel, Login-Item, `IOAVService`),
   `Resources/` (Asset-Katalog, String-Katalog, Privacy-Manifest).
