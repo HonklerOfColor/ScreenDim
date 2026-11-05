@@ -160,8 +160,10 @@ Die Grenze hat eine Hysterese von 20 cm (`presence_distance_hysteresis`): „Abw
 zählt erst ab Max Distance + 20 cm, „anwesend“ wieder ab Max Distance. Wer genau an der
 Grenze sitzt oder sich zurücklehnt, flackert so nicht zwischen beiden hin und her.
 
-Einstellen in der Weboberfläche des Sensors (`http://screendim-desk-xxxxxx.local`, Login
-`screendim`, Passwort der Kopplungscode ohne Bindestrich):
+Einstellen in der App unter Einstellungen → Sensor, Zeile **Anwesend bis** (darunter die
+gerade gemessene Entfernung), oder in der Weboberfläche des Sensors
+(`http://screendim-desk-xxxxxx.local`, Login `screendim`, Passwort der Kopplungscode ohne
+Bindestrich):
 
 - **Distance** zeigt, wie weit das Radar dich gerade sieht (leer: niemand erkannt).
 - **Max Distance** (30–800 cm) bleibt über Neustarts gespeichert. Setz die Grenze etwa
@@ -184,8 +186,10 @@ Feste Angaben in `ScreenDimKit/Sources/ScreenDimKit/Sensor/SensorEvent.swift`
 - `GET /events`: SSE mit `state` (`binary_sensor/Presence`, `sensor/Ambient Light`) und
   `ping` alle 10 s
 - `GET /binary_sensor/Presence`, `GET /sensor/Ambient Light`,
-  `GET /text_sensor/Pairing Code`; `sensor/Distance` und `number/Max Distance` kommen im
-  SSE-Strom mit, die App übergeht sie
+  `GET /text_sensor/Pairing Code`
+- `sensor/Distance` und `number/Max Distance` im SSE-Strom (Max Distance beim Verbinden
+  mit `min_value`, `max_value`, `step`); die App zeigt beide unter „Anwesend bis“ und setzt
+  Max Distance per `POST /number/Max Distance/set?value=<cm>` (Digest-Login)
 - Lux kommt bei 3 % Änderung, sonst alle 30 s: Nach 45 s ohne Ereignis gilt der Sensor
   in der App als ausgefallen, und die Lichtregelung stoppt.
 

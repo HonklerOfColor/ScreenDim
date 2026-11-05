@@ -3,7 +3,8 @@ import ScreenDimKit
 import SwiftUI
 
 /// Einstellungsfenster in drei Tabs: „Allgemein“ (Login, Tastenkürzel, Leerlauf, Monitore),
-/// „Sensor“ (Kopplung, Demo, Diagnose) und „Licht“ (Umgebungslicht, Kurven je Monitor).
+/// „Sensor“ (Kopplung, Reichweite, Abwesenheit, Demo, Diagnose) und „Licht“ (Umgebungslicht,
+/// Kurven je Monitor). Kein Tab sollte höher als etwa 900 pt werden (MacBook Air 13").
 /// Jeder Tab ist so hoch wie sein Inhalt, gescrollt wird nicht.
 struct SettingsView: View {
     let sensor: SensorController
@@ -381,6 +382,86 @@ private struct SensorSection: View {
             if needed { browser.start() } else { browser.stop() }
         }
         .onDisappear { browser.stop() }
+    }
+}
+
+/// „Anwesend bis“: Bis zu dieser Entfernung zählt jemand als anwesend („Max Distance“ der
+/// Firmware, gespeichert im Sensor). Feld und Stepper zeigen bis zur Bestätigung durch den
+/// Sensor den gewählten Wert, danach wieder den des Sensors. Darunter klein die Entfernung
+/// laut Radar; eine Zeile statt eines eigenen Abschnitts, damit der Tab nicht wächst.
+private struct MaxDistanceRow: View {
+    let sensor: SensorController
+    let setting: SensorNumber
+    /// Gewählt, vom Sensor noch nicht bestätigt.
+    @State private var draft: Double?
+
+    private var range: ClosedRange<Double> { setting.range ?? SensorProtocol.maxDistanceRange }
+    private var step: Double { setting.step ?? SensorProtocol.maxDistanceStep }
+
+    var body: some View {
+        let value = Binding<Double>(
+            get: { draft ?? setting.value },
+            set: { new in
+                let normalized = SensorController.normalize(new, range: range, step: step)
+                draft = normalized == setting.value ? nil : normalized
+                sensor.setMaxDistance(normalized)
+            }
+        )
+        LabeledContent {
+            HStack(spacing: 6) {
+                if sensor.maxDistanceWrite == .saving {
+                    ProgressView().controlSize(.small)
+                }
+                TextField("Anwesend bis", value: value, format: .number.precision(.fractionLength(0)).grouping(.never))
+                    .labelsHidden()
+                    .multilineTextAlignment(.trailing)
+                    .monospacedDigit()
+                    .frame(width: 56)
+                Text(verbatim: "cm")
+                Stepper("Anwesend bis", value: value, in: range, step: step)
+                    .labelsHidden()
+            }
+        } label: {
+            Text("Anwesend bis")
+            MeasuredDistance(sensor: sensor)
+        }
+        .help("Bis zu dieser Entfernung zählt jemand als anwesend; „abwesend“ meldet der Sensor erst etwas weiter weg, damit es an der Grenze nicht flackert. Setz sie etwa 30–50 cm über den gemessenen Wert, während du normal sitzt. Gespeichert wird im Sensor („Max Distance“ in seiner Weboberfläche).")
+        // Bestätigt oder anderswo geändert (Weboberfläche): Es gilt der Wert des Sensors.
+        .onChange(of: setting.value) { draft = nil }
+        .onChange(of: sensor.maxDistanceWrite) { _, write in
+            if case .failed = write { draft = nil }
+        }
+        if case .failed(let failure) = sensor.maxDistanceWrite {
+            Label(failureText(failure), systemImage: "exclamationmark.triangle")
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func failureText(_ failure: SensorController.SettingWriteFailure) -> LocalizedStringKey {
+        switch failure {
+        case .unauthorized: "Nicht gespeichert: Der Sensor lehnt den Code ab."
+        case .unsupported: "Nicht gespeichert: Die Firmware des Sensors kennt die Einstellung nicht. Aktualisiere sie."
+        case .unreachable: "Nicht gespeichert: Der Sensor ist nicht erreichbar."
+        }
+    }
+}
+
+/// Entfernung laut Radar. Eigene View: Sie ändert sich alle 2 s, der Rest des Tabs nicht.
+private struct MeasuredDistance: View {
+    let sensor: SensorController
+
+    var body: some View {
+        Group {
+            if let distance = sensor.distance {
+                Text("Gerade gemessen: \(Int(distance.rounded())) cm").monospacedDigit()
+            } else {
+                Text("Gerade gemessen: niemand erkannt")
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 }
 
@@ -858,6 +939,9 @@ private struct SensorReadings: View {
             case false?: Text("Abwesend")
             case nil: Text(verbatim: "–")
             }
+        }
+        if let maxDistance = sensor.maxDistance {
+            MaxDistanceRow(sensor: sensor, setting: maxDistance)
         }
         LabeledContent("Umgebungslicht") {
             if let lux = sensor.lux {

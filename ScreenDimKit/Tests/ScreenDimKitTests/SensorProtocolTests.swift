@@ -102,6 +102,28 @@ struct ServerSentEventsTests {
         #expect(event("kein json") == nil)
     }
 
+    @Test("Max Distance: beim Verbinden mit Bereich und Schritt (als Text), danach nur der Wert")
+    func maxDistance() {
+        #expect(event(#"{"id":"number/Max Distance","name":"Max Distance","value":"120","state":"120 cm","min_value":"30","max_value":"800","step":"10","mode":2,"uom":"cm"}"#)
+            == .maxDistance(SensorNumber(value: 120, range: 30...800, step: 10)))
+        #expect(event(#"{"id":"number/Max Distance","value":"150","state":"150 cm"}"#)
+            == .maxDistance(SensorNumber(value: 150)))
+        #expect(event(#"{"id":"number-max_distance","value":90,"state":"90 cm"}"#) == .maxDistance(SensorNumber(value: 90)))
+        #expect(event(#"{"id":"number/Max Distance","state":"200 cm"}"#) == .maxDistance(SensorNumber(value: 200)))
+        // NaN (Wert noch nicht gesetzt) und unsinnige Grenzen.
+        #expect(event(#"{"id":"number/Max Distance","value":"NaN","state":"NA"}"#) == nil)
+        #expect(event(#"{"id":"number/Max Distance","value":"120","min_value":"800","max_value":"30"}"#)
+            == .maxDistance(SensorNumber(value: 120)))
+    }
+
+    @Test("Entfernung: Zahl in cm; niemand erkannt (null, NA) heißt nil")
+    func distance() {
+        #expect(event(#"{"id":"sensor/Distance","value":85,"state":"85 cm"}"#) == .distance(85))
+        #expect(event(#"{"id":"sensor-distance","value":42.0,"state":"42 cm"}"#) == .distance(42))
+        #expect(event(#"{"id":"sensor/Distance","value":null,"state":"NA"}"#) == .distance(nil))
+        #expect(event(#"{"id":"sensor/Distance","state":"NA"}"#) == .distance(nil))
+    }
+
     @Test("Object-ID aus dem Pfad")
     func objectID() {
         #expect(ESPHomeEvents.objectID(forPath: "sensor/Ambient Light") == "sensor-ambient_light")
@@ -113,6 +135,10 @@ struct ServerSentEventsTests {
         let endpoint = SensorEndpoint(hostname: "screendim-desk-a1b2c3.local")
         #expect(endpoint.url(SensorProtocol.luxPath).absoluteString == "http://screendim-desk-a1b2c3.local/sensor/Ambient%20Light")
         #expect(endpoint.url(SensorProtocol.eventsPath).absoluteString == "http://screendim-desk-a1b2c3.local/events")
+        #expect(endpoint.url(
+            SensorProtocol.setPath(SensorProtocol.maxDistancePath),
+            query: [URLQueryItem(name: "value", value: "150")]
+        ).absoluteString == "http://screendim-desk-a1b2c3.local/number/Max%20Distance/set?value=150")
     }
 
     @Test("Bonjour-Dienst → Sensor")

@@ -384,30 +384,59 @@ final class StubSensorSource: SensorSource {
 }
 
 /// HTTP ohne Netz: Antworten je Pfad (`sensor/Ambient Light`), der Reihe nach; danach
-/// `.unreachable`.
+/// `.unreachable`. POST hat eigene Antworten (`enqueuePost`).
 final class StubSensorHTTP: SensorHTTP {
+    struct Post: Equatable {
+        var path: String
+        var query: String?
+        var password: String?
+    }
+
     private struct State {
         var responses: [String: [SensorResponse]] = [:]
+        var postResponses: [String: [SensorResponse]] = [:]
         var requests: [(path: String, password: String?)] = []
+        var posts: [Post] = []
     }
 
     private let state = Mutex(State())
 
     var requests: [(path: String, password: String?)] { state.withLock { $0.requests } }
+    var posts: [Post] { state.withLock { $0.posts } }
 
     func enqueue(_ response: SensorResponse, for path: String) {
         state.withLock { $0.responses[path, default: []].append(response) }
     }
 
+    func enqueuePost(_ response: SensorResponse, for path: String) {
+        state.withLock { $0.postResponses[path, default: []].append(response) }
+    }
+
     func get(_ url: URL, password: String?) async -> SensorResponse {
-        let path = String(url.path().removingPercentEncoding?.dropFirst() ?? "")
+        let path = Self.path(of: url)
         return state.withLock { state in
             state.requests.append((path, password))
-            guard var queue = state.responses[path], !queue.isEmpty else { return .unreachable }
-            let response = queue.removeFirst()
-            state.responses[path] = queue
-            return response
+            return Self.next(from: &state.responses, path: path)
         }
+    }
+
+    func post(_ url: URL, password: String?) async -> SensorResponse {
+        let path = Self.path(of: url)
+        return state.withLock { state in
+            state.posts.append(Post(path: path, query: url.query(), password: password))
+            return Self.next(from: &state.postResponses, path: path)
+        }
+    }
+
+    private static func path(of url: URL) -> String {
+        String(url.path().removingPercentEncoding?.dropFirst() ?? "")
+    }
+
+    private static func next(from responses: inout [String: [SensorResponse]], path: String) -> SensorResponse {
+        guard var queue = responses[path], !queue.isEmpty else { return .unreachable }
+        let response = queue.removeFirst()
+        responses[path] = queue
+        return response
     }
 }
 

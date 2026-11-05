@@ -9,16 +9,17 @@ public struct SensorEndpoint: Equatable, Hashable, Sendable {
     }
 
     /// `sensor/Ambient Light` → `http://<host>/sensor/Ambient%20Light`
-    public func url(_ path: String) -> URL {
+    public func url(_ path: String, query: [URLQueryItem] = []) -> URL {
         var components = URLComponents()
         components.scheme = "http"
         components.host = hostname
         components.path = "/" + path
+        if !query.isEmpty { components.queryItems = query }
         return components.url!
     }
 }
 
-/// Antwort einer einfachen GET-Anfrage an den Sensor.
+/// Antwort einer einfachen Anfrage an den Sensor.
 public enum SensorResponse: Equatable, Sendable {
     case ok(Data)
     /// 401: Login nötig bzw. Code falsch.
@@ -29,9 +30,11 @@ public enum SensorResponse: Equatable, Sendable {
     case unreachable
 }
 
-/// GET an den Sensor, wahlweise mit Digest-Login. In Tests ersetzbar.
+/// GET und POST an den Sensor, wahlweise mit Digest-Login. In Tests ersetzbar.
 public protocol SensorHTTP: Sendable {
     func get(_ url: URL, password: String?) async -> SensorResponse
+    /// POST ohne Rumpf; die Werte stehen in der Query (ESPHome: `…/set?value=…`).
+    func post(_ url: URL, password: String?) async -> SensorResponse
 }
 
 /// Beantwortet die Digest-Abfrage des Sensors mit dem Kopplungscode. Basic lehnt sie ab:
@@ -96,8 +99,18 @@ public final class URLSessionSensorHTTP: SensorHTTP {
     }
 
     public func get(_ url: URL, password: String?) async -> SensorResponse {
+        await send(URLRequest(url: url), password: password)
+    }
+
+    public func post(_ url: URL, password: String?) async -> SensorResponse {
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        return await send(request, password: password)
+    }
+
+    private func send(_ request: URLRequest, password: String?) async -> SensorResponse {
         do {
-            let (data, response) = try await session.data(from: url, delegate: DigestDelegate(password: password))
+            let (data, response) = try await session.data(for: request, delegate: DigestDelegate(password: password))
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             switch status {
             case 200: return .ok(data)

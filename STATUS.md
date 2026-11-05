@@ -24,6 +24,13 @@ Auf echter Hardware noch nicht geprüft. Die Tests decken nur die Logik ab.
 - [ ] Signiert (Developer ID, Hardened Runtime): Gamma-Tabelle, Tastenkürzel, Login-Item
       und `IOAVService` funktionieren.
 
+### Schreibtisch-Sensor (XIAO, Firmware 0.1.0)
+- [x] „Anwesend bis“ (2026-11-05, XIAO): zeigt den Wert des Sensors (120 cm),
+      „Gerade gemessen“ folgt dem Radar; Stepper schreibt genau einen Wert (130, dann
+      120), Log „Max Distance … cm“, der Sensor meldet ihn im Strom zurück.
+- [ ] „Anwesend bis“ offen: Änderung in der Weboberfläche erscheint in der App; Feld per
+      Tastatur; Sensor aus: Zeile verschwindet; Sensor-Tab passt auf ein MacBook Air 13".
+
 ### Dock-Betrieb (StarTech TB4, Realtek-MST)
 - [ ] Gespeicherte Werte: Wechsel direkt ↔ Dock ohne doppelte Abdunklung.
 

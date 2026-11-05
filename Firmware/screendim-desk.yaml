@@ -7,9 +7,10 @@
 # - Webserver mit Digest-Login, Nutzer `screendim`, Passwort = Kopplungscode.
 #   `GET /events` (SSE, Ping alle 10 s), `GET /binary_sensor/Presence`,
 #   `GET /sensor/Ambient Light`, `GET /text_sensor/Pairing Code`.
-#   Dazu für die Weboberfläche: `sensor/Distance` (Entfernung laut Radar) und
+#   Dazu `sensor/Distance` (Entfernung laut Radar, die App zeigt sie an) und
 #   `number/Max Distance` (bis dahin zählt jemand als anwesend; „abwesend“ erst ab
-#   20 cm darüber).
+#   20 cm darüber). Die App liest beides aus dem SSE-Strom und setzt Max Distance per
+#   `POST /number/Max Distance/set?value=…`; Name und Bereich müssen dazu passen.
 # - BOOT kurz drücken: Kopplungsfenster (2 min, LED pulsiert blau): Der Code ist ohne
 #   Login abrufbar; alles andere bleibt hinter dem Login.
 #   BOOT 10 s halten: neuer Code, alte Kopplung ungültig, danach Kopplungsfenster.
@@ -30,8 +31,8 @@ substitutions:
   led_pin: GPIO48
   # Zusätzlich zur Abfallverzögerung im Radar
   presence_off_delay: 5s
-  # Anwesend nur bis zu dieser Entfernung (cm); änderbar in der Weboberfläche
-  # („Max Distance“), gemerkt über Neustarts.
+  # Anwesend nur bis zu dieser Entfernung (cm); änderbar in der App (Einstellungen →
+  # Sensor → „Anwesend bis“) oder der Weboberfläche („Max Distance“), gemerkt über Neustarts.
   presence_max_distance: "120"
   # Hysterese der Entfernung (cm): „abwesend“ erst ab Max Distance + diesem Wert,
   # „anwesend“ wieder ab Max Distance. Sonst flackert die Anwesenheit, wenn jemand
@@ -183,7 +184,7 @@ i2c:
 
 sensor:
   # Entfernung der Person laut Radar, zum Einstellen von „Max Distance“; leer, wenn das
-  # Radar niemanden sieht oder nichts meldet. Die App liest es nicht.
+  # Radar niemanden sieht oder nichts meldet. Die App zeigt sie unter „Anwesend bis“.
   - platform: template
     id: distance
     name: Distance

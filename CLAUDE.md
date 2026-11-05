@@ -48,7 +48,8 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
     Standard aus), `DisplaySleep` (Display-Ruhezustand von macOS: `pmset displaysleepnow`,
     Wecken per `IOPMAssertionDeclareUserActivity`; öffentliche API).
   - `Sensor/`: optionaler Schreibtisch-Sensor. `SensorController` (Einstellungen, Kopplung,
-    Quelle, Abwesenheit in zwei Stufen, Lux → Helligkeit),
+    Quelle, Abwesenheit in zwei Stufen, Lux → Helligkeit, Reichweite: `maxDistance` und
+    `distance` aus dem SSE-Strom, `setMaxDistance` per `POST …/set`, entprellt),
     `SensorSource` mit `SSESensorSource` (Digest, SSE, Backoff) und
     `SimulatedSensorSource` (Demo), `SensorBrowser` (NWBrowser), `SensorKeychain`,
     `PairingCode`, `SSEParser`/`ESPHomeEvents`, `PresenceGate`, `SensorDebug`

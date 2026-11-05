@@ -53,6 +53,15 @@
   im NVS, BOOT kurz = Kopplungsfenster 2 min, BOOT 10 s = neuer Code, Digest-Login,
   mDNS `_screendim._tcp`, WLAN per Captive Portal oder Improv. UART des Radars wird
   vorerst nur mitgeloggt.
+- Reichweite in der App (Einstellungen → Sensor, Zeile „Anwesend bis“ unter
+  „Anwesenheit“): stellt „Max Distance“ des Sensors direkt ein (Feld und Stepper,
+  30–800 cm in 10er-Schritten, Grenzen laut Firmware), darunter klein die gerade gemessene
+  Entfernung, die Erklärung als Tooltip. Eine Zeile statt eines eigenen Abschnitts, damit
+  der Tab kaum wächst. Die Weboberfläche des Sensors braucht es dafür nicht mehr. Die App
+  liest beides aus dem SSE-Strom und schreibt per `POST /number/Max Distance/set` mit dem
+  Digest-Login; schnelle Änderungen gehen nach 0,5 s als ein Write raus. Gilt erst, wenn
+  der Sensor den Wert zurückmeldet; scheitert der Write, steht der Grund darunter. Keine
+  neue Firmware nötig. Am XIAO geprüft (130 cm und zurück auf 120 cm).
 - Reichweite der Anwesenheit (Firmware): Anwesend ist nur, wer innerhalb von „Max
   Distance“ sitzt (Standard 120 cm, 30–800 cm, in der Weboberfläche des Sensors änderbar
   und gemerkt). Die Firmware wertet dafür die Textzeilen des Radars aus (`ON`/`OFF`,

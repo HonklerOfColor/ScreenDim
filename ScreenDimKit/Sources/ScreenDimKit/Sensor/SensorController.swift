@@ -37,6 +37,24 @@ public final class SensorController {
         case off
     }
 
+    /// Stand des letzten Schreibens einer Einstellung in den Sensor („Max Distance“).
+    public enum SettingWrite: Equatable, Sendable {
+        case idle
+        /// Wartet auf weitere Änderungen (Stepper) oder auf die Antwort des Sensors.
+        case saving
+        /// Nicht gespeichert; im Sensor gilt der bisherige Wert.
+        case failed(SettingWriteFailure)
+    }
+
+    public enum SettingWriteFailure: Equatable, Sendable {
+        /// Der Sensor lehnt den Code ab (401).
+        case unauthorized
+        /// Die Firmware kennt die Einstellung nicht (404, ältere Firmware).
+        case unsupported
+        /// Keine Antwort, Zeitüberschreitung oder anderer HTTP-Status.
+        case unreachable
+    }
+
     /// Wie weit die Abwesenheit die Bildschirme zurückgenommen hat.
     public enum AbsenceStage: Equatable, Sendable {
         /// Niemand weg, oder Eingabe hat gewonnen.
@@ -137,6 +155,9 @@ public final class SensorController {
     public static let defaultAbsenceOffDelay: Duration? = .seconds(5 * 60)
     public static let absenceLevelRange: ClosedRange<Double> = 0...50
     public static let defaultAbsenceLevel: Double = 5
+    /// So lange sammelt `setMaxDistance` Änderungen, bevor es schreibt: Klicks auf den
+    /// Stepper gehen als ein Write raus.
+    public static let settingWriteDelay: Duration = .milliseconds(500)
 
     public private(set) var status: Status = .off
     public private(set) var pairing: Pairing = .idle
@@ -157,6 +178,13 @@ public final class SensorController {
     public private(set) var isDeskSensorLightAvailable = false
     /// Zeit des letzten Ereignisses vom Schreibtisch-Sensor bzw. der Demo.
     public private(set) var lastEventDate: Date?
+    /// „Max Distance“ des verbundenen Sensors (cm): Bis dahin zählt jemand als anwesend.
+    /// `nil` ohne Verbindung, in der Demo und bei Firmware ohne die Einstellung.
+    public private(set) var maxDistance: SensorNumber?
+    /// Entfernung der Person laut Radar (cm); `nil`, wenn es niemanden sieht oder ohne
+    /// Verbindung. Hilft beim Wählen von `maxDistance`.
+    public private(set) var distance: Double?
+    public private(set) var maxDistanceWrite: SettingWrite = .idle
     /// Letzte Helligkeit aus dem Licht je angeschlossenem Monitor und woher das Licht kam.
     public private(set) var lightLevels: [LightLevel] = []
     public private(set) var lightBrightnessOrigin: SensorOrigin?
@@ -224,6 +252,11 @@ public final class SensorController {
 
     @ObservationIgnored private var simulation: SimulatedSensorSource?
     @ObservationIgnored private var sourceTask: Task<Void, Never>?
+    /// Adresse und Code der laufenden echten Quelle, für Writes an den Sensor.
+    @ObservationIgnored private var liveEndpoint: SensorEndpoint?
+    @ObservationIgnored private var liveCode: PairingCode?
+    /// Entprellen und Schreiben von „Max Distance“; ein neuer Wert ersetzt den alten.
+    @ObservationIgnored private var maxDistanceTask: Task<Void, Never>?
     @ObservationIgnored private var pairingTask: Task<Void, Never>?
     @ObservationIgnored private var watchdog: Task<Void, Never>?
     /// Warten bis zum Ausschalten oder, nach dem Aufwachen, bis die Helligkeit zurückkommt.
@@ -500,6 +533,9 @@ public final class SensorController {
         lastEventDate = nil
         lightLevels = []
         lightBrightnessOrigin = nil
+        liveEndpoint = nil
+        liveCode = nil
+        resetSensorSettings()
         returnFromAbsence(wake: false)
 
         let source: any SensorSource
@@ -522,7 +558,10 @@ public final class SensorController {
                 status = .keychainUnavailable(error.status)
                 return
             }
-            source = makeLiveSource(SensorEndpoint(hostname: host), code)
+            let endpoint = SensorEndpoint(hostname: host)
+            source = makeLiveSource(endpoint, code)
+            liveEndpoint = endpoint
+            liveCode = code
             status = .searching
         } else {
             status = isEnabled ? .notPaired : .off
@@ -572,6 +611,7 @@ public final class SensorController {
                 // erst eine Eingabe.
                 lastEventAt = nil
                 presence = nil
+                resetSensorSettings()
                 returnFromAbsence(wake: false)
                 updateActiveLight()
                 return
@@ -616,7 +656,92 @@ public final class SensorController {
             }
         case .heartbeat:
             lastEventAt = now()
+        case .maxDistance(let number):
+            lastEventAt = now()
+            // Nach dem Verbinden kommen Bereich und Schritt mit, danach nur der Wert.
+            let merged = SensorNumber(
+                value: number.value,
+                range: number.range ?? maxDistance?.range,
+                step: number.step ?? maxDistance?.step
+            )
+            if maxDistance != merged { maxDistance = merged }
+        case .distance(let cm):
+            lastEventAt = now()
+            if distance != cm { distance = cm }
         }
+    }
+
+    // MARK: - Einstellungen im Sensor
+
+    /// Setzt „Max Distance“ im Sensor (cm), gerundet auf den Schritt und begrenzt auf den
+    /// Bereich der Firmware. Geschrieben wird erst nach `settingWriteDelay` ohne weitere
+    /// Änderung, es gilt der letzte Wert. Den neuen Wert meldet der Sensor über den
+    /// SSE-Strom zurück. Nur mit verbundenem echtem Sensor, der den Wert gemeldet hat.
+    public func setMaxDistance(_ cm: Double) {
+        guard status == .connected, let current = maxDistance, let endpoint = liveEndpoint, let code = liveCode,
+              cm.isFinite
+        else { return }
+        let value = Self.normalize(
+            cm,
+            range: current.range ?? SensorProtocol.maxDistanceRange,
+            step: current.step ?? SensorProtocol.maxDistanceStep
+        )
+        // Wartet oder läuft schon ein Write, geht auch der bisherige Wert noch einmal raus:
+        // Ein laufender könnte schon angekommen sein.
+        let busy = maxDistanceTask != nil
+        maxDistanceTask?.cancel()
+        maxDistanceTask = nil
+        guard value != current.value || busy else {
+            if maxDistanceWrite != .idle { maxDistanceWrite = .idle }
+            return
+        }
+        maxDistanceWrite = .saving
+        let url = endpoint.url(
+            SensorProtocol.setPath(SensorProtocol.maxDistancePath),
+            query: [URLQueryItem(name: "value", value: value == value.rounded() ? String(Int(value)) : String(value))]
+        )
+        let http = http
+        let wait = wait
+        maxDistanceTask = Task { [weak self] in
+            await wait(Self.settingWriteDelay)
+            guard !Task.isCancelled else { return }
+            let response = await http.post(url, password: code.raw)
+            guard !Task.isCancelled, let self else { return }
+            self.maxDistanceTask = nil
+            switch response {
+            case .ok:
+                sensorLog.notice("Sensor \(endpoint.hostname, privacy: .public): Max Distance \(Int(value)) cm")
+                self.maxDistanceWrite = .idle
+            case .unauthorized:
+                sensorLog.notice("Sensor \(endpoint.hostname, privacy: .public): Max Distance abgelehnt (401)")
+                self.maxDistanceWrite = .failed(.unauthorized)
+            case .status(404):
+                sensorLog.notice("Sensor \(endpoint.hostname, privacy: .public): Max Distance unbekannt (404)")
+                self.maxDistanceWrite = .failed(.unsupported)
+            case .status(let status):
+                sensorLog.notice("Sensor \(endpoint.hostname, privacy: .public): Max Distance, HTTP \(status)")
+                self.maxDistanceWrite = .failed(.unreachable)
+            case .timeout, .unreachable:
+                sensorLog.notice("Sensor \(endpoint.hostname, privacy: .public): Max Distance nicht gesendet, nicht erreichbar")
+                self.maxDistanceWrite = .failed(.unreachable)
+            }
+        }
+    }
+
+    /// Auf den Schritt ab der Untergrenze gerundet, dann in den Bereich. So schreibt
+    /// `setMaxDistance`; die Einstellungen zeigen damit gleich den Wert, der rausgeht.
+    nonisolated public static func normalize(_ value: Double, range: ClosedRange<Double>, step: Double) -> Double {
+        let stepped = step > 0 ? range.lowerBound + ((value - range.lowerBound) / step).rounded() * step : value.rounded()
+        return min(max(stepped, range.lowerBound), range.upperBound)
+    }
+
+    /// Ohne Verbindung gibt es nichts einzustellen; ein offener Write verfällt.
+    private func resetSensorSettings() {
+        maxDistanceTask?.cancel()
+        maxDistanceTask = nil
+        if maxDistance != nil { maxDistance = nil }
+        if distance != nil { distance = nil }
+        if maxDistanceWrite != .idle { maxDistanceWrite = .idle }
     }
 
     private var lastEventAge: Duration? {
@@ -878,6 +1003,8 @@ public final class SensorController {
 
     /// Protokoll der Sensor-Diagnose; nur, solange sie offen ist.
     private func record(_ origin: SensorOrigin, _ event: SensorEvent, stageBefore: AbsenceStage, applied: [LightLevel]) {
+        // Die Entfernung kommt alle 2 s und schaltet nichts; sie verdrängte das Übrige.
+        if case .distance = event { return }
         let effect: SensorDebugEntry.Effect? = if !applied.isEmpty {
             .brightness(applied)
         } else if absenceStage != stageBefore {

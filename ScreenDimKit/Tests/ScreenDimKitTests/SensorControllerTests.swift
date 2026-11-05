@@ -1187,6 +1187,124 @@ struct SensorControllerTests {
         #expect(controller.status == .notPaired)
     }
 
+    private static let maxDistanceSet = "number/Max Distance/set"
+    private static let maxDistanceDetail = SensorNumber(value: 120, range: 30...800, step: 10)
+
+    @Test("Max Distance und Entfernung vom Sensor; Bereich bleibt bei reinen Zustandsmeldungen; Trennen löscht beides")
+    func sensorSettingsFromStream() async {
+        let controller = makeController()
+        controller.start()
+        source.send(.connection(.connected), .maxDistance(Self.maxDistanceDetail), .distance(85))
+        #expect(await eventually { controller.distance == 85 })
+        #expect(controller.maxDistance == Self.maxDistanceDetail)
+
+        source.send(.maxDistance(SensorNumber(value: 150)), .distance(nil))
+        #expect(await eventually { controller.distance == nil })
+        #expect(controller.maxDistance == SensorNumber(value: 150, range: 30...800, step: 10))
+        // Die Entfernung kommt alle 2 s; sie zählt als Lebenszeichen, nicht im Protokoll.
+        controller.setDebugMonitoring(true)
+        source.send(.distance(60), .presence(true))
+        #expect(await eventually { controller.presence == true })
+        #expect(controller.debugLog.map(\.kind) == [.event(.deskSensor, .presence(true))])
+
+        source.send(.connection(.searching))
+        #expect(await eventually { controller.maxDistance == nil })
+        #expect(controller.distance == nil)
+        controller.stop()
+    }
+
+    @Test("Max Distance setzen: entprellt, auf den Schritt gerundet, ein POST mit Code; der Sensor meldet zurück")
+    func setMaxDistance() async {
+        let controller = makeController()
+        var started = sleeper.started.makeAsyncIterator()
+        controller.start()
+        source.send(.connection(.connected), .maxDistance(Self.maxDistanceDetail))
+        #expect(await eventually { controller.maxDistance != nil })
+        http.enqueuePost(.ok(Data()), for: Self.maxDistanceSet)
+
+        // Gleicher Wert: nichts zu tun.
+        controller.setMaxDistance(120)
+        #expect(controller.maxDistanceWrite == .idle)
+
+        controller.setMaxDistance(130)
+        controller.setMaxDistance(144)
+        #expect(controller.maxDistanceWrite == .saving)
+        #expect(await started.next() == SensorController.settingWriteDelay)
+        #expect(await started.next() == SensorController.settingWriteDelay)
+        #expect(http.posts.isEmpty)
+        sleeper.wake()
+        #expect(await eventually { controller.maxDistanceWrite == .idle })
+        #expect(http.posts == [StubSensorHTTP.Post(path: Self.maxDistanceSet, query: "value=140", password: Self.code.raw)])
+        // Den neuen Wert bestätigt der Sensor im Strom.
+        #expect(controller.maxDistance?.value == 120)
+        source.send(.maxDistance(SensorNumber(value: 140)))
+        #expect(await eventually { controller.maxDistance?.value == 140 })
+        controller.stop()
+    }
+
+    @Test("Max Distance: Bereich begrenzt; abgelehnt, unbekannt oder unerreichbar heißt „nicht gespeichert“", arguments: [
+        (SensorResponse.unauthorized, SensorController.SettingWriteFailure.unauthorized),
+        (.status(404), .unsupported),
+        (.status(500), .unreachable),
+        (.timeout, .unreachable),
+    ])
+    func setMaxDistanceFails(_ response: SensorResponse, _ failure: SensorController.SettingWriteFailure) async {
+        let controller = makeController()
+        var started = sleeper.started.makeAsyncIterator()
+        controller.start()
+        source.send(.connection(.connected), .maxDistance(Self.maxDistanceDetail))
+        #expect(await eventually { controller.maxDistance != nil })
+        http.enqueuePost(response, for: Self.maxDistanceSet)
+
+        controller.setMaxDistance(5000)
+        _ = await started.next()
+        sleeper.wake()
+        #expect(await eventually { controller.maxDistanceWrite == .failed(failure) })
+        #expect(http.posts.map(\.query) == ["value=800"])
+        #expect(controller.maxDistance?.value == 120)
+        // Zurück auf den Wert des Sensors: Der Fehler ist erledigt.
+        controller.setMaxDistance(120)
+        #expect(controller.maxDistanceWrite == .idle)
+        controller.stop()
+    }
+
+    @Test("Max Distance: ohne Verbindung oder in der Demo nichts; Trennen verwirft einen wartenden Write")
+    func setMaxDistanceNeedsSensor() async {
+        let demo = makeController(demo: true)
+        demo.start()
+        #expect(await eventually { demo.presence != nil })
+        demo.setMaxDistance(200)
+        #expect(demo.maxDistance == nil)
+        #expect(demo.maxDistanceWrite == .idle)
+        demo.stop()
+
+        let controller = makeController()
+        var started = sleeper.started.makeAsyncIterator()
+        controller.start()
+        controller.setMaxDistance(200)
+        #expect(controller.maxDistanceWrite == .idle)
+        source.send(.connection(.connected), .maxDistance(Self.maxDistanceDetail))
+        #expect(await eventually { controller.maxDistance != nil })
+        controller.setMaxDistance(200)
+        _ = await started.next()
+        source.send(.connection(.searching))
+        #expect(await eventually { controller.maxDistance == nil })
+        #expect(controller.maxDistanceWrite == .idle)
+        sleeper.wake()
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(http.posts.isEmpty)
+        controller.stop()
+    }
+
+    @Test("Runden auf den Schritt ab der Untergrenze, dann in den Bereich")
+    func normalizeSetting() {
+        #expect(SensorController.normalize(144, range: 30...800, step: 10) == 140)
+        #expect(SensorController.normalize(35, range: 30...800, step: 10) == 40)
+        #expect(SensorController.normalize(25, range: 30...800, step: 10) == 30)
+        #expect(SensorController.normalize(805, range: 30...800, step: 10) == 800)
+        #expect(SensorController.normalize(57, range: 25...800, step: 10) == 55)
+    }
+
     @Test("Demo und echter Sensor schließen sich aus")
     func demoExcludesSensor() async {
         let controller = makeController(demo: true)

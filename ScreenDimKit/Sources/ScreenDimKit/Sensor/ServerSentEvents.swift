@@ -66,7 +66,9 @@ public enum ESPHomeEvents {
     public static func event(
         from message: SSEMessage,
         presencePath: String = SensorProtocol.presencePath,
-        luxPath: String = SensorProtocol.luxPath
+        luxPath: String = SensorProtocol.luxPath,
+        maxDistancePath: String = SensorProtocol.maxDistancePath,
+        distancePath: String = SensorProtocol.distancePath
     ) -> SensorEvent? {
         switch message.event {
         case "ping": return .heartbeat
@@ -96,6 +98,33 @@ public enum ESPHomeEvents {
             }
             if let lux = state.flatMap(leadingNumber), lux.isFinite { return .lux(lux) }
             return nil
+        }
+        if ids.contains(where: { matches($0, path: maxDistancePath) }) {
+            // ESPHome schickt Wert, Bereich und Schritt einer Number als Text („120“); beim
+            // Verbinden mit Bereich und Schritt, danach nur den Wert.
+            guard let cm = number(value) ?? state.flatMap(leadingNumber), cm.isFinite else { return nil }
+            var range: ClosedRange<Double>?
+            if let low = number(object["min_value"]), let high = number(object["max_value"]), low <= high {
+                range = low...high
+            }
+            let step = number(object["step"]).flatMap { $0 > 0 ? $0 : nil }
+            return .maxDistance(SensorNumber(value: cm, range: range, step: step))
+        }
+        if ids.contains(where: { matches($0, path: distancePath) }) {
+            // Sieht das Radar niemanden, meldet die Firmware NaN: Wert `null`, Zustand „NA“.
+            let cm = number(value) ?? state.flatMap(leadingNumber)
+            return .distance(cm.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil })
+        }
+        return nil
+    }
+
+    /// Zahl aus JSON: `NSNumber` (ohne `Bool`) oder Text wie „120“; sonst `nil`.
+    private static func number(_ value: Any?) -> Double? {
+        if let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() {
+            return number.doubleValue.isFinite ? number.doubleValue : nil
+        }
+        if let text = value as? String, let number = Double(text.trimmingCharacters(in: .whitespaces)) {
+            return number.isFinite ? number : nil
         }
         return nil
     }

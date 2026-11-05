@@ -81,6 +81,26 @@
         }
       }
     },
+    "Anwesend bis" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Present up to"
+          }
+        }
+      }
+    },
+    "Anwesend bis %lld cm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Present up to %lld cm"
+          }
+        }
+      }
+    },
     "Anwesend: %lld s" : {
       "localizations" : {
         "en" : {
@@ -121,6 +141,16 @@
         }
       }
     },
+    "Bis zu dieser Entfernung zählt jemand als anwesend; „abwesend“ meldet der Sensor erst etwas weiter weg, damit es an der Grenze nicht flackert. Setz sie etwa 30–50 cm über den gemessenen Wert, während du normal sitzt. Gespeichert wird im Sensor („Max Distance“ in seiner Weboberfläche)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Up to this distance, someone counts as present; the sensor reports “away” only a bit further out so it doesn't flicker at the limit. Set it about 30–50 cm above the measured value while you sit normally. It's stored in the sensor (“Max Distance” in its web interface)."
+          }
+        }
+      }
+    },
     "Der Sensor zeigt Anwesenheit weiter an, ScreenDim dunkelt aber nichts ab, schaltet nichts aus und weckt nichts." : {
       "localizations" : {
         "en" : {
@@ -151,6 +181,46 @@
         }
       }
     },
+    "Entfernung %lld cm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Distance %lld cm"
+          }
+        }
+      }
+    },
+    "Entfernung: niemand erkannt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Distance: nobody detected"
+          }
+        }
+      }
+    },
+    "Gerade gemessen: %lld cm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measured now: %lld cm"
+          }
+        }
+      }
+    },
+    "Gerade gemessen: niemand erkannt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measured now: nobody detected"
+          }
+        }
+      }
+    },
     "Meldet der Sensor niemanden, dunkelt ScreenDim die Bildschirme ab und schaltet sie nach der gewählten Zeit aus. Kommst du zurück, gehen sie wieder an; Maus und Tastatur holen sie jederzeit zurück." : {
       "localizations" : {
         "en" : {
@@ -167,6 +237,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "After %lld s"
+          }
+        }
+      }
+    },
+    "Nicht gespeichert: Der Sensor ist nicht erreichbar." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not saved: the sensor can't be reached."
+          }
+        }
+      }
+    },
+    "Nicht gespeichert: Der Sensor lehnt den Code ab." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not saved: the sensor rejects the code."
+          }
+        }
+      }
+    },
+    "Nicht gespeichert: Die Firmware des Sensors kennt die Einstellung nicht. Aktualisiere sie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not saved: the sensor's firmware doesn't know this setting. Update it."
           }
         }
       }

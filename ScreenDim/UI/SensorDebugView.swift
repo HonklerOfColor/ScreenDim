@@ -259,6 +259,9 @@ private struct EventLog: View {
         case .connection(.searching): "Suche …"
         case .connection(.pairingRequired): "Kopplung nötig"
         case .heartbeat: "Lebenszeichen"
+        case .maxDistance(let setting): "Anwesend bis \(Int(setting.value.rounded())) cm"
+        case .distance(let cm?): "Entfernung \(Int(cm.rounded())) cm"
+        case .distance(nil): "Entfernung: niemand erkannt"
         }
     }
 
