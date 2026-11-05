@@ -933,6 +933,167 @@ struct SensorControllerTests {
         #expect(await eventually { brightness == 20 })
     }
 
+    @Test("Wert von Hand, dann weg und zurück: unter dem Deckel bleibt er, zurück gilt das Lichtprofil")
+    func arrivalRestoresLightProfile() async {
+        let controller = makeController()
+        controller.start()
+        controller.setDebugMonitoring(true)
+        source.send(.connection(.connected), .presence(true), .lux(1000))
+        #expect(await eventually { brightness == 100 })
+        manager.setBrightness(50, for: 7)
+
+        source.send(.presence(false))
+        #expect(await eventually { controller.absenceStage == .dimmed })
+        #expect(brightness == 50)
+        #expect(gamma.levels[7] == SensorController.defaultAbsenceLevel)
+
+        source.send(.presence(true))
+        #expect(await eventually { controller.absenceStage == .none })
+        #expect(brightness == 100)
+        #expect(gamma.levels[7] == 100)
+        #expect(manager.dimCauses.isEmpty)
+        #expect(controller.debugLog.contains { $0.job?.reason == .presenceChange && $0.job?.target == 100 })
+    }
+
+    @Test("Weggehen ohne Abwesenheit (gerade getippt): Lichtprofil sofort, genau, ohne Hysterese")
+    func leavingRestoresLightProfile() async {
+        let controller = makeController()
+        controller.start()
+        source.send(.connection(.connected), .presence(true), .lux(1000))
+        #expect(await eventually { brightness == 100 })
+        manager.setBrightness(98, for: 7)
+
+        input.timeSinceLastInput = .seconds(1)
+        source.send(.presence(false))
+        #expect(await eventually { brightness == 100 })
+        #expect(controller.absenceStage == .none)
+        #expect(gamma.levels[7] == 100)
+    }
+
+    @Test("Wert von Hand bei „abwesend“: übersteht die verspätete Meldung „anwesend“, nicht den nächsten Wechsel")
+    func manualWhileAbsentSurvivesArrival() async {
+        let controller = makeController()
+        controller.start()
+        input.timeSinceLastInput = .seconds(1)
+        source.send(.connection(.connected), .presence(true), .lux(1000), .presence(false))
+        #expect(await eventually { controller.presence == false && brightness == 100 })
+
+        manager.setBrightness(40, for: 7)
+        source.send(.presence(true))
+        #expect(await eventually { controller.presence == true })
+        #expect(brightness == 40)
+
+        source.send(.presence(false))
+        #expect(await eventually { brightness == 100 })
+    }
+
+    @Test("Erste Meldung nach dem Verbinden oder „Bei Abwesenheit reagieren“ aus: Wert von Hand bleibt")
+    func presenceKeepsManualValueWhenNotSwitching() async {
+        let controller = makeController()
+        controller.start()
+        source.send(.connection(.connected), .lux(1000))
+        #expect(await eventually { brightness == 100 })
+        manager.setBrightness(50, for: 7)
+        source.send(.presence(true))
+        #expect(await eventually { controller.presence == true })
+        #expect(brightness == 50)
+
+        controller.setReactsToAbsence(false)
+        source.send(.presence(false))
+        #expect(await eventually { controller.presence == false })
+        source.send(.presence(true))
+        #expect(await eventually { controller.presence == true })
+        #expect(brightness == 50)
+    }
+
+    // MARK: Manueller Modus
+
+    @Test("Manuell: Licht und Anwesenheit verstellen nichts, nichts dunkelt ab, schaltet aus oder weckt; bleibt gespeichert")
+    func manualModeIgnoresLightAndPresence() async {
+        let controller = makeController()
+        var arrivals = 0
+        controller.onArrival = { arrivals += 1 }
+        controller.start()
+        source.send(.connection(.connected), .presence(true), .lux(1000))
+        #expect(await eventually { brightness == 100 })
+        #expect(!controller.isManualMode)
+
+        controller.setManualMode(true)
+        #expect(preferences.object(forKey: SensorController.Keys.manualMode) as? Bool == true)
+        #expect(controller.activePresenceOrigin == nil)
+        manager.setBrightness(40, for: 7)
+
+        // Auch nach Ablauf der Pause vom Regler: Licht und Weggehen ändern nichts.
+        clock.advance(by: .seconds(600))
+        source.send(.lux(10), .presence(false))
+        #expect(await eventually { controller.presence == false })
+        #expect(controller.lux == 10)
+        #expect(brightness == 40)
+        #expect(controller.absenceStage == .none)
+        #expect(manager.dimCauses.isEmpty)
+
+        controller.screensDidSleep()
+        source.send(.presence(true))
+        #expect(await eventually { controller.presence == true })
+        #expect(displaySleep.sleeps == 0)
+        #expect(displaySleep.wakes == 0)
+        #expect(arrivals == 0)
+        #expect(brightness == 40)
+
+        controller.stop()
+        #expect(makeController().isManualMode)
+    }
+
+    @Test("Manuell während der Abwesenheit: Deckel weg, nichts geht aus; zurück auf automatisch gilt sofort das Lichtprofil")
+    func manualModeEndsAbsenceAndAutomaticRestoresProfile() async {
+        let controller = makeController()
+        controller.start()
+        source.send(.connection(.connected), .presence(true), .lux(1000))
+        #expect(await eventually { brightness == 100 })
+        manager.setBrightness(50, for: 7)
+        source.send(.presence(false))
+        #expect(await eventually { controller.absenceStage == .dimmed })
+
+        controller.setManualMode(true)
+        #expect(controller.absenceStage == .none)
+        #expect(manager.dimCauses.isEmpty)
+        #expect(gamma.levels[7] == 50)
+        sleeper.wake()
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(displaySleep.sleeps == 0)
+
+        // Automatisch: sofort das Lichtprofil, trotz Wert von Hand. Die Anwesenheit zählt ab
+        // dem nächsten Wechsel.
+        controller.setManualMode(false)
+        #expect(await eventually { brightness == 100 })
+        #expect(gamma.levels[7] == 100)
+        #expect(controller.absenceStage == .none)
+        source.send(.presence(true), .presence(false))
+        #expect(await eventually { controller.absenceStage == .dimmed })
+    }
+
+    @Test("Wechsel, während macOS die Displays schlafen lässt: Lichtprofil erst nach dem Aufwachen")
+    func sleepingDisplaysDeferLightProfile() async {
+        let controller = makeController()
+        var started = sleeper.started.makeAsyncIterator()
+        controller.start()
+        source.send(.connection(.connected), .presence(true), .lux(1000))
+        #expect(await eventually { brightness == 100 })
+        manager.setBrightness(50, for: 7)
+
+        controller.screensDidSleep()
+        input.timeSinceLastInput = .seconds(1)
+        source.send(.presence(false), .presence(true))
+        #expect(await eventually { displaySleep.wakes == 1 })
+        #expect(brightness == 50)
+
+        controller.screensDidWake()
+        #expect(await started.next() == IdleDimmer.screenWakeSettle)
+        #expect(brightness == 50)
+        sleeper.wake()
+        #expect(await eventually { brightness == 100 })
+    }
+
     @Test("Demo ersetzt den Schreibtisch-Sensor als Lichtquelle, außer bei „aus“")
     func demoOverridesLightSources() async {
         let controller = makeController(demo: true)

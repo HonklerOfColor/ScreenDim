@@ -44,7 +44,8 @@ struct SensorDebugView: View {
             "ScreenDim Sensor-Diagnose, \(Date().formatted(date: .numeric, time: .standard))",
             "Lichtquelle (Einstellung): \(sensor.lightSource.rawValue)",
             "Licht aktiv: \(sensor.activeLightOrigin?.rawValue ?? "-"), Schreibtisch verfügbar \(sensor.isDeskSensorLightAvailable)",
-            "Anwesenheit aktiv: \(sensor.activePresenceOrigin?.rawValue ?? "-"), reagieren \(sensor.reactsToAbsence)",
+            "Anwesenheit aktiv: \(sensor.activePresenceOrigin?.rawValue ?? "-"), reagieren \(sensor.reactsToAbsence), "
+                + "manuell \(sensor.isManualMode)",
             "Schreibtisch-Sensor: \(sensor.status), Host \(sensor.pairedHostname ?? "-"), "
                 + "Anwesenheit \(sensor.presence.map(String.init) ?? "-"), Lux \(sensor.lux.map { String($0) } ?? "-")",
             "Zuletzt gesetzt: \(sensor.lightLevels.isEmpty ? "-" : levelsText(sensor.lightLevels)) "
@@ -266,6 +267,7 @@ private struct EventLog: View {
         case .lux: "Licht"
         case .sourceSwitch: "Quellwechsel"
         case .profileChange: "Profil"
+        case .presenceChange: "Anwesenheit"
         case .pendingAfterProbe: "Nach der Prüfung"
         case .manual: "Von Hand"
         case .probeRestore: "Gespeicherter Wert"

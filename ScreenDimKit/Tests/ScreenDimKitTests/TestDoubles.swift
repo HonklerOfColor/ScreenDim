@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import Security
 import Synchronization
 @testable import ScreenDimKit
 
@@ -398,6 +399,107 @@ final class StubSensorHTTP: SensorHTTP {
             state.responses[path] = queue
             return response
         }
+    }
+}
+
+/// `SecItem…`-Aufrufe im RAM: ein Eintrag je Service und Account. Zeichnet jedes Update auf.
+final class MemoryKeychainItems: KeychainItems {
+    struct Item: Equatable {
+        var data: Data
+        /// `nil`: Der Eintrag hat keine (wie Einträge ohne Angabe beim Anlegen).
+        var accessible: String?
+    }
+
+    struct Update: Equatable {
+        let service: String?
+        let account: String?
+        /// Geänderte Attribute, ohne Werte.
+        let keys: Set<String>
+        let accessible: String?
+    }
+
+    private struct State {
+        var items: [String: Item] = [:]
+        var updates: [Update] = []
+        var updateFailure: OSStatus?
+        var reportsAccessibility = true
+    }
+
+    private let state = Mutex(State())
+
+    var updates: [Update] { state.withLock { $0.updates } }
+
+    func item(service: String, account: String) -> Item? {
+        state.withLock { $0.items[Self.key(service, account)] }
+    }
+
+    func put(_ item: Item, service: String, account: String) {
+        state.withLock { $0.items[Self.key(service, account)] = item }
+    }
+
+    /// Gesetzt: Jedes Update scheitert mit diesem Status.
+    func failUpdates(with status: OSStatus?) {
+        state.withLock { $0.updateFailure = status }
+    }
+
+    /// Aus: Lesen liefert die Zugänglichkeit nicht mit, wie womöglich der dateibasierte
+    /// Schlüsselbund von macOS.
+    func setReportsAccessibility(_ reports: Bool) {
+        state.withLock { $0.reportsAccessibility = reports }
+    }
+
+    func copyMatching(_ query: [String: Any]) -> (status: OSStatus, result: CFTypeRef?) {
+        state.withLock { state in
+            guard let item = state.items[Self.key(query)] else { return (errSecItemNotFound, nil) }
+            guard query[kSecReturnAttributes as String] as? Bool == true else { return (errSecSuccess, item.data as CFData) }
+            var attributes: [String: Any] = [kSecValueData as String: item.data]
+            if state.reportsAccessibility, let accessible = item.accessible {
+                attributes[kSecAttrAccessible as String] = accessible
+            }
+            return (errSecSuccess, attributes as CFDictionary)
+        }
+    }
+
+    func add(_ attributes: [String: Any]) -> OSStatus {
+        state.withLock { state in
+            let key = Self.key(attributes)
+            guard state.items[key] == nil else { return errSecDuplicateItem }
+            state.items[key] = Item(
+                data: attributes[kSecValueData as String] as? Data ?? Data(),
+                accessible: attributes[kSecAttrAccessible as String] as? String
+            )
+            return errSecSuccess
+        }
+    }
+
+    func update(_ query: [String: Any], with attributes: [String: Any]) -> OSStatus {
+        state.withLock { state in
+            state.updates.append(Update(
+                service: query[kSecAttrService as String] as? String,
+                account: query[kSecAttrAccount as String] as? String,
+                keys: Set(attributes.keys),
+                accessible: attributes[kSecAttrAccessible as String] as? String
+            ))
+            if let failure = state.updateFailure { return failure }
+            let key = Self.key(query)
+            guard var item = state.items[key] else { return errSecItemNotFound }
+            if let data = attributes[kSecValueData as String] as? Data { item.data = data }
+            if let accessible = attributes[kSecAttrAccessible as String] as? String { item.accessible = accessible }
+            state.items[key] = item
+            return errSecSuccess
+        }
+    }
+
+    func delete(_ query: [String: Any]) -> OSStatus {
+        state.withLock { $0.items.removeValue(forKey: Self.key(query)) == nil ? errSecItemNotFound : errSecSuccess }
+    }
+
+    private static func key(_ query: [String: Any]) -> String {
+        key(query[kSecAttrService as String] as? String ?? "", query[kSecAttrAccount as String] as? String ?? "")
+    }
+
+    private static func key(_ service: String, _ account: String) -> String {
+        "\(service)\u{0}\(account)"
     }
 }
 

@@ -57,6 +57,8 @@ struct MenuContentView: View {
     /// Monitor sein Name und sein Regler. Ignorierte Monitore fehlen; an ihnen gibt es
     /// nichts zu regeln. Angezeigt wird, was die Monitore gerade ausgeben, live auch beim
     /// Abdunkeln (Leerlauf, Abwesenheit) und bei der Lichtregelung; Ziehen setzt den Wert.
+    /// Neben dem obersten Regler schaltet ein Knopf zwischen automatisch und manuell, sofern
+    /// ein Sensor (oder die Demo) etwas regeln kann.
     private var brightnessCard: some View {
         let monitors = manager.monitors.filter { !$0.isIgnored }
         return VStack(alignment: .leading, spacing: 12) {
@@ -74,7 +76,9 @@ struct MenuContentView: View {
                         value: Binding(get: { manager.masterOutputBrightness }, set: { manager.setAllBrightness($0, interactive: true) }),
                         onEnded: { manager.endInteractiveBrightness() },
                         isEnabled: monitors.contains(where: \.isAdjustable)
-                    )
+                    ) {
+                        modeButton
+                    }
                 }
                 ForEach(monitors) { monitor in
                     BrightnessControl(
@@ -86,13 +90,24 @@ struct MenuContentView: View {
                         ),
                         onEnded: { manager.endInteractiveBrightness(for: monitor.id) },
                         isEnabled: monitor.isAdjustable
-                    )
+                    ) {
+                        // Nur ein Monitor: Der Knopf steht neben seinem Regler.
+                        if monitors.count == 1 { modeButton }
+                    }
                 }
             }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.fill.quaternary, in: .rect(cornerRadius: 12))
+    }
+
+    /// Ohne Sensor und Demo regelt nichts automatisch; dann gibt es nichts umzuschalten.
+    @ViewBuilder
+    private var modeButton: some View {
+        if sensor.isEnabled || sensor.isDemoActive {
+            ModeButton(isManual: sensor.isManualMode) { sensor.setManualMode(!sensor.isManualMode) }
+        }
     }
 
     // MARK: - Zeilen
@@ -125,15 +140,17 @@ struct MenuContentView: View {
 
 // MARK: - Helligkeitsregler
 
-/// Name und Wert in einer Zeile, darunter der Regler. `value` setzt beim Ziehen jeden
-/// Zwischenwert; `onEnded` meldet das Loslassen (speichern, Auftrag).
-private struct BrightnessControl: View {
+/// Name und Wert in einer Zeile, darunter der Regler, rechts daneben optional ein Knopf.
+/// `value` setzt beim Ziehen jeden Zwischenwert; `onEnded` meldet das Loslassen (speichern,
+/// Auftrag).
+private struct BrightnessControl<Accessory: View>: View {
     /// Schon lokalisiert bzw. Monitorname.
     let title: String
     let systemImage: String
     @Binding var value: Double
     let onEnded: () -> Void
     let isEnabled: Bool
+    @ViewBuilder var accessory: Accessory
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -147,11 +164,45 @@ private struct BrightnessControl: View {
                     .font(.subheadline.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
-            BrightnessBar(value: $value, onEnded: onEnded, systemImage: systemImage)
-                .accessibilityLabel(Text("Helligkeit \(title)"))
+            .opacity(contentOpacity)
+            HStack(spacing: 8) {
+                BrightnessBar(value: $value, onEnded: onEnded, systemImage: systemImage)
+                    .accessibilityLabel(Text("Helligkeit \(title)"))
+                    .disabled(!isEnabled)
+                    .opacity(contentOpacity)
+                // Bleibt bedienbar, auch während die Monitore noch geprüft werden.
+                accessory
+            }
         }
-        .disabled(!isEnabled)
-        .opacity(isEnabled ? 1 : 0.5)
+    }
+
+    private var contentOpacity: Double { isEnabled ? 1 : 0.5 }
+}
+
+/// Runder Knopf wie im Kontrollzentrum: in Akzentfarbe, solange Licht und Anwesenheit die
+/// Helligkeit regeln; grau mit Hand, wenn der Wert vom Regler dauerhaft gilt.
+private struct ModeButton: View {
+    let isManual: Bool
+    let toggle: () -> Void
+
+    private static let size: CGFloat = 28
+
+    var body: some View {
+        Button(action: toggle) {
+            Image(systemName: isManual ? "hand.point.up.left.fill" : "sensor.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isManual ? AnyShapeStyle(.primary) : AnyShapeStyle(.white))
+                .frame(width: Self.size, height: Self.size)
+                .background(isManual ? AnyShapeStyle(.fill.secondary) : AnyShapeStyle(.tint), in: .circle)
+                .contentShape(.circle)
+        }
+        .buttonStyle(.plain)
+        .help(isManual
+            ? Text("Manuell: Die Helligkeit bleibt, wie du sie einstellst; nichts dunkelt ab oder schaltet aus. Klicken schaltet auf automatisch.")
+            : Text("Automatisch: Umgebungslicht und Anwesenheit regeln die Helligkeit. Klicken schaltet auf manuell."))
+        .accessibilityLabel(Text("Automatische Helligkeit"))
+        .accessibilityValue(isManual ? Text("Aus") : Text("An"))
+        .accessibilityAddTraits(.isToggle)
     }
 }
 

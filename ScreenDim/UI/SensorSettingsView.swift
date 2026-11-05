@@ -392,6 +392,7 @@ private struct AbsenceSection: View {
 
     var body: some View {
         Section("Wenn du weg bist") {
+            ManualModeNotice(sensor: sensor)
             Toggle("Bei Abwesenheit reagieren", isOn: Binding(
                 get: { sensor.reactsToAbsence }, set: { sensor.setReactsToAbsence($0) }
             ))
@@ -479,6 +480,7 @@ private struct LightSection: View {
 
     var body: some View {
         Section("Umgebungslicht") {
+            if hasLight { ManualModeNotice(sensor: sensor) }
             Toggle("Helligkeit dem Umgebungslicht anpassen", isOn: Binding(
                 get: { sensor.lightSource != .off },
                 set: { sensor.setLightSource($0 ? .deskSensorOnly : .off) }
@@ -519,6 +521,23 @@ private struct LightSection: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Manuell (Knopf im Menü neben dem Regler): Die Einstellungen darunter gelten erst wieder,
+/// wenn automatisch geregelt wird.
+private struct ManualModeNotice: View {
+    let sensor: SensorController
+
+    var body: some View {
+        if sensor.isManualMode {
+            LabeledContent {
+                Button("Automatisch regeln") { sensor.setManualMode(false) }
+            } label: {
+                Label("Manuell: Licht und Anwesenheit regeln nichts", systemImage: "hand.point.up.left.fill")
+                    .foregroundStyle(.orange)
+            }
+        }
     }
 }
 

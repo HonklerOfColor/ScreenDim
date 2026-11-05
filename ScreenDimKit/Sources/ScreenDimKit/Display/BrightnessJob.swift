@@ -13,6 +13,9 @@ public struct BrightnessJob: Equatable, Sendable {
         case sourceSwitch(from: SensorOrigin?, to: SensorOrigin)
         /// Lichtprofil geändert (Einstellungen).
         case profileChange
+        /// Die Anwesenheit hat gewechselt: Das Lichtprofil gilt wieder statt eines Werts von
+        /// Hand.
+        case presenceChange
         /// Licht kam während der DDC-Prüfung; nach der Prüfung nachgeholt.
         case pendingAfterProbe
         /// Regler oder Tastenkürzel; sofort, ohne Überblendung.
@@ -82,6 +85,7 @@ extension BrightnessJob.Reason {
             "lux \(origin.rawValue) \(Int(raw.rounded()))→\(Int(filtered.rounded())) lx"
         case .sourceSwitch(let from, let to): "sourceSwitch \(from?.rawValue ?? "-")→\(to.rawValue)"
         case .profileChange: "profileChange"
+        case .presenceChange: "presenceChange"
         case .pendingAfterProbe: "pendingAfterProbe"
         case .manual: "manual"
         case .probeRestore: "probeRestore"

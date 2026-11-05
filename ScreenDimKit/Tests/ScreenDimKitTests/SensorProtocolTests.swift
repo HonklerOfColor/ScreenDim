@@ -218,3 +218,94 @@ struct SensorKeychainTests {
         #expect(try keychain.code(for: host) == nil)
     }
 }
+
+@Suite("Schlüsselbund: ältere Einträge umstellen")
+struct SensorKeychainMigrationTests {
+    private static let service = "com.andreastrabi.ScreenDim.sensor"
+    private static let host = "screendim-desk-a1b2c3.local"
+    private static let thisDeviceOnly = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String
+    private static let oldAccessibility = kSecAttrAccessibleAfterFirstUnlock as String
+
+    private let items = MemoryKeychainItems()
+    private let keychain: SensorKeychain
+
+    init() {
+        keychain = SensorKeychain(service: Self.service, items: items)
+    }
+
+    private func store(_ code: String, accessible: String?, host: String = Self.host) {
+        items.put(.init(data: Data(code.utf8), accessible: accessible), service: Self.service, account: host)
+    }
+
+    @Test("Älterer Eintrag: Code gelesen, einmal nur die Zugänglichkeit auf „nur dieses Gerät“ gesetzt")
+    func migratesOnce() throws {
+        store("ABCDEFGH", accessible: Self.oldAccessibility)
+        let expected = try #require(PairingCode(normalizing: "ABCD-EFGH"))
+
+        #expect(try keychain.code(for: Self.host) == expected)
+        #expect(items.updates == [.init(
+            service: Self.service, account: Self.host,
+            keys: [kSecAttrAccessible as String], accessible: Self.thisDeviceOnly
+        )])
+        #expect(items.item(service: Self.service, account: Self.host) == .init(data: Data("ABCDEFGH".utf8), accessible: Self.thisDeviceOnly))
+
+        #expect(try keychain.code(for: Self.host) == expected)
+        #expect(items.updates.count == 1)
+    }
+
+    @Test("Schon „nur dieses Gerät“: kein Update")
+    func currentEntryUntouched() throws {
+        store("ABCDEFGH", accessible: Self.thisDeviceOnly)
+        #expect(try keychain.code(for: Self.host) != nil)
+        #expect(items.updates.isEmpty)
+    }
+
+    @Test("Schlüsselbund meldet die Zugänglichkeit nicht: ein Versuch je Lauf, nicht bei jedem Lesen")
+    func unreportedAccessibilityTriedOnce() throws {
+        items.setReportsAccessibility(false)
+        store("ABCDEFGH", accessible: Self.thisDeviceOnly)
+        #expect(try keychain.code(for: Self.host) != nil)
+        #expect(try keychain.code(for: Self.host) != nil)
+        #expect(items.updates.count == 1)
+
+        // Kopien teilen sich das Gedächtnis.
+        let copy = keychain
+        #expect(try copy.code(for: Self.host) != nil)
+        #expect(items.updates.count == 1)
+    }
+
+    @Test("Update scheitert: Code trotzdem gelesen, kein Fehler, kein zweiter Versuch")
+    func failedUpdateKeepsCode() throws {
+        store("ABCDEFGH", accessible: Self.oldAccessibility)
+        items.failUpdates(with: errSecInteractionNotAllowed)
+        #expect(try keychain.code(for: Self.host) == PairingCode(normalizing: "ABCD-EFGH"))
+        #expect(try keychain.code(for: Self.host) != nil)
+        #expect(items.updates.count == 1)
+        #expect(items.item(service: Self.service, account: Self.host)?.accessible == Self.oldAccessibility)
+    }
+
+    @Test("Kein Eintrag: nichts gelesen, nichts umgestellt; jeder Host für sich")
+    func perHost() throws {
+        #expect(try keychain.code(for: Self.host) == nil)
+        #expect(items.updates.isEmpty)
+
+        let other = "screendim-desk-d4e5f6.local"
+        store("ABCDEFGH", accessible: Self.oldAccessibility)
+        store("K7M2P9QR", accessible: Self.oldAccessibility, host: other)
+        #expect(try keychain.code(for: Self.host) != nil)
+        #expect(try keychain.code(for: other) == PairingCode(normalizing: "K7M2-P9QR"))
+        #expect(items.updates.map(\.account) == [Self.host, other])
+    }
+
+    @Test("Speichern legt mit „nur dieses Gerät“ an und überschreibt Code und Zugänglichkeit")
+    func saveWritesAccessibility() throws {
+        let code = try #require(PairingCode(normalizing: "ABCD-EFGH"))
+        try keychain.save(code, for: Self.host)
+        #expect(items.item(service: Self.service, account: Self.host) == .init(data: Data("ABCDEFGH".utf8), accessible: Self.thisDeviceOnly))
+
+        store("ABCDEFGH", accessible: Self.oldAccessibility)
+        let second = try #require(PairingCode(normalizing: "K7M2-P9QR"))
+        try keychain.save(second, for: Self.host)
+        #expect(items.item(service: Self.service, account: Self.host) == .init(data: Data("K7M2P9QR".utf8), accessible: Self.thisDeviceOnly))
+    }
+}

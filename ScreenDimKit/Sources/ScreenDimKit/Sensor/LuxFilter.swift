@@ -15,8 +15,6 @@ public struct LuxFilter: Sendable {
         /// So viele Sprungwerte in Folge ziehen den EMA nach.
         public var jumpCount: Int
 
-        /// Eingebauter Sensor: meldet jede Sekunde, auch ohne Änderung, und flackert.
-        public static let builtIn = Configuration(medianWindow: 5, timeConstant: .seconds(4), jumpFactor: 3, jumpCount: 3)
         /// Schreibtisch-Sensor und Demo: Die Firmware glättet schon und meldet nur bei
         /// Änderung (oder im 30-s-Takt). Jeder Median oder EMA würde eine einzelne
         /// Änderung bis zur nächsten Meldung zurückhalten; deshalb durchreichen.

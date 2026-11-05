@@ -567,6 +567,36 @@
         }
       }
     },
+    "Automatisch regeln" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch to automatic"
+          }
+        }
+      }
+    },
+    "Automatisch: Umgebungslicht und Anwesenheit regeln die Helligkeit. Klicken schaltet auf manuell." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic: ambient light and presence control the brightness. Click to switch to manual."
+          }
+        }
+      }
+    },
+    "Automatische Helligkeit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic brightness"
+          }
+        }
+      }
+    },
     "AV-Service" : {
       "localizations" : {
         "en" : {
@@ -1711,6 +1741,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "macOS controls this display itself. Turn off “Automatically adjust brightness” if you want ScreenDim to control it."
+          }
+        }
+      }
+    },
+    "Manuell: Die Helligkeit bleibt, wie du sie einstellst; nichts dunkelt ab oder schaltet aus. Klicken schaltet auf automatisch." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manual: the brightness stays where you set it; nothing dims or turns off. Click to switch to automatic."
+          }
+        }
+      }
+    },
+    "Manuell: Licht und Anwesenheit regeln nichts" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manual: light and presence change nothing"
           }
         }
       }

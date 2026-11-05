@@ -59,7 +59,10 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
   - Alle automatischen Wege laufen über `DisplayManager.fadeBrightness` (Licht 2 s,
     Prüfung/Rückfall/Aufwachen 0,5 s), Start beim echten Wert (DDC: zuletzt bestätigter
     Write, kein Read). Nur `setBrightness` (Regler, Tasten) setzt sofort und pausiert die
-    Lichtregelung des Monitors.
+    Lichtregelung des Monitors (5 min, Licht × 2, oder bis zum nächsten Wechsel der
+    Anwesenheit: dann gilt das Lichtprofil genau, ohne Hysterese; bei Abwesenheit kurz
+    vor dem Aufheben des Deckels, bei schlafenden Displays nach dem Aufwachen. Eine Pause,
+    die bei „abwesend“ begann, übersteht die folgende Meldung „anwesend“).
   - Lux des ESP32 durchgereicht, Hysterese 3 Punkte gegen das laufende Ziel. Werte
     außerhalb 0…200 000 lx verwirft `SensorController` (Log `notice`).
     Schreibtisch-Sensor frisch durch jedes Ereignis (45 s).
@@ -91,6 +94,11 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
   außer eine Eingabe kurz vor oder nach dem Aufwachen (`PresenceGate.inputGrace`) hat sie
   geweckt. Schalter „Bei Abwesenheit reagieren“ (`reactsToAbsence`, Standard an): aus,
   schaltet die Anwesenheit nichts (kein Abdunkeln, Ausschalten, Wecken, `onArrival`).
+- Manueller Modus (`SensorController.isManualMode`, gespeichert, Standard automatisch):
+  runder Knopf im Menü neben dem obersten Regler, nur mit Sensor oder Demo. Manuell regelt
+  weder Licht noch Anwesenheit etwas (wie „Bei Abwesenheit reagieren“ aus, dazu keine
+  Lichtregelung), eine laufende Abwesenheit endet. Zurück auf automatisch: sofort das
+  Lichtprofil, Pausen enden. Die Leerlauf-Dimmung bleibt davon unberührt.
 - `ScreenDim/` (App): `App/` (Einstieg, Fabrik für DDC), `UI/` (Menü, Einstellungen,
   Sensor-Diagnose, DDC-Diagnose), `System/` (Tastenkürzel, Login-Item, `IOAVService`),
   `Resources/` (Asset-Katalog, String-Katalog, Privacy-Manifest).

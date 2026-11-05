@@ -6,7 +6,8 @@ import Observation
 /// Verbindet den optionalen Schreibtisch-Sensor (oder die Simulation) mit dem
 /// `DisplayManager`: Abwesenheit dunkelt die Bildschirme ab und schaltet sie nach einer
 /// Weile aus (`AbsenceStage`, abschaltbar mit `reactsToAbsence`), Umgebungslicht regelt
-/// die Helligkeit (`LightSource`). Ohne Sensor passiert nichts; Standard ist „aus“.
+/// die Helligkeit (`LightSource`). Ohne Sensor passiert nichts; Standard ist „aus“. Im
+/// manuellen Modus (`isManualMode`, Umschalter im Menü) ruht beides.
 ///
 /// Gekoppelt ist höchstens ein Sensor. Sein Hostname steht in UserDefaults, der Code nur
 /// im Schlüsselbund.
@@ -98,6 +99,7 @@ public final class SensorController {
         static let adjustsBrightness = "sensorAdjustsBrightness"
         /// „Bei Abwesenheit reagieren“; fehlt der Eintrag, gilt an.
         static let reactsToAbsence = "sensorReactsToAbsence"
+        static let manualMode = "sensorManualMode"
         static let absenceLevel = "sensorAbsenceLevel"
         /// Sekunden bis zum Ausschalten; negativ: nie.
         static let absenceOffDelay = "sensorAbsenceOffDelay"
@@ -110,8 +112,9 @@ public final class SensorController {
     /// Mindestabstand in Prozentpunkten zwischen neuem Ziel und dem Wert, auf den der
     /// Monitor gerade zugeht, bevor Licht ihn verstellt. Hält DDC-Writes selten.
     public static let lightHysteresis: Double = 3
-    /// Nach Regler oder Tastenkürzel ruht die Lichtregelung dieses Monitors so lange, oder
-    /// bis sich das Licht um mehr als `manualHoldLuxFactor` ändert.
+    /// Nach Regler oder Tastenkürzel ruht die Lichtregelung dieses Monitors so lange, bis
+    /// sich das Licht um mehr als `manualHoldLuxFactor` ändert oder bis zum nächsten Wechsel
+    /// der Anwesenheit (`resumeLightProfiles`).
     public static let manualHold: Duration = .seconds(300)
     nonisolated public static let manualHoldLuxFactor: Double = 2
     /// Nach einer fremden Änderung (macOS, Helligkeitstasten) ruht die Lichtregelung dieses
@@ -169,6 +172,10 @@ public final class SensorController {
     /// „Bei Abwesenheit reagieren“: Aus, schaltet die Anwesenheit nichts, weder abdunkeln
     /// und ausschalten noch wecken. Licht und Anzeige laufen weiter. Standard an.
     public private(set) var reactsToAbsence: Bool
+    /// „Manuell“ (Umschalter im Menü): Weder Licht noch Anwesenheit verstellen etwas, der
+    /// Wert von Regler oder Tasten bleibt dauerhaft; nichts dunkelt ab, schaltet aus oder
+    /// weckt. Die Einstellungen bleiben, wie sie sind. Gespeichert; Standard automatisch.
+    public private(set) var isManualMode: Bool
     /// Höchste Helligkeit in Prozent, solange niemand da ist.
     public private(set) var absenceLevel: Double
     /// Wie lange abgedunkelt bleibt, bevor die Displays schlafen; `nil`: nie, sonst
@@ -187,9 +194,14 @@ public final class SensorController {
     /// Quelle, deren Anwesenheit gerade die Bildschirme schaltet; `nil`, wenn keine (auch
     /// wenn „Bei Abwesenheit reagieren“ aus ist).
     public var activePresenceOrigin: SensorOrigin? {
-        guard reactsToAbsence else { return nil }
+        guard reactsToPresence else { return nil }
         if isDemoActive { return .demo }
         return status == .connected ? .deskSensor : nil
+    }
+
+    /// Ob die Anwesenheit etwas schaltet: „Bei Abwesenheit reagieren“ an und nicht manuell.
+    private var reactsToPresence: Bool {
+        reactsToAbsence && !isManualMode
     }
 
     @ObservationIgnored private let manager: DisplayManager
@@ -229,6 +241,9 @@ public final class SensorController {
     @ObservationIgnored private var deskFilter = LuxFilter(.deskSensor)
     /// Pausen der Lichtregelung je Monitor (`storageKey`).
     @ObservationIgnored private var holds: [String: LightHold] = [:]
+    /// Die Anwesenheit hat gewechselt, das Lichtprofil gilt wieder, ist aber noch nicht
+    /// gesetzt: Abwesenheit oder schlafende Displays schieben es auf (`applyLightProfilesIfDue`).
+    @ObservationIgnored private var lightProfilesDue = false
     /// Monitore, die beim letzten Setzen noch in der DDC-Prüfung waren und den Wert nicht
     /// übernommen haben; der nächste Lux-Wert holt ihn nach, auch innerhalb der Hysterese.
     @ObservationIgnored private var pendingLight: Set<String> = []
@@ -298,6 +313,7 @@ public final class SensorController {
         }
         pairedHostname = preferences.string(forKey: Keys.hostname)
         reactsToAbsence = preferences.object(forKey: Keys.reactsToAbsence) as? Bool ?? true
+        isManualMode = preferences.object(forKey: Keys.manualMode) as? Bool ?? false
         absenceLevel = (preferences.object(forKey: Keys.absenceLevel) as? Double).map(Self.clampAbsenceLevel)
             ?? Self.defaultAbsenceLevel
         if let seconds = preferences.object(forKey: Keys.absenceOffDelay) as? Double {
@@ -381,6 +397,25 @@ public final class SensorController {
         preferences.set(reacts, forKey: Keys.reactsToAbsence)
         sensorLog.notice("Bei Abwesenheit reagieren: \(reacts ? "an" : "aus", privacy: .public)")
         if !reacts { returnFromAbsence(wake: false) }
+    }
+
+    /// Manuell: Eine laufende Abwesenheit endet, Licht und Anwesenheit verstellen nichts
+    /// mehr; die Helligkeit bleibt, wo sie ist. Zurück auf automatisch: Jeder Monitor geht
+    /// sofort auf sein Lichtprofil, Pausen vom Regler enden; bei der Anwesenheit gilt erst
+    /// der nächste Wechsel.
+    public func setManualMode(_ manual: Bool) {
+        guard manual != isManualMode else { return }
+        isManualMode = manual
+        preferences.set(manual, forKey: Keys.manualMode)
+        sensorLog.notice("Modus: \(manual ? "manuell" : "automatisch", privacy: .public)")
+        if manual {
+            lightProfilesDue = false
+            returnFromAbsence(wake: false)
+        } else {
+            holds = [:]
+            lightProfilesDue = true
+            applyLightProfilesIfDue()
+        }
     }
 
     /// Gilt ab der nächsten Abwesenheit.
@@ -547,8 +582,11 @@ public final class SensorController {
             lastEventAt = now()
             let previous = presence
             presence = present
-            // Abgeschaltet: anzeigen, sonst nichts.
-            guard reactsToAbsence else { break }
+            // Abgeschaltet oder manuell: anzeigen, sonst nichts.
+            guard reactsToPresence else { break }
+            // Jeder Wechsel, nicht die erste Meldung nach dem Verbinden: Das Lichtprofil geht
+            // wieder vor einem Wert von Hand.
+            if let previous, previous != present { resumeLightProfiles(arriving: present) }
             if present {
                 // Annäherung weckt schlafende Displays immer, auch ohne Abwesenheit von
                 // ScreenDim (etwa nach „Eingabe gewinnt“, oder macOS hat ausgeschaltet).
@@ -565,6 +603,8 @@ public final class SensorController {
             ) {
                 beginAbsence()
             }
+            // Ohne Abwesenheit sofort; sonst setzt es `endAbsence`.
+            applied = applyLightProfilesIfDue()
         case .lux(let value):
             lastEventAt = now()
             lux = value
@@ -602,8 +642,8 @@ public final class SensorController {
         ignoresHysteresis: Bool = false
     ) -> [LightLevel] {
         // Niemand da: Die Ausgabe ist gedeckelt oder die Displays schlafen. Zurück gilt der
-        // nächste Wert.
-        guard absenceStage == .none else { return [] }
+        // nächste Wert. Manuell: Der Wert vom Regler bleibt.
+        guard absenceStage == .none, !isManualMode else { return [] }
         let at = now()
         var applied: [LightLevel] = []
         for monitor in manager.monitors {
@@ -651,6 +691,9 @@ public final class SensorController {
         let until: ContinuousClock.Instant
         /// Licht beim Beginn; ändert es sich um mehr als den Faktor, endet die Pause.
         let lux: Double?
+        /// Begann, während der Sensor „abwesend“ meldete: Wer den Wert setzte, war schon da.
+        /// Die folgende Meldung „anwesend“ beendet die Pause deshalb nicht.
+        var beganWhileAbsent = false
 
         func isActive(at instant: ContinuousClock.Instant, lux current: Double) -> Bool {
             guard instant < until else { return false }
@@ -665,12 +708,12 @@ public final class SensorController {
     func handleJob(_ job: BrightnessJob) {
         switch job.reason {
         case .manual:
-            holds[job.storageKey] = LightHold(until: now() + Self.manualHold, lux: activeLux)
+            holds[job.storageKey] = LightHold(until: now() + Self.manualHold, lux: activeLux, beganWhileAbsent: presence == false)
             pendingLight.remove(job.storageKey)
             // Wer am Regler zieht, ist da. Den Deckel hat `setBrightness` schon aufgehoben.
             if absenceStage != .none { returnFromAbsence(wake: false) }
         case .externalChange:
-            holds[job.storageKey] = LightHold(until: now() + Self.externalChangeHold, lux: nil)
+            holds[job.storageKey] = LightHold(until: now() + Self.externalChangeHold, lux: nil, beganWhileAbsent: presence == false)
         default:
             break
         }
@@ -683,6 +726,31 @@ public final class SensorController {
               let origin = activeLightOrigin, let lux = activeLux
         else { return }
         applyAmbientLight(lux, from: origin, reason: .pendingAfterProbe, only: monitor.storageKey, ignoresHysteresis: true)
+    }
+
+    /// Die Anwesenheit wechselt: Die Lichtprofile gehen wieder vor einem Wert von Regler oder
+    /// Tasten, ihre Pausen enden. Nur eine Pause, die während „abwesend“ begann, übersteht
+    /// die folgende Rückkehr: Der Sensor meldet dann nur verspätet, wer schon am Regler war.
+    /// Gesetzt wird beim nächsten `applyLightProfilesIfDue`.
+    private func resumeLightProfiles(arriving: Bool) {
+        if arriving {
+            holds = holds.filter(\.value.beganWhileAbsent).mapValues { LightHold(until: $0.until, lux: $0.lux) }
+        } else {
+            holds = [:]
+        }
+        lightProfilesDue = true
+    }
+
+    /// Setzt nach einem Wechsel der Anwesenheit jeden Monitor auf sein Lichtprofil, genau,
+    /// ohne Hysterese. Wartet, solange die Ausgabe gedeckelt ist (dann vor dem Aufheben des
+    /// Deckels, siehe `endAbsence`) oder die Displays schlafen (dann nach dem Aufwachen).
+    /// Ohne Licht bleibt es bei den beendeten Pausen; der nächste Lux-Wert regelt.
+    @discardableResult
+    private func applyLightProfilesIfDue() -> [LightLevel] {
+        guard lightProfilesDue, absenceStage == .none, !displaysAsleep else { return [] }
+        lightProfilesDue = false
+        guard let origin = activeLightOrigin, let lux = activeLux else { return [] }
+        return applyAmbientLight(lux, from: origin, reason: .presenceChange, ignoresHysteresis: true)
     }
 
     // MARK: - Lichtprofile
@@ -933,6 +1001,8 @@ public final class SensorController {
         guard absenceStage != .none else { return }
         setAbsenceStage(.none)
         manager.setScreensBlanked(false)
+        // Noch unter dem Deckel: Die Ausgabe steigt danach gleich zum Wert des Profils.
+        applyLightProfilesIfDue()
         manager.endDim(.absence)
     }
 
@@ -972,7 +1042,10 @@ public final class SensorController {
     func screensDidWake() {
         displaysAsleep = false
         displaysWokeAt = now()
-        guard absenceStage != .none else { return }
+        guard absenceStage != .none else {
+            if lightProfilesDue { applyLightProfilesAfterWake() }
+            return
+        }
         absenceTask?.cancel()
         let wait = wait
         absenceTask = Task { [weak self] in
@@ -988,11 +1061,24 @@ public final class SensorController {
         }
     }
 
+    /// Die Anwesenheit wechselte, während die Displays ohne Abwesenheit schliefen (macOS):
+    /// Das Lichtprofil gilt kurz nach dem Aufwachen, wenn DDC wieder etwas annimmt.
+    private func applyLightProfilesAfterWake() {
+        absenceTask?.cancel()
+        let wait = wait
+        absenceTask = Task { [weak self] in
+            await wait(IdleDimmer.screenWakeSettle)
+            guard !Task.isCancelled, let self else { return }
+            self.absenceTask = nil
+            self.applyLightProfilesIfDue()
+        }
+    }
+
     /// Nach dem Aufwachen weiter niemand da, etwa weil eine Mitteilung die Displays geweckt
     /// hat: Der Sensor ist verbunden, frisch und meldet „abwesend“, und seit kurz vor dem
     /// Aufwachen gab es keine Eingabe (`PresenceGate.restartsAbsenceAfterWake`).
     private var isStillAwayAfterWake: Bool {
-        guard reactsToAbsence, let displaysWokeAt else { return false }
+        guard reactsToPresence, let displaysWokeAt else { return false }
         let connected = connection == .connected
         guard !PresenceGate.isStale(connected: connected, lastEventAge: lastEventAge) else { return false }
         return PresenceGate.restartsAbsenceAfterWake(

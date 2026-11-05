@@ -169,13 +169,17 @@ struct PresenceGateTests {
 
     // MARK: LuxFilter
 
+    /// Glättung für eine Quelle, die jede Sekunde meldet und flackert (früher der
+    /// eingebaute Sensor). Keine Quelle der App nutzt sie mehr; der Filter kann es weiter.
+    private static let smoothing = LuxFilter.Configuration(medianWindow: 5, timeConstant: .seconds(4), jumpFactor: 3, jumpCount: 3)
+
     private static func feed(_ filter: inout LuxFilter, _ values: [Double], from start: ContinuousClock.Instant, every step: Duration = .seconds(1)) -> [Double] {
         values.enumerated().map { index, lux in filter.add(lux, at: start + step * index) }
     }
 
-    @Test("Median filtert einzelne Ausreißer des eingebauten Sensors")
+    @Test("Median filtert einzelne Ausreißer")
     func medianDropsOutliers() {
-        var filter = LuxFilter(.builtIn)
+        var filter = LuxFilter(Self.smoothing)
         let out = Self.feed(&filter, [100, 100, 100, 5000, 100, 2, 100], from: .now)
         #expect(out.allSatisfy { abs($0 - 100) < 1 })
     }
@@ -183,7 +187,7 @@ struct PresenceGateTests {
     @Test("Stufensprung: kleiner gleitet mit ~4 s, großer anhaltender zieht nach drei Werten nach")
     func emaFollowsStep() {
         let start = ContinuousClock.now
-        var filter = LuxFilter(.builtIn)
+        var filter = LuxFilter(Self.smoothing)
         _ = Self.feed(&filter, [100, 100, 100, 100, 100], from: start)
 
         // Faktor 1,5: gleitet, nach 1 s erst ein Teil, nach 20 s fast ganz.

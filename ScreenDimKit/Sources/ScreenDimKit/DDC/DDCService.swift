@@ -224,7 +224,8 @@ public final class DDCService: DDCControlling {
             return true
         }
         guard proceed else {
-            ddcLog.info("\(self.label, privacy: .public) \(operation, privacy: .public): übersprungen, Aufrufer hat schon eine Antwort")
+            // Folge eines Timeouts oder Hängers: selten und für deren Aufklärung nötig.
+            ddcLog.notice("\(self.label, privacy: .public) \(operation, privacy: .public): übersprungen, Aufrufer hat schon eine Antwort")
             return
         }
 
@@ -371,6 +372,7 @@ public final class DDCService: DDCControlling {
             ddcLog.error("\(self.label, privacy: .public) \(kind, privacy: .public) [\(packet.hexString, privacy: .public)]: \(status, privacy: .public), \(duration.milliseconds) ms")
             throw error
         }
+        // Jeder Schritt einer Überblendung: nur `info` (nicht gespeichert). Fehler oben als `error`.
         ddcLog.info("\(self.label, privacy: .public) \(kind, privacy: .public) [\(packet.hexString, privacy: .public)]: \(status, privacy: .public), \(duration.milliseconds) ms")
     }
 
@@ -387,6 +389,7 @@ public final class DDCService: DDCControlling {
             ddcLog.error("\(self.label, privacy: .public) I2C-Read \(count) Bytes: \(status, privacy: .public), \(duration.milliseconds) ms")
             throw error
         }
+        // Ergebnis steht als `notice` beim Auswerten (Wert oder Bytes der kaputten Antwort).
         ddcLog.info("\(self.label, privacy: .public) I2C-Read \(count) Bytes: \(status, privacy: .public), \(duration.milliseconds) ms")
         return reply
     }
@@ -394,7 +397,8 @@ public final class DDCService: DDCControlling {
     private func parse(_ reply: [UInt8], expecting code: UInt8) throws(DDCError) -> VCPReading {
         do throws(DDCError) {
             let reading = try DDCPacket.parseGetVCPReply(reply, expecting: code)
-            ddcLog.info("\(self.label, privacy: .public) VCP 0x\(Self.hex(code), privacy: .public) = \(reading.current)/\(reading.maximum)")
+            // Reads gibt es nur bei Prüfung und Diagnose; der Wert zeigt, was der Monitor meldet.
+            ddcLog.notice("\(self.label, privacy: .public) VCP 0x\(Self.hex(code), privacy: .public) = \(reading.current)/\(reading.maximum)")
             return reading
         } catch {
             switch error {
