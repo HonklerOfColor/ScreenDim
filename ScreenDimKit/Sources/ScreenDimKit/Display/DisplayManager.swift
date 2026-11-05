@@ -126,8 +126,9 @@ public final class DisplayManager {
     @ObservationIgnored private var fades: [CGDirectDisplayID: Task<Void, Never>] = [:]
     /// Ziel der laufenden Überblendung je Display.
     @ObservationIgnored private var fadeTargets: [CGDirectDisplayID: Double] = [:]
-    /// Deckel je Grund, auch beim Ausblenden nach `endDim`.
-    @ObservationIgnored private var caps: [DimCause: DimCap] = [:]
+    /// Deckel je Grund, auch beim Ausblenden nach `endDim`. Beobachtet: Die Anzeige der
+    /// Ausgabe (`outputBrightness`) folgt jedem Schritt einer Überblendung.
+    private var caps: [DimCause: DimCap] = [:]
     /// Wert vor dem Ziehen am Regler je Display (`setBrightness(…, interactive: true)`).
     @ObservationIgnored private var interactiveStart: [CGDirectDisplayID: Double] = [:]
 
@@ -484,6 +485,27 @@ public final class DisplayManager {
         let values = monitors.filter(\.isAdjustable).map(\.brightness)
         guard !values.isEmpty else { return 0 }
         return (values.reduce(0, +) / Double(values.count)).rounded()
+    }
+
+    /// Was ein Monitor gerade ausgibt: der eingestellte Wert, unter einem Deckel (Leerlauf,
+    /// Abwesenheit) entsprechend weniger, beim Überblenden anteilig. Beobachtbar bei jedem
+    /// Schritt, auch wenn sich nur der Deckel ändert; für die Anzeige im Menü. `nil` für
+    /// einen unbekannten Monitor.
+    public func outputBrightness(for id: CGDirectDisplayID) -> Double? {
+        monitors.first { $0.id == id }.map(currentOutput)
+    }
+
+    /// Durchschnitt der Ausgaben der regelbaren Monitore, für „Alle Monitore“ im Menü.
+    public var masterOutputBrightness: Double {
+        let values = monitors.filter(\.isAdjustable).map(currentOutput)
+        guard !values.isEmpty else { return 0 }
+        return (values.reduce(0, +) / Double(values.count)).rounded()
+    }
+
+    /// Nur regelbare Monitore liegen unter einem Deckel; ignorierte oder noch geprüfte
+    /// zeigen ihren Wert.
+    private func currentOutput(_ monitor: Monitor) -> Double {
+        monitor.isAdjustable ? output(monitor.brightness) : monitor.brightness
     }
 
     /// Wert, auf den das Display gerade zugeht: Ziel der laufenden Überblendung, sonst der

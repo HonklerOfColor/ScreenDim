@@ -55,7 +55,8 @@ struct MenuContentView: View {
 
     /// Eine Karte für alle Regler: bei mehreren Monitoren zuerst „Alle Monitore“, dann je
     /// Monitor sein Name und sein Regler. Ignorierte Monitore fehlen; an ihnen gibt es
-    /// nichts zu regeln.
+    /// nichts zu regeln. Angezeigt wird, was die Monitore gerade ausgeben, live auch beim
+    /// Abdunkeln (Leerlauf, Abwesenheit) und bei der Lichtregelung; Ziehen setzt den Wert.
     private var brightnessCard: some View {
         let monitors = manager.monitors.filter { !$0.isIgnored }
         return VStack(alignment: .leading, spacing: 12) {
@@ -70,7 +71,7 @@ struct MenuContentView: View {
                     BrightnessControl(
                         title: String(localized: "Alle Monitore"),
                         systemImage: "sun.max.fill",
-                        value: Binding(get: { manager.masterBrightness }, set: { manager.setAllBrightness($0, interactive: true) }),
+                        value: Binding(get: { manager.masterOutputBrightness }, set: { manager.setAllBrightness($0, interactive: true) }),
                         onEnded: { manager.endInteractiveBrightness() },
                         isEnabled: monitors.contains(where: \.isAdjustable)
                     )
@@ -79,7 +80,10 @@ struct MenuContentView: View {
                     BrightnessControl(
                         title: monitor.name,
                         systemImage: monitor.isBuiltIn ? "laptopcomputer" : "display",
-                        value: Binding(get: { monitor.brightness }, set: { manager.setBrightness($0, for: monitor.id, interactive: true) }),
+                        value: Binding(
+                            get: { manager.outputBrightness(for: monitor.id) ?? monitor.brightness },
+                            set: { manager.setBrightness($0, for: monitor.id, interactive: true) }
+                        ),
                         onEnded: { manager.endInteractiveBrightness(for: monitor.id) },
                         isEnabled: monitor.isAdjustable
                     )
@@ -138,7 +142,8 @@ private struct BrightnessControl: View {
                     .font(.subheadline.weight(.medium))
                     .lineLimit(1)
                 Spacer(minLength: 8)
-                Text(verbatim: "\(Int(value)) %")
+                // Gerundet: Beim Überblenden liegen die Werte zwischen ganzen Prozent.
+                Text(verbatim: "\(Int(value.rounded())) %")
                     .font(.subheadline.monospacedDigit())
                     .foregroundStyle(.secondary)
             }

@@ -1,5 +1,7 @@
 import CoreGraphics
 import Foundation
+import Observation
+import Synchronization
 import Testing
 @testable import ScreenDimKit
 
@@ -90,6 +92,48 @@ struct DisplayManagerTests {
 
     private func state(_ manager: DisplayManager, _ id: CGDirectDisplayID) -> DDCState? {
         manager.monitors.first { $0.id == id }?.state
+    }
+
+    @Test("Menü zeigt die Ausgabe: unter einem Deckel live beobachtbar, der eingestellte Wert bleibt")
+    func outputBrightnessFollowsCap() {
+        setup.displays = [Self.external(2, avService: nil), Self.external(3, avService: nil)]
+        let setup = setup
+        let manager = DisplayManager(
+            store: BrightnessStore(storage: setup.preferences),
+            timing: .immediate,
+            fadeDuration: .zero,
+            systemFadeDuration: .zero,
+            gamma: setup.gamma,
+            overlay: setup.overlay,
+            blanker: setup.blanker,
+            discover: { _ in setup.displays }
+        )
+        manager.refresh(force: true)
+        manager.setBrightness(70, for: 2)
+        manager.setBrightness(10, for: 3)
+        #expect(manager.outputBrightness(for: 2) == 70)
+        #expect(manager.masterOutputBrightness == 40)
+        #expect(manager.outputBrightness(for: 9) == nil)
+
+        // Was das Menü liest, meldet die Änderung, obwohl sich nur der Deckel ändert.
+        let changed = ChangeFlag()
+        withObservationTracking {
+            _ = manager.outputBrightness(for: 2)
+        } onChange: {
+            changed.set()
+        }
+        manager.beginDim(.idle, to: 20)
+        #expect(changed.isSet)
+        #expect(manager.outputBrightness(for: 2) == 20)
+        #expect(manager.outputBrightness(for: 3) == 10) // dunklere bleiben
+        #expect(manager.masterOutputBrightness == 15)
+        #expect(monitor(manager, 2)?.brightness == 70)
+        #expect(manager.masterBrightness == 40)
+        #expect(setup.gamma.levels[2] == 20)
+
+        manager.endDim(.idle)
+        #expect(manager.outputBrightness(for: 2) == 70)
+        #expect(manager.masterOutputBrightness == 40)
     }
 
     @Test("Refresh mit gleicher Display-Menge erzeugt keine neuen Kanäle")
@@ -1048,5 +1092,16 @@ struct DisplayManagerTests {
         #expect(monitor(manager, 2)?.branchVendor == "Realtek")
         #expect(monitor(manager, 3)?.intermediary == .adapter)
         #expect(monitor(manager, 4)?.intermediary == nil)
+    }
+}
+
+/// Merkt sich, ob eine beobachtete Eigenschaft eine Änderung gemeldet hat.
+private final class ChangeFlag: Sendable {
+    private let state = Mutex(false)
+
+    var isSet: Bool { state.withLock { $0 } }
+
+    func set() {
+        state.withLock { $0 = true }
     }
 }
