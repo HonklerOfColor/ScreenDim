@@ -102,6 +102,12 @@ public final class DisplayManager {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var rescanTask: Task<Void, Never>?
+    /// Die Displays schlafen (`NSWorkspace`). Dann sucht der Manager keine Kanäle neu: Der
+    /// U28E590 am USB-C-Adapter baut im Standby alle 9 s seinen Link neu auf, jede Suche
+    /// fragte ihn per DDC ab. Nach dem Aufwachen einmal.
+    @ObservationIgnored private var screensAsleep = false
+    @ObservationIgnored private var rescanAfterWake = false
+    @ObservationIgnored private var screenObservers: [any NSObjectProtocol] = []
     @ObservationIgnored private var pendingForcedRefresh = false
     @ObservationIgnored private var pendingResetDimming = false
     @ObservationIgnored private var pendingReconfigured: Set<CGDirectDisplayID> = []
@@ -199,6 +205,15 @@ public final class DisplayManager {
         if !DisplayDiscovery.watchAVServices(avServicePublished) {
             log.error("Keine Meldung über neue AV-Services; nach dem Display-Ruhezustand hilft dann „Erneut prüfen“")
         }
+        let workspace = NSWorkspace.shared.notificationCenter
+        screenObservers = [
+            workspace.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.screensDidSleep() }
+            },
+            workspace.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.screensDidWake() }
+            },
+        ]
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { _ in
@@ -478,6 +493,7 @@ public final class DisplayManager {
     /// App auf Software-Dimmung. Durchläuft die IORegistry und verbindet nur die Monitore
     /// neu, deren Proxy gewechselt hat; die übrigen bleiben unberührt, ohne I2C-Verkehr.
     /// Neue oder geänderte Displays übernimmt der Refresh aus dem Reconfiguration-Callback.
+    /// Während des Display-Schlafs nicht (`scheduleChannelRescan`).
     func rescanChannels() {
         for display in discover(true) {
             guard let known = discovered[display.id], known.identity == display.identity,
@@ -517,14 +533,39 @@ public final class DisplayManager {
         }
     }
 
-    fileprivate func scheduleChannelRescan() {
+    /// Sucht die Kanäle nach `channelRescanDelay` neu (neuer Proxy gemeldet, toter Kanal);
+    /// schlafen die Displays, erst nach dem Aufwachen.
+    func scheduleChannelRescan() {
         rescanTask?.cancel()
+        rescanTask = nil
+        guard !screensAsleep else {
+            rescanAfterWake = true
+            return
+        }
         let delay = channelRescanDelay
         rescanTask = Task { [weak self] in
             try? await Task.sleep(for: delay)
-            guard !Task.isCancelled else { return }
-            self?.rescanChannels()
+            guard !Task.isCancelled, let self else { return }
+            // Inzwischen eingeschlafen: nach dem Aufwachen.
+            guard !self.screensAsleep else {
+                self.rescanAfterWake = true
+                return
+            }
+            self.rescanChannels()
         }
+    }
+
+    func screensDidSleep() {
+        screensAsleep = true
+    }
+
+    /// Nach dem Aufwachen einmal suchen, wenn während des Schlafs ein Proxy kam; die
+    /// Wartezeit lässt dem Link Zeit, sich zu setzen.
+    func screensDidWake() {
+        screensAsleep = false
+        guard rescanAfterWake else { return }
+        rescanAfterWake = false
+        scheduleChannelRescan()
     }
 
     fileprivate func scheduleRefresh(

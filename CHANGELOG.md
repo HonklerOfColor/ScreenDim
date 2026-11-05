@@ -118,6 +118,11 @@
   (die übrigen ohne I2C-Verkehr), danach gilt wieder der gespeicherte DDC-Wert. Ein Write
   oder Read an einen toten Kanal löst dieselbe Suche aus, „Erneut prüfen“ ebenso. Log und
   Diagnose nennen den Code beim Namen.
+- Display-Ruhezustand: Der U28E590 am USB-C→DP-Adapter baut im Standby alle 9 s seinen
+  Link neu auf (neuer Proxy, Hotplug laut WindowServer), auch ohne ScreenDim. Die App
+  verband und prüfte ihn dabei jedes Mal neu, also eine DDC-Abfrage alle 9 s an einen
+  schlafenden Monitor. Jetzt merkt sie neue Proxys während des Schlafs nur vor und sucht
+  einmal nach dem Aufwachen.
 - Schreibtisch-Sensor: Ein nicht lesbarer Schlüsselbund (gesperrt, Zugriff verweigert)
   galt als „nicht gekoppelt“ und verlangte eine Neukopplung, die den Code überschrieb.
   Jetzt eigener Status „Schlüsselbund nicht lesbar“; Code und Hostname bleiben.

@@ -173,7 +173,9 @@ zwei Interpolationen → `%1$@`, `%2$@`.
   Display-Menge ändert sich nicht). Der alte Kanal antwortet mit `0x10000003`
   (`MACH_SEND_INVALID_DEST`). Der JapanNext per TB4 behält seinen Proxy. Deshalb meldet
   IOKit neue Proxys (`DisplayDiscovery.watchAVServices`), und
-  `DisplayManager.rescanChannels` verbindet nur die betroffenen Monitore neu.
+  `DisplayManager.rescanChannels` verbindet nur die betroffenen Monitore neu. Im Standby
+  baut er den Link alle 9 s neu auf (auch ohne App); deshalb sucht der Manager während
+  des Display-Schlafs nicht, sondern einmal nach `screensDidWake`.
 - JapanNext 6K (6720×3780): über USB-C→DP (Sabrent-Adapter) nur Null-Messages, außer
   einmal beim Einstecken vor dem EDID; über HDMI und über Thunderbolt-4-Kabel an seinem
   USB-C-Eingang geht DDC/CI (TB4: Antwort sofort in Runde 1). Nach dem Einstecken per

@@ -274,6 +274,39 @@ struct DisplayManagerTests {
         #expect(monitor(manager, 2)?.usesSoftwareDimming == false)
     }
 
+    @Test("Display-Schlaf: neue Proxys nur vormerken (U28E590 alle 9 s), nach dem Aufwachen einmal verbinden und prüfen")
+    func rescanWaitsForWake() async {
+        let first = StubControl()
+        let fresh = StubControl()
+        setup.displays = [Self.external(2, avService: 0x100)]
+        setup.makeControl = { id in id == 0x100 ? first : fresh }
+        let manager = makeManager()
+        manager.refresh(force: true)
+        #expect(await eventually { state(manager, 2) == .ready })
+
+        // Aufwachen ohne vorgemerkten Proxy: keine Suche.
+        let scans = setup.scans.count
+        manager.screensDidSleep()
+        manager.screensDidWake()
+        try? await Task.sleep(for: .milliseconds(30))
+        #expect(setup.scans.count == scans)
+
+        manager.screensDidSleep()
+        setup.displays = [Self.external(2, avService: 0x101)]
+        manager.scheduleChannelRescan()
+        manager.scheduleChannelRescan()
+        try? await Task.sleep(for: .milliseconds(30))
+        #expect(setup.scans.count == scans)
+        #expect(setup.created == [0x100])
+        #expect(fresh.reads == 0)
+
+        manager.screensDidWake()
+        #expect(await eventually { state(manager, 2) == .ready && fresh.reads == 1 })
+        #expect(setup.created == [0x100, 0x101])
+        #expect(setup.scans.count == scans + 1)
+        #expect(first.reads == 1)
+    }
+
     @Test("Neuer AV-Service bei Gamma: kein Kanal; wer später DDC/CI wählt, bekommt den neuen")
     func newServiceWhileDDCDisabled() async {
         setup.displays = [Self.external(2, avService: 0x100)]
