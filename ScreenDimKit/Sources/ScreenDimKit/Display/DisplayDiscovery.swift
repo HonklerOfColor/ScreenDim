@@ -181,6 +181,32 @@ public enum DisplayDiscovery {
 
     // MARK: - IORegistry
 
+    /// Ruft `callback` auf der Main-Queue, sobald macOS einen `DCPAVServiceProxy` anlegt:
+    /// Monitor angesteckt, oder sein Link nach dem Display-Ruhezustand neu aufgebaut. Der
+    /// Callback muss den Iterator mit `drain(_:)` leeren, sonst kommt keine weitere
+    /// Meldung. Port und Iterator bleiben, solange die App läuft. Öffentliche IOKit-API.
+    /// - Returns: `false`, wenn sich die Benachrichtigung nicht einrichten ließ.
+    static func watchAVServices(_ callback: IOServiceMatchingCallback) -> Bool {
+        guard let port = IONotificationPortCreate(kIOMainPortDefault) else { return false }
+        IONotificationPortSetDispatchQueue(port, .main)
+        var iterator: io_iterator_t = 0
+        guard IOServiceAddMatchingNotification(
+            port, kIOFirstMatchNotification, IOServiceMatching("DCPAVServiceProxy"), callback, nil, &iterator
+        ) == KERN_SUCCESS else {
+            IONotificationPortDestroy(port)
+            return false
+        }
+        // Die vorhandenen Proxys abholen; erst das schärft die Benachrichtigung.
+        drain(iterator)
+        return true
+    }
+
+    nonisolated static func drain(_ iterator: io_iterator_t) {
+        while case let entry = IOIteratorNext(iterator), entry != 0 {
+            IOObjectRelease(entry)
+        }
+    }
+
     private struct Candidate {
         let vendor: UInt32?
         let model: UInt32?

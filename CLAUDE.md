@@ -39,8 +39,9 @@ geht nur über `IOAVService`, und das ist private API (Review-Richtlinie 2.5.1).
     Deadline, Sperre bei Hängern, höchstens 3 offene Aufrufe, Vorlauf-Write nach jedem
     Read), `LatestValueThrottle`, `I2CTransport` (nur das Protokoll), `DDCDiagnostics`.
   - `Display/`: `DisplayManager` (Zustand, Kanal-Cache über Refreshes, Probe in bis zu
-    drei Runden, Routing der Software-Dimmung, `setBrightnessMethod`), `DisplayDiscovery`
-    (CoreGraphics und IORegistry: Framebuffer ↔ `DCPAVServiceProxy`, DisplayPort-Links),
+    drei Runden, Routing der Software-Dimmung, `setBrightnessMethod`, Neuverbindung bei
+    neuem Proxy: `rescanChannels`), `DisplayDiscovery` (CoreGraphics und IORegistry:
+    Framebuffer ↔ `DCPAVServiceProxy`, DisplayPort-Links, IOKit-Meldung neuer Proxys),
     `BrightnessStore` (DDC- und Software-Wert getrennt, Verfahren und DDC-Wahl je
     Monitor), `BrightnessMethod`, `SoftwareDimming` mit `GammaDimmer` und
     `OverlayDimmer`, `ScreenBlanker`, `DisplayDiagnostics`, `IdleDimmer` (Leerlauf-Dimmung,
@@ -167,6 +168,12 @@ zwei Interpolationen → `%1$@`, `%2$@`.
   der vorigen Antwort im Puffer), W-W-R antwortet immer, auch mit 160 ms Abstand; ein
   einzelner Set-VCP nach einem Read geht verloren. Deshalb der Vorlauf-Write
   (`DDCTiming.primeAfterRead`). Mess-Werkzeug: eigenes Swift-CLI mit `IOAVService`.
+- U28E590 per USB-C→DP (2026-11-05): Nach dem Display-Ruhezustand legt macOS seinen
+  `DCPAVServiceProxy` neu an (neue RegistryEntryID, gleiche `CGDirectDisplayID`, die
+  Display-Menge ändert sich nicht). Der alte Kanal antwortet mit `0x10000003`
+  (`MACH_SEND_INVALID_DEST`). Der JapanNext per TB4 behält seinen Proxy. Deshalb meldet
+  IOKit neue Proxys (`DisplayDiscovery.watchAVServices`), und
+  `DisplayManager.rescanChannels` verbindet nur die betroffenen Monitore neu.
 - JapanNext 6K (6720×3780): über USB-C→DP (Sabrent-Adapter) nur Null-Messages, außer
   einmal beim Einstecken vor dem EDID; über HDMI und über Thunderbolt-4-Kabel an seinem
   USB-C-Eingang geht DDC/CI (TB4: Antwort sofort in Runde 1). Nach dem Einstecken per

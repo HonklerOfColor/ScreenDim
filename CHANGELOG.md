@@ -109,6 +109,15 @@
 - Logik als lokales Swift-Paket `ScreenDimKit`; Tests per `swift test`.
 
 ### Behoben
+- DDC/CI nach dem Display-Ruhezustand: Ein Monitor, dessen Link macOS beim Aufwachen neu
+  aufbaut (Samsung U28E590 am USB-C→DP-Adapter), bekommt einen neuen `DCPAVServiceProxy`;
+  die `CGDirectDisplayID` bleibt, kein Refresh lief. Die App schrieb weiter an den toten
+  Kanal (`0x10000003`, `MACH_SEND_INVALID_DEST`), fiel auf Software-Dimmung zurück und
+  fand DDC erst nach einem Neustart wieder. Jetzt meldet IOKit jeden neuen Proxy; 1,5 s
+  danach sucht die App die Kanäle neu und verbindet und prüft nur den betroffenen Monitor
+  (die übrigen ohne I2C-Verkehr), danach gilt wieder der gespeicherte DDC-Wert. Ein Write
+  oder Read an einen toten Kanal löst dieselbe Suche aus, „Erneut prüfen“ ebenso. Log und
+  Diagnose nennen den Code beim Namen.
 - Schreibtisch-Sensor: Ein nicht lesbarer Schlüsselbund (gesperrt, Zugriff verweigert)
   galt als „nicht gekoppelt“ und verlangte eine Neukopplung, die den Code überschrieb.
   Jetzt eigener Status „Schlüsselbund nicht lesbar“; Code und Hostname bleiben.

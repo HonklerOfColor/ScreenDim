@@ -23,7 +23,7 @@ Helligkeit sofort zurück.
 ## So sieht es aus
 
 <p align="center">
-  <img src="docs/screenshots/menue.png" width="346" alt="Menü in der Menüleiste: ein Regler für alle Monitore und einer je Monitor, darunter Sensor-Status und Einstellungen">
+  <img src="docs/screenshots/menue.png" width="346" alt="Menü in der Menüleiste: ein Regler für alle Monitore mit rundem Knopf für automatisch oder manuell, einer je Monitor, darunter Sensor-Status und Einstellungen">
 </p>
 
 <table>
@@ -33,9 +33,9 @@ Helligkeit sofort zurück.
     <th>Sensor</th>
   </tr>
   <tr>
-    <td valign="top"><img src="docs/screenshots/einstellungen-allgemein.png" alt="Einstellungen, Tab Allgemein: Login, Tastenkürzel, Abdunkeln bei Inaktivität und Verfahren je Monitor (DDC/CI, Gamma, Overlay)"></td>
+    <td valign="top"><img src="docs/screenshots/einstellungen-allgemein.png" alt="Einstellungen, Tab Allgemein: Login, Tastenkürzel, Abdunkeln bei Inaktivität und Verfahren je Monitor (DDC/CI, Gamma, Overlay, Ignorieren)"></td>
     <td valign="top"><img src="docs/screenshots/einstellungen-licht.png" alt="Einstellungen, Tab Licht: Lichtkurve je Monitor, Helligkeit über Lux"></td>
-    <td valign="top"><img src="docs/screenshots/einstellungen-sensor.png" alt="Einstellungen, Tab Sensor: gekoppelter Schreibtisch-Sensor, Status, Demo-Modus"></td>
+    <td valign="top"><img src="docs/screenshots/einstellungen-sensor.png" alt="Einstellungen, Tab Sensor: gekoppelter Schreibtisch-Sensor mit Status, Anwesenheit und Umgebungslicht, Verhalten bei Abwesenheit (abdunkeln, Displays aus), Demo-Modus"></td>
   </tr>
 </table>
 

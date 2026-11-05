@@ -44,6 +44,9 @@ struct IOReturnDescriptionTests {
         #expect(IOReturnDescription.describe(0) == "0x00000000 kIOReturnSuccess")
         #expect(IOReturnDescription.describe(Int32(bitPattern: 0xE000_02D6)) == "0xE00002D6 kIOReturnTimeout")
         #expect(IOReturnDescription.name(Int32(bitPattern: 0xE000_02CA)) == "kIOReturnIOError")
+        #expect(IOReturnDescription.describe(Int32(bitPattern: 0x1000_0003)) == "0x10000003 MACH_SEND_INVALID_DEST")
+        #expect(DDCError.writeFailed(Int32(bitPattern: 0x1000_0003)).isStaleService)
+        #expect(!DDCError.writeFailed(Int32(bitPattern: 0xE000_02CA)).isStaleService)
     }
 
     @Test("Unbekannter Code wird zerlegt (echter Wert vom S34CG50)")

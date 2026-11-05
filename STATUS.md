@@ -30,6 +30,9 @@ Auf echter Hardware noch nicht geprüft. Die Tests decken nur die Logik ab.
 ### Aufwachen
 - [ ] Nach dem Ruhezustand: Software-Dimmung wieder aktiv (Gamma und Overlay), kein
       dauerhaftes Flackern.
+- [ ] U28E590 (USB-C→DP) nach dem Display-Ruhezustand (Abwesenheit, Stufe 2): Log zeigt
+      „neuer AV-Service … statt …“, danach „Helligkeit …/100“; Diagnose „Bereit“, Regler
+      stellt die Hintergrundbeleuchtung, ohne Neustart. JapanNext bleibt unberührt.
 
 ### Hotplug und Umkonfiguration
 - [ ] Monitor ab- und wieder anstecken: Kanal und Werte kommen zurück.

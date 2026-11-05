@@ -43,6 +43,12 @@ public enum DDCError: Error, Equatable, Sendable {
         default: nil
         }
     }
+
+    /// Der Kanal zeigt auf einen Dienst, den es nicht mehr gibt: macOS hat den Proxy des
+    /// Monitors neu angelegt (`MACH_SEND_INVALID_DEST`). Ein neuer Kanal hilft, kein Retry.
+    public var isStaleService: Bool {
+        ioReturn == IOReturnDescription.machSendInvalidDest
+    }
 }
 
 extension DDCError: CustomStringConvertible {

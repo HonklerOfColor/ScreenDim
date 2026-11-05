@@ -61,14 +61,19 @@ final class MockTransport: I2CTransport {
 final class StubControl: DDCControlling {
     private struct State {
         var readResult: Result<VCPReading, DDCError>
+        var writeError: DDCError?
         var reads = 0
         var writes: [UInt16] = []
     }
 
     private let state: Mutex<State>
 
-    init(read: Result<VCPReading, DDCError> = .success(VCPReading(current: 50, maximum: 100))) {
-        state = Mutex(State(readResult: read))
+    /// - Parameter writeError: Jeder Write scheitert so, etwa an einem toten Kanal.
+    init(
+        read: Result<VCPReading, DDCError> = .success(VCPReading(current: 50, maximum: 100)),
+        writeError: DDCError? = nil
+    ) {
+        state = Mutex(State(readResult: read, writeError: writeError))
     }
 
     var reads: Int { state.withLock { $0.reads } }
@@ -87,7 +92,11 @@ final class StubControl: DDCControlling {
     }
 
     func write(_ code: VCPCode, value: UInt16) async throws(DDCError) {
-        state.withLock { $0.writes.append(value) }
+        let error = state.withLock { state in
+            state.writes.append(value)
+            return state.writeError
+        }
+        if let error { throw error }
     }
 }
 

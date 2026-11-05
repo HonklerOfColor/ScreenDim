@@ -24,13 +24,18 @@ struct DisplayManagerTests {
 
     private let setup = Setup()
 
-    private func makeManager(sleeper: ManualSleeper? = nil, systemFade: Duration = .zero) -> DisplayManager {
+    private func makeManager(
+        sleeper: ManualSleeper? = nil,
+        systemFade: Duration = .zero,
+        rescanDelay: Duration = .milliseconds(5)
+    ) -> DisplayManager {
         let setup = setup
         return DisplayManager(
             store: BrightnessStore(storage: setup.preferences),
             timing: .immediate,
             probeRetryDelay: .milliseconds(1),
             probeLateRetryDelay: .milliseconds(20),
+            channelRescanDelay: rescanDelay,
             systemFadeDuration: systemFade,
             sleep: { duration in
                 if let sleeper { await sleeper.sleep(duration) } else { try? await Task.sleep(for: duration) }
@@ -179,6 +184,113 @@ struct DisplayManagerTests {
         #expect(setup.created == [0x100])
         #expect(manager.monitors.map(\.id) == [5])
         #expect(state(manager, 5) != .noChannel)
+    }
+
+    @Test("Neuer AV-Service bei gleicher Display-ID (Display-Ruhezustand): neuer Kanal, nur dieser Monitor wird geprüft")
+    func newServiceSameDisplayRebinds() async {
+        let first = StubControl(read: .success(VCPReading(current: 70, maximum: 100)))
+        let other = StubControl()
+        // Vor dem Ruhezustand hatte die Abwesenheit den Monitor auf 0 gedeckelt.
+        let fresh = StubControl(read: .success(VCPReading(current: 0, maximum: 100)))
+        setup.displays = [Self.external(2, avService: 0x100), Self.external(3, avService: 0x200)]
+        setup.makeControl = { id in [0x100: first, 0x200: other, 0x101: fresh][id]! }
+        BrightnessStore(storage: setup.preferences).setBrightness(
+            70, for: Self.external(2, avService: nil).identity.storageKey, mode: .ddc
+        )
+        let manager = makeManager()
+        var ready: [CGDirectDisplayID] = []
+        manager.onMonitorReady = { ready.append($0) }
+        manager.refresh(force: true)
+        #expect(await eventually { state(manager, 2) == .ready && state(manager, 3) == .ready })
+
+        // Gleiche Proxys: nichts passiert.
+        manager.rescanChannels()
+        #expect(setup.created.sorted() == [0x100, 0x200])
+
+        setup.displays = [Self.external(2, avService: 0x101), Self.external(3, avService: 0x200)]
+        ready = []
+        manager.rescanChannels()
+        #expect(setup.created.sorted() == [0x100, 0x101, 0x200])
+        #expect(state(manager, 2) == .probing)
+        #expect(await eventually { state(manager, 2) == .ready })
+        #expect(ready == [2])
+        #expect(manager.diagnostics().first { $0.id == 2 }?.avServiceID == 0x101)
+        // Der gespeicherte Wert geht an den neuen Kanal; der andere Monitor bleibt unberührt.
+        #expect(await eventually { fresh.writes == [70] })
+        #expect(first.reads == 1)
+        #expect(other.reads == 1)
+        #expect(other.writes.isEmpty)
+    }
+
+    @Test("Write an toten Kanal: Software-Rückfall, die neue Suche holt DDC mit dem gespeicherten Wert zurück")
+    func staleChannelRecovers() async {
+        let stale = DDCError.writeFailed(IOReturnDescription.machSendInvalidDest)
+        let dead = StubControl(read: .success(VCPReading(current: 75, maximum: 100)), writeError: stale)
+        let fresh = StubControl(read: .success(VCPReading(current: 0, maximum: 100)))
+        setup.displays = [Self.external(2, avService: 0x100)]
+        setup.makeControl = { id in id == 0x100 ? dead : fresh }
+        BrightnessStore(storage: setup.preferences).setBrightness(
+            75, for: Self.external(2, avService: nil).identity.storageKey, mode: .ddc
+        )
+        let manager = makeManager(rescanDelay: .milliseconds(300))
+        var jobs: [BrightnessJob] = []
+        manager.onBrightnessJob = { jobs.append($0) }
+        manager.refresh(force: true)
+        #expect(await eventually { state(manager, 2) == .ready })
+
+        // macOS hat den Proxy neu angelegt, die Meldung darüber fehlt; der Write geht an den alten.
+        setup.displays = [Self.external(2, avService: 0x101)]
+        manager.setBrightness(30, for: 2)
+        #expect(await eventually { monitor(manager, 2)?.usesSoftwareDimming == true })
+        #expect(state(manager, 2) == .ioError(IOReturnDescription.machSendInvalidDest))
+
+        // Der tote Kanal löst die Suche selbst aus.
+        #expect(await eventually { state(manager, 2) == .ready })
+        #expect(setup.created == [0x100, 0x101])
+        #expect(monitor(manager, 2)?.usesSoftwareDimming == false)
+        #expect(setup.gamma.levels.isEmpty)
+        #expect(await eventually { fresh.writes == [30] })
+        // Der Rückfall hat keinen Auftrag: ohne gespeicherten Software-Wert schon am Ziel (100 %).
+        #expect(jobs.map(\.reason) == [.manual, .probeRestore])
+    }
+
+    @Test("Toter Kanal bei der Prüfung: keine zweite Runde; „Erneut prüfen“ sucht zuerst den neuen AV-Service")
+    func retryRescans() async {
+        let dead = StubControl(read: .failure(.readFailed(IOReturnDescription.machSendInvalidDest)))
+        let fresh = StubControl(read: .success(VCPReading(current: 60, maximum: 100)))
+        setup.displays = [Self.external(2, avService: 0x100)]
+        setup.makeControl = { id in id == 0x100 ? dead : fresh }
+        let manager = makeManager(rescanDelay: .seconds(60))
+        manager.refresh(force: true)
+        #expect(await eventually { state(manager, 2) == .ioError(IOReturnDescription.machSendInvalidDest) })
+        #expect(dead.reads == 1)
+        #expect(monitor(manager, 2)?.usesSoftwareDimming == true)
+
+        setup.displays = [Self.external(2, avService: 0x101)]
+        manager.retry(2)
+        #expect(await eventually { state(manager, 2) == .ready })
+        #expect(fresh.reads == 1)
+        #expect(dead.reads == 1)
+        #expect(monitor(manager, 2)?.usesSoftwareDimming == false)
+    }
+
+    @Test("Neuer AV-Service bei Gamma: kein Kanal; wer später DDC/CI wählt, bekommt den neuen")
+    func newServiceWhileDDCDisabled() async {
+        setup.displays = [Self.external(2, avService: 0x100)]
+        let manager = makeManager()
+        manager.refresh(force: true)
+        #expect(await eventually { state(manager, 2) == .ready })
+        manager.setBrightnessMethod(.gamma, for: 2)
+
+        setup.displays = [Self.external(2, avService: 0x101)]
+        manager.rescanChannels()
+        #expect(setup.created == [0x100])
+        #expect(state(manager, 2) == .disabled)
+        #expect(monitor(manager, 2)?.preferredMethod == .gamma)
+
+        manager.setBrightnessMethod(.ddc, for: 2)
+        #expect(setup.created == [0x100, 0x101])
+        #expect(await eventually { state(manager, 2) == .ready })
     }
 
     @Test("Ohne AV-Service: kein Kanal, kein IOAVService")

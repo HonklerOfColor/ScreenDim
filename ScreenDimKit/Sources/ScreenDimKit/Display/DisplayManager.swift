@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import IOKit
 import Observation
 import os
 
@@ -100,6 +101,7 @@ public final class DisplayManager {
     @ObservationIgnored private var knownIdentities: [CGDirectDisplayID: DisplayIdentity] = [:]
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
+    @ObservationIgnored private var rescanTask: Task<Void, Never>?
     @ObservationIgnored private var pendingForcedRefresh = false
     @ObservationIgnored private var pendingResetDimming = false
     @ObservationIgnored private var pendingReconfigured: Set<CGDirectDisplayID> = []
@@ -116,6 +118,9 @@ public final class DisplayManager {
     /// Pause vor der dritten Runde, die es nur nach einer verstümmelten Antwort gibt:
     /// Der Monitor spricht, ist aber noch nicht hochgefahren.
     @ObservationIgnored private let probeLateRetryDelay: Duration
+    /// Pause nach einem neuen `DCPAVServiceProxy` (oder einem Write an einen toten), bevor
+    /// die Kanäle neu gesucht werden: Der Link steht dann, DDC antwortet.
+    @ObservationIgnored private let channelRescanDelay: Duration
     /// Dauer einer Überblendung nach Licht, unabhängig von der Größe des Sprungs.
     @ObservationIgnored private let fadeDuration: Duration
     /// Kürzere Überblendung für Wege des Managers selbst: Wert nach der Prüfung,
@@ -143,6 +148,7 @@ public final class DisplayManager {
         timing: DDCTiming = .configured(from: .standard),
         probeRetryDelay: Duration = .seconds(2),
         probeLateRetryDelay: Duration = .seconds(5),
+        channelRescanDelay: Duration = .milliseconds(1500),
         fadeDuration: Duration = .seconds(2),
         systemFadeDuration: Duration = .milliseconds(500),
         sleep: @escaping @Sendable (Duration) async -> Void = { try? await Task.sleep(for: $0) },
@@ -157,6 +163,7 @@ public final class DisplayManager {
         self.timing = timing
         self.probeRetryDelay = probeRetryDelay
         self.probeLateRetryDelay = probeLateRetryDelay
+        self.channelRescanDelay = channelRescanDelay
         self.fadeDuration = fadeDuration
         self.systemFadeDuration = systemFadeDuration
         self.sleep = sleep
@@ -189,6 +196,9 @@ public final class DisplayManager {
     public func start() {
         ReconfigurationRelay.manager = self
         CGDisplayRegisterReconfigurationCallback(displayReconfigured, nil)
+        if !DisplayDiscovery.watchAVServices(avServicePublished) {
+            log.error("Keine Meldung über neue AV-Services; nach dem Display-Ruhezustand hilft dann „Erneut prüfen“")
+        }
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { _ in
@@ -445,14 +455,76 @@ public final class DisplayManager {
         }
     }
 
+    /// „Erneut prüfen“: erst die Kanäle neu suchen, denn ein Kanal kann tot sein, weil macOS
+    /// den Proxy des Monitors neu angelegt hat; dann prüfen.
     public func retry(_ id: CGDirectDisplayID) {
+        rescanChannels()
         guard let index = index(of: id), channels[id] != nil else {
             refresh(force: true)
             return
         }
+        // Gerade neu verbunden: Die Prüfung läuft schon.
+        guard monitors[index].state != .probing else { return }
         monitors[index].state = .probing
         let generation = generation
         Task { await probe(id, generation: generation) }
+    }
+
+    /// macOS kann den `DCPAVServiceProxy` eines Monitors neu anlegen, ohne dass sich die
+    /// Display-Menge ändert: Am USB-C-Adapter baut der Samsung U28E590 nach dem
+    /// Display-Ruhezustand seinen Link neu auf, die `CGDirectDisplayID` bleibt, kein
+    /// Reconfiguration-Callback ändert die Menge. Der alte Kanal ist dann tot
+    /// (`MACH_SEND_INVALID_DEST`), und ohne neuen bliebe der Monitor bis zum Neustart der
+    /// App auf Software-Dimmung. Durchläuft die IORegistry und verbindet nur die Monitore
+    /// neu, deren Proxy gewechselt hat; die übrigen bleiben unberührt, ohne I2C-Verkehr.
+    /// Neue oder geänderte Displays übernimmt der Refresh aus dem Reconfiguration-Callback.
+    func rescanChannels() {
+        for display in discover(true) {
+            guard let known = discovered[display.id], known.identity == display.identity,
+                  let avServiceID = display.avServiceID, avServiceID != known.avServiceID,
+                  let index = index(of: display.id)
+            else { continue }
+            log.notice("Display \(display.id): neuer AV-Service \(String(format: "0x%llX", avServiceID), privacy: .public) statt \(known.avServiceID.map { String(format: "0x%llX", $0) } ?? "-", privacy: .public)")
+            discovered[display.id] = display
+            rebind(at: index)
+        }
+    }
+
+    /// Neuer Proxy für einen bekannten Monitor: alter Kanal weg, neuer Kanal und Prüfung wie
+    /// beim Refresh. Wer schon per Software dimmt (etwa nach dem gescheiterten Write an den
+    /// alten Kanal), bleibt dabei, auch mitten in einer Überblendung, bis die Prüfung DDC
+    /// zurückholt.
+    private func rebind(at index: Int) {
+        let monitor = monitors[index]
+        // Abgewählt oder ignoriert: kein Kanal; wer später DDC/CI wählt, bekommt den neuen.
+        guard !monitor.isIgnored, monitor.ddcEnabled else {
+            monitors[index].canUseDDC = true
+            return
+        }
+        if let channel = channels.removeValue(forKey: monitor.id) {
+            channelCache[channel.key] = nil
+        }
+        if !monitor.usesSoftwareDimming {
+            fades.removeValue(forKey: monitor.id)?.cancel()
+            fadeTargets[monitor.id] = nil
+        }
+        let opened = openChannel(at: index)
+        monitors[index].canUseDDC = opened
+        if !opened {
+            monitors[index].state = .noChannel
+            switchToSoftwareDimming(index)
+            onMonitorReady?(monitor.id)
+        }
+    }
+
+    fileprivate func scheduleChannelRescan() {
+        rescanTask?.cancel()
+        let delay = channelRescanDelay
+        rescanTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else { return }
+            self?.rescanChannels()
+        }
     }
 
     fileprivate func scheduleRefresh(
@@ -929,6 +1001,11 @@ public final class DisplayManager {
             } catch {
                 lastError = error
                 log.error("Read Helligkeit Display \(id), Runde \(round): \(error.description, privacy: .public)")
+                if error.isStaleService {
+                    // Kein Retry an den toten Kanal; der neue Proxy bekommt eine eigene Prüfung.
+                    scheduleChannelRescan()
+                    break
+                }
                 guard let delay = probeDelay(after: error, round: round, isBuiltIn: monitor.isBuiltIn) else { break }
                 try? await Task.sleep(for: delay)
             }
@@ -990,6 +1067,10 @@ public final class DisplayManager {
     }
 
     private func writeFailed(_ key: ChannelKey, raw: UInt16, error: DDCError) {
+        // Sicherheitsnetz, falls die Meldung über den neuen Proxy fehlt oder früher kam.
+        if error.isStaleService, channels.values.contains(where: { $0.key == key }) {
+            scheduleChannelRescan()
+        }
         for (id, channel) in channels where channel.key == key {
             log.error("Write \(raw) an Display \(id) fehlgeschlagen: \(error.description, privacy: .public)")
             guard let index = index(of: id), monitors[index].state != .probing, monitors[index].state != .noChannel else { continue }
@@ -1173,7 +1254,7 @@ private struct DimCap {
     var fade: Task<Void, Never>?
 }
 
-/// Brücke vom C-Callback zurück in den MainActor.
+/// Brücke von den C-Callbacks zurück in den MainActor.
 @MainActor
 private enum ReconfigurationRelay {
     static weak var manager: DisplayManager?
@@ -1191,5 +1272,13 @@ private func displayReconfigured(
         }
         // Hotplug: kurz warten, bis der DDC-Kanal des neuen Monitors bereit ist.
         ReconfigurationRelay.manager?.scheduleRefresh(force: false, reconfigured: [display], after: .milliseconds(1500))
+    }
+}
+
+/// Ein neuer `DCPAVServiceProxy` (siehe `DisplayManager.rescanChannels`).
+private func avServicePublished(_ refcon: UnsafeMutableRawPointer?, _ iterator: io_iterator_t) {
+    DisplayDiscovery.drain(iterator)
+    Task { @MainActor in
+        ReconfigurationRelay.manager?.scheduleChannelRescan()
     }
 }

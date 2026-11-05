@@ -9,8 +9,13 @@ public enum IOReturnDescription {
         String(format: "0x%08X", UInt32(bitPattern: status))
     }
 
+    /// `MACH_SEND_INVALID_DEST`: Der Mach-Port des Dienstes ist tot. So antwortet ein
+    /// DDC-Kanal, dessen `DCPAVServiceProxy` macOS inzwischen neu angelegt hat.
+    public static let machSendInvalidDest = Int32(bitPattern: 0x1000_0003)
+
     public static func name(_ status: Int32) -> String {
         if status == 0 { return "kIOReturnSuccess" }
+        if status == machSendInvalidDest { return "MACH_SEND_INVALID_DEST" }
         let raw = UInt32(bitPattern: status)
         // sys_iokit | sub_iokit_common
         if raw & 0xFFFF_C000 == 0xE000_0000, let name = commonNames[raw & 0x3FFF] {
